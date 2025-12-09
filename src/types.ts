@@ -42,12 +42,22 @@ export interface Training {
   uhrzeit_bis: string
   spieler_ids: string[]
   tarif_id?: string
+  trainer_id?: string
   status: 'geplant' | 'durchgefuehrt' | 'abgesagt'
   notiz?: string
   serie_id?: string
   custom_preis_pro_stunde?: number
   custom_abrechnung?: 'proTraining' | 'proSpieler'
   bar_bezahlt: boolean
+  created_at: string
+}
+
+export interface Trainer {
+  id: string
+  user_id: string
+  name: string
+  stundensatz: number
+  notiz?: string
   created_at: string
 }
 
@@ -90,4 +100,4 @@ export interface PlanungData {
   tage: { [key: string]: { [zeit: string]: string[] } }
 }
 
-export type Tab = 'kalender' | 'training' | 'verwaltung' | 'abrechnung' | 'planung' | 'weiteres'
+export type Tab = 'kalender' | 'training' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'weiteres'

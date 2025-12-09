@@ -354,73 +354,73 @@ tr:hover {
 }
 
 .calendar-grid.day-view {
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 60px 1fr;
 }
 
 .calendar-grid.day-view .calendar-time-cell {
-  height: 80px;
-  font-size: 14px;
+  height: 50px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .calendar-grid.day-view .calendar-day-cell {
-  min-height: 80px;
+  min-height: 50px;
 }
 
 .calendar-grid.day-view .training-block {
-  padding: 10px 14px;
-  font-size: 14px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-radius: 4px;
   left: 4px;
   right: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .calendar-grid.day-view .training-block .training-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   white-space: normal;
 }
 
 .calendar-grid.day-view .training-block .training-time {
-  font-size: 13px;
+  font-size: 11px;
   opacity: 0.9;
 }
 
 .calendar-grid.day-view .training-block .training-tarif {
-  font-size: 12px;
+  font-size: 10px;
   opacity: 0.8;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .calendar-grid.day-view .calendar-header-cell {
-  padding: 16px;
-  font-size: 16px;
+  padding: 12px;
+  font-size: 14px;
 }
 
 .day-view-header {
   text-align: center;
-  padding: 10px;
+  padding: 8px;
   background: var(--primary-light);
   border-radius: var(--radius);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .day-view-header .day-name {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--primary);
   font-weight: 500;
 }
 
 .day-view-header .day-date {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--gray-800);
 }
 
 .day-view-header .day-month {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--gray-600);
 }
 

@@ -6,6 +6,7 @@ import type {
   Spieler,
   Tarif,
   Training,
+  Trainer,
   Payment,
   MonthlyAdjustment,
   Notiz,
@@ -158,6 +159,7 @@ function MainApp({ user }: { user: User }) {
   const [spieler, setSpieler] = useState<Spieler[]>([])
   const [tarife, setTarife] = useState<Tarif[]>([])
   const [trainings, setTrainings] = useState<Training[]>([])
+  const [trainer, setTrainer] = useState<Trainer[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
   const [notizen, setNotizen] = useState<Notiz[]>([])
@@ -177,6 +179,7 @@ function MainApp({ user }: { user: User }) {
         spielerRes,
         tarifeRes,
         trainingsRes,
+        trainerRes,
         paymentsRes,
         adjustmentsRes,
         notizenRes,
@@ -186,6 +189,7 @@ function MainApp({ user }: { user: User }) {
         supabase.from('spieler').select('*').eq('user_id', user.id).order('name'),
         supabase.from('tarife').select('*').eq('user_id', user.id).order('name'),
         supabase.from('trainings').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
+        supabase.from('trainer').select('*').eq('user_id', user.id).order('name'),
         supabase.from('payments').select('*').eq('user_id', user.id),
         supabase.from('monthly_adjustments').select('*').eq('user_id', user.id),
         supabase.from('notizen').select('*').eq('user_id', user.id).order('erstellt_am', { ascending: false }),
@@ -196,6 +200,7 @@ function MainApp({ user }: { user: User }) {
       if (spielerRes.data) setSpieler(spielerRes.data)
       if (tarifeRes.data) setTarife(tarifeRes.data)
       if (trainingsRes.data) setTrainings(trainingsRes.data)
+      if (trainerRes.data) setTrainer(trainerRes.data)
       if (paymentsRes.data) setPayments(paymentsRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
       if (notizenRes.data) setNotizen(notizenRes.data)
@@ -211,14 +216,24 @@ function MainApp({ user }: { user: User }) {
     await supabase.auth.signOut()
   }
 
-  const tabs = [
+  const baseTabs = [
     { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
     { id: 'training' as Tab, label: 'Training', icon: '🎾' },
     { id: 'verwaltung' as Tab, label: 'Verwaltung', icon: '👥' },
     { id: 'abrechnung' as Tab, label: 'Abrechnung', icon: '💰' },
-    { id: 'planung' as Tab, label: 'Planung', icon: '📋' },
-    { id: 'weiteres' as Tab, label: 'Weiteres', icon: '⚙️' }
   ]
+
+  // Dynamisch Abrechnung Trainer Tab hinzufügen wenn Trainer vorhanden
+  const tabs = trainer.length > 0
+    ? [...baseTabs,
+        { id: 'abrechnung-trainer' as Tab, label: 'Abr. Trainer', icon: '👨‍🏫' },
+        { id: 'planung' as Tab, label: 'Planung', icon: '📋' },
+        { id: 'weiteres' as Tab, label: 'Weiteres', icon: '⚙️' }
+      ]
+    : [...baseTabs,
+        { id: 'planung' as Tab, label: 'Planung', icon: '📋' },
+        { id: 'weiteres' as Tab, label: 'Weiteres', icon: '⚙️' }
+      ]
 
   return (
     <div className="app-container">
@@ -289,6 +304,7 @@ function MainApp({ user }: { user: User }) {
               <VerwaltungView
                 spieler={spieler}
                 tarife={tarife}
+                trainer={trainer}
                 onUpdate={loadAllData}
                 userId={user.id}
               />
@@ -301,6 +317,14 @@ function MainApp({ user }: { user: User }) {
                 payments={payments}
                 adjustments={adjustments}
                 profile={profile}
+                onUpdate={loadAllData}
+                userId={user.id}
+              />
+            )}
+            {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
+              <AbrechnungTrainerView
+                trainings={trainings}
+                trainer={trainer}
                 onUpdate={loadAllData}
                 userId={user.id}
               />
@@ -381,12 +405,12 @@ function KalenderView({
   const getTrainingPosition = (training: Training, isDayView: boolean) => {
     const [startH, startM] = training.uhrzeit_von.split(':').map(Number)
     const [endH, endM] = training.uhrzeit_bis.split(':').map(Number)
-    const cellHeight = isDayView ? 80 : 60
+    const cellHeight = isDayView ? 50 : 60
     const startMinutes = startH * 60 + startM - 7 * 60
     const endMinutes = endH * 60 + endM - 7 * 60
     const top = (startMinutes / 60) * cellHeight
     const height = ((endMinutes - startMinutes) / 60) * cellHeight
-    return { top, height: Math.max(height, isDayView ? 50 : 30) }
+    return { top, height: Math.max(height, isDayView ? 40 : 30) }
   }
 
   const navigateDay = (direction: number) => {
@@ -412,7 +436,8 @@ function KalenderView({
   }
 
   const isDayView = viewMode === 'day'
-  const cellHeight = isDayView ? 80 : 60
+  const cellHeight = isDayView ? 50 : 60
+  const [showAddTraining, setShowAddTraining] = useState(false)
 
   return (
     <div>
@@ -429,18 +454,23 @@ function KalenderView({
               {weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}
             </h3>
           )}
-          <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none' }}>
-            <button
-              className={`tab ${viewMode === 'week' ? 'active' : ''}`}
-              onClick={() => setViewMode('week')}
-            >
-              Woche
-            </button>
-            <button
-              className={`tab ${viewMode === 'day' ? 'active' : ''}`}
-              onClick={() => setViewMode('day')}
-            >
-              Tag
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none' }}>
+              <button
+                className={`tab ${viewMode === 'week' ? 'active' : ''}`}
+                onClick={() => setViewMode('week')}
+              >
+                Woche
+              </button>
+              <button
+                className={`tab ${viewMode === 'day' ? 'active' : ''}`}
+                onClick={() => setViewMode('day')}
+              >
+                Tag
+              </button>
+            </div>
+            <button className="btn btn-primary" onClick={() => setShowAddTraining(true)}>
+              + Training
             </button>
           </div>
         </div>
@@ -524,6 +554,21 @@ function KalenderView({
           onClose={() => setEditingTraining(null)}
           onSave={() => {
             setEditingTraining(null)
+            onUpdate()
+          }}
+        />
+      )}
+
+      {/* Add Training Modal */}
+      {showAddTraining && (
+        <TrainingModal
+          spieler={spieler}
+          tarife={tarife}
+          userId={userId}
+          initialDate={formatDate(currentDate)}
+          onClose={() => setShowAddTraining(false)}
+          onSave={() => {
+            setShowAddTraining(false)
             onUpdate()
           }}
         />
@@ -648,6 +693,7 @@ function TrainingModal({
   spieler,
   tarife,
   userId,
+  initialDate,
   onClose,
   onSave
 }: {
@@ -655,10 +701,11 @@ function TrainingModal({
   spieler: Spieler[]
   tarife: Tarif[]
   userId: string
+  initialDate?: string
   onClose: () => void
   onSave: () => void
 }) {
-  const [datum, setDatum] = useState(training?.datum || formatDate(new Date()))
+  const [datum, setDatum] = useState(training?.datum || initialDate || formatDate(new Date()))
   const [uhrzeitVon, setUhrzeitVon] = useState(training?.uhrzeit_von || '09:00')
   const [uhrzeitBis, setUhrzeitBis] = useState(training?.uhrzeit_bis || '10:00')
   const [selectedSpieler, setSelectedSpieler] = useState<string[]>(training?.spieler_ids || [])
@@ -917,19 +964,23 @@ function TrainingModal({
 function VerwaltungView({
   spieler,
   tarife,
+  trainer,
   onUpdate,
   userId
 }: {
   spieler: Spieler[]
   tarife: Tarif[]
+  trainer: Trainer[]
   onUpdate: () => void
   userId: string
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'spieler' | 'tarife'>('spieler')
+  const [activeSubTab, setActiveSubTab] = useState<'spieler' | 'tarife' | 'trainer'>('spieler')
   const [showSpielerModal, setShowSpielerModal] = useState(false)
   const [showTarifModal, setShowTarifModal] = useState(false)
+  const [showTrainerModal, setShowTrainerModal] = useState(false)
   const [editingSpieler, setEditingSpieler] = useState<Spieler | null>(null)
   const [editingTarif, setEditingTarif] = useState<Tarif | null>(null)
+  const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
   const filteredSpieler = useMemo(() => {
@@ -956,6 +1007,12 @@ function VerwaltungView({
           onClick={() => setActiveSubTab('tarife')}
         >
           Tarife ({tarife.length})
+        </button>
+        <button
+          className={`tab ${activeSubTab === 'trainer' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('trainer')}
+        >
+          Trainer ({trainer.length})
         </button>
       </div>
 
@@ -1107,6 +1164,23 @@ function VerwaltungView({
           onSave={() => {
             setShowTarifModal(false)
             setEditingTarif(null)
+            onUpdate()
+          }}
+        />
+      )}
+
+      {/* Trainer Modal */}
+      {showTrainerModal && (
+        <TrainerModal
+          trainerData={editingTrainer}
+          userId={userId}
+          onClose={() => {
+            setShowTrainerModal(false)
+            setEditingTrainer(null)
+          }}
+          onSave={() => {
+            setShowTrainerModal(false)
+            setEditingTrainer(null)
             onUpdate()
           }}
         />
@@ -1361,6 +1435,120 @@ function TarifModal({
         </div>
         <div className="modal-footer">
           {tarif && (
+            <button className="btn btn-danger" onClick={handleDelete}>
+              Löschen
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichere...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+// ============ TRAINER MODAL ============
+function TrainerModal({
+  trainerData,
+  userId,
+  onClose,
+  onSave
+}: {
+  trainerData: Trainer | null
+  userId: string
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [name, setName] = useState(trainerData?.name || '')
+  const [stundensatz, setStundensatz] = useState(trainerData?.stundensatz?.toString() || '25')
+  const [notiz, setNotiz] = useState(trainerData?.notiz || '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert('Name ist erforderlich')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const data = {
+        user_id: userId,
+        name: name.trim(),
+        stundensatz: parseFloat(stundensatz) || 25,
+        notiz: notiz || null
+      }
+
+      if (trainerData) {
+        await supabase.from('trainer').update(data).eq('id', trainerData.id)
+      } else {
+        await supabase.from('trainer').insert(data)
+      }
+      onSave()
+    } catch (err) {
+      console.error('Error saving trainer:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!trainerData) return
+    if (!confirm('Trainer wirklich löschen?')) return
+
+    await supabase.from('trainer').delete().eq('id', trainerData.id)
+    onSave()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{trainerData ? 'Trainer bearbeiten' : 'Neuer Trainer'}</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Name *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name des Trainers"
+            />
+          </div>
+          <div className="form-group">
+            <label>Stundensatz (€) *</label>
+            <input
+              type="number"
+              className="form-control"
+              value={stundensatz}
+              onChange={(e) => setStundensatz(e.target.value)}
+              placeholder="z.B. 25"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div className="form-group">
+            <label>Notiz</label>
+            <textarea
+              className="form-control"
+              value={notiz}
+              onChange={(e) => setNotiz(e.target.value)}
+              rows={2}
+              placeholder="Optionale Notiz..."
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          {trainerData && (
             <button className="btn btn-danger" onClick={handleDelete}>
               Löschen
             </button>
@@ -1646,6 +1834,7 @@ function InvoiceModal({
     spieler: Spieler
     trainings: Training[]
     summe: number
+    bezahlt: boolean
   }[]
   profile: TrainerProfile | null
   selectedMonth: string
@@ -1653,6 +1842,7 @@ function InvoiceModal({
 }) {
   const [step, setStep] = useState(1)
   const [selectedSpielerId, setSelectedSpielerId] = useState('')
+  const [rechnungsbetrag, setRechnungsbetrag] = useState('')
   const [stunden, setStunden] = useState('')
   const [preisProStunde, setPreisProStunde] = useState(profile?.stundensatz?.toString() || '25')
   const [iban, setIban] = useState(profile?.iban || '')
@@ -1679,13 +1869,16 @@ function InvoiceModal({
           return sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
         }, 0)
         setStunden(totalHours.toString())
+        // Offenen Umsatz als Rechnungsbetrag übernehmen
+        setRechnungsbetrag(summary.summe.toFixed(2))
         setRechnungsempfaengerName(sp.name)
         setRechnungsempfaengerAdresse(sp.rechnungs_adresse || '')
       }
     }
   }, [selectedSpielerId, spielerSummary, spieler])
 
-  const zwischensumme = parseFloat(stunden || '0') * parseFloat(preisProStunde || '0')
+  // Verwende Rechnungsbetrag wenn gesetzt, sonst Stunden x Preis
+  const zwischensumme = rechnungsbetrag ? parseFloat(rechnungsbetrag) : parseFloat(stunden || '0') * parseFloat(preisProStunde || '0')
   const mwst = kleinunternehmer ? 0 : zwischensumme * 0.19
   const gesamtbetrag = zwischensumme + mwst
 
@@ -1800,14 +1993,29 @@ function InvoiceModal({
                   onChange={(e) => setSelectedSpielerId(e.target.value)}
                 >
                   <option value="">-- Spieler auswählen --</option>
-                  {spieler.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                  {spielerSummary.filter(s => s.summe > 0).map((s) => (
+                    <option key={s.spieler.id} value={s.spieler.id}>
+                      {s.spieler.name} - {s.summe.toFixed(2)} € offen
+                    </option>
                   ))}
                 </select>
               </div>
+              {selectedSpielerId && (
+                <div className="form-group" style={{ background: 'var(--success-light)', padding: 12, borderRadius: 'var(--radius)' }}>
+                  <label style={{ color: 'var(--success)', marginBottom: 4 }}>Offener Betrag (übernommen)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={rechnungsbetrag}
+                    onChange={(e) => setRechnungsbetrag(e.target.value)}
+                    step="0.01"
+                    style={{ fontWeight: 600, fontSize: 18 }}
+                  />
+                </div>
+              )}
               <div className="form-row">
                 <div className="form-group">
-                  <label>Anzahl Stunden</label>
+                  <label>Anzahl Stunden (Info)</label>
                   <input
                     type="number"
                     className="form-control"
@@ -1992,6 +2200,125 @@ function InvoiceModal({
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+
+// ============ ABRECHNUNG TRAINER VIEW ============
+function AbrechnungTrainerView({
+  trainings,
+  trainer,
+}: {
+  trainings: Training[]
+  trainer: Trainer[]
+  onUpdate: () => void
+  userId: string
+}) {
+  const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
+
+  const trainerSummary = useMemo(() => {
+    const monthTrainings = trainings.filter((t) => {
+      const tMonth = t.datum.substring(0, 7)
+      return tMonth === selectedMonth && t.status === 'durchgefuehrt'
+    })
+
+    return trainer.map((tr) => {
+      // Filter trainings for this trainer
+      const trainerTrainings = monthTrainings.filter((t) => t.trainer_id === tr.id)
+      
+      // Calculate total hours
+      const totalStunden = trainerTrainings.reduce((sum, t) => {
+        return sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+      }, 0)
+
+      const summe = totalStunden * tr.stundensatz
+
+      return {
+        trainer: tr,
+        trainings: trainerTrainings,
+        stunden: totalStunden,
+        summe
+      }
+    })
+  }, [trainings, trainer, selectedMonth])
+
+  const totalStats = useMemo(() => {
+    const totalStunden = trainerSummary.reduce((sum, s) => sum + s.stunden, 0)
+    const totalSumme = trainerSummary.reduce((sum, s) => sum + s.summe, 0)
+    return { totalStunden, totalSumme }
+  }, [trainerSummary])
+
+  return (
+    <div>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Gesamtstunden</div>
+          <div className="stat-value">{totalStats.totalStunden.toFixed(1)} h</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Gesamtkosten</div>
+          <div className="stat-value">{totalStats.totalSumme.toFixed(2)} €</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h3>Trainer-Abrechnung</h3>
+          <input
+            type="month"
+            className="form-control"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            style={{ width: 'auto' }}
+          />
+        </div>
+
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Trainer</th>
+                <th>Stundensatz</th>
+                <th>Trainings</th>
+                <th>Stunden</th>
+                <th>Summe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trainerSummary.map((item) => (
+                <tr key={item.trainer.id}>
+                  <td>{item.trainer.name}</td>
+                  <td>{item.trainer.stundensatz} €/h</td>
+                  <td>{item.trainings.length}</td>
+                  <td>{item.stunden.toFixed(1)} h</td>
+                  <td><strong>{item.summe.toFixed(2)} €</strong></td>
+                </tr>
+              ))}
+              {trainerSummary.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="empty-state">
+                    Keine Trainer vorhanden
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
+                <td colSpan={3}>Gesamt</td>
+                <td>{totalStats.totalStunden.toFixed(1)} h</td>
+                <td>{totalStats.totalSumme.toFixed(2)} €</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
+          <strong>Hinweis:</strong> Um Trainings einem Trainer zuzuordnen, müssen Sie bei der Trainingserfassung den Trainer auswählen.
+        </p>
       </div>
     </div>
   )
