@@ -483,6 +483,36 @@ function KalenderView({
   const cellHeight = isDayView ? 50 : 60
   const [showAddTraining, setShowAddTraining] = useState(false)
 
+  // Swipe-Handling für Mobile
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+
+  const minSwipeDistance = 50
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe) {
+      // Swipe nach links = nächster Tag/Woche
+      isDayView ? navigateDay(1) : navigateWeek(1)
+    } else if (isRightSwipe) {
+      // Swipe nach rechts = vorheriger Tag/Woche
+      isDayView ? navigateDay(-1) : navigateWeek(-1)
+    }
+  }
+
   return (
     <div>
       <div className="card">
@@ -518,7 +548,12 @@ function KalenderView({
         </div>
 
 
-        <div className="calendar-scroll-container">
+        <div
+          className="calendar-scroll-container"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <div className="swipe-hint mobile-only"></div>
           <div className={`calendar-grid ${isDayView ? 'day-view' : ''}`}>
             {/* Header Row - only for week view */}
