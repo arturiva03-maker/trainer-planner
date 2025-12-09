@@ -3133,12 +3133,14 @@ function PlanungView({
       </div>
 
       <div className="card">
-        <div className="planung-grid">
-          {/* Header */}
-          <div className="planung-cell planung-header">Zeit</div>
-          {WOCHENTAGE.map((tag) => (
-            <div key={tag} className="planung-cell planung-header">{tag}</div>
-          ))}
+        <div className="swipe-hint mobile-only"></div>
+        <div className="planung-scroll-container">
+          <div className="planung-grid">
+            {/* Header */}
+            <div className="planung-cell planung-header">Zeit</div>
+            {WOCHENTAGE.map((tag) => (
+              <div key={tag} className="planung-cell planung-header">{tag}</div>
+            ))}
 
           {/* Rows */}
           {sheetData.zeitslots.map((zeit) => (
@@ -3181,6 +3183,7 @@ function PlanungView({
               })}
             </>
           ))}
+          </div>
         </div>
       </div>
     </div>
