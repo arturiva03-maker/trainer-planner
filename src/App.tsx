@@ -22,8 +22,7 @@ import {
   getMonthString,
   calculateDuration,
   generateRechnungsnummer,
-  WOCHENTAGE,
-  WOCHENTAGE_LANG
+  WOCHENTAGE
 } from './utils'
 
 // ============ AUTH COMPONENT ============
@@ -235,13 +234,22 @@ function MainApp({ user }: { user: User }) {
         { id: 'weiteres' as Tab, label: 'Weiteres', icon: '⚙️' }
       ]
 
+  // Haupt-Tabs für die mobile Bottom-Navigation (max 5 für bessere UX)
+  const mobileNavTabs = [
+    { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
+    { id: 'training' as Tab, label: 'Training', icon: '🎾' },
+    { id: 'verwaltung' as Tab, label: 'Verwalten', icon: '👥' },
+    { id: 'abrechnung' as Tab, label: 'Rechnung', icon: '💰' },
+    { id: 'weiteres' as Tab, label: 'Mehr', icon: '⚙️' }
+  ]
+
   return (
     <div className="app-container">
       {/* Mobile Header */}
       <div className="mobile-header">
         <button className="burger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
         <h2>Trainer Planner</h2>
-        <div style={{ width: 40 }} />
+        <div style={{ width: 44 }} />
       </div>
 
       {/* Sidebar Overlay (Mobile) */}
@@ -275,6 +283,22 @@ function MainApp({ user }: { user: User }) {
           </button>
         </div>
       </aside>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="mobile-bottom-nav">
+        <div className="mobile-bottom-nav-inner">
+          {mobileNavTabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`mobile-nav-item ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="nav-icon">{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* Main Content */}
       <main className="main-content">
@@ -445,102 +469,91 @@ function KalenderView({
         <div className="calendar-header">
           <div className="calendar-nav">
             <button className="btn btn-secondary" onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
-            <button className="btn btn-primary" onClick={goToToday}>Heute</button>
+            <h3>
+              {isDayView
+                ? currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+                : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
+              }
+            </h3>
             <button className="btn btn-secondary" onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
-          {!isDayView && (
-            <h3>
-              {weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })} -
-              {weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}
-            </h3>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none' }}>
-              <button
-                className={`tab ${viewMode === 'week' ? 'active' : ''}`}
-                onClick={() => setViewMode('week')}
-              >
-                Woche
-              </button>
-              <button
-                className={`tab ${viewMode === 'day' ? 'active' : ''}`}
-                onClick={() => setViewMode('day')}
-              >
-                Tag
-              </button>
-            </div>
-            <button className="btn btn-primary" onClick={() => setShowAddTraining(true)}>
-              + Training
+          <div className="view-toggle">
+            <button
+              className={`btn ${viewMode === 'week' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setViewMode('week')}
+            >
+              Woche
+            </button>
+            <button
+              className={`btn ${viewMode === 'day' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setViewMode('day')}
+            >
+              Tag
+            </button>
+            <button className="btn btn-primary" onClick={goToToday}>Heute</button>
+            <button className="btn btn-success" onClick={() => setShowAddTraining(true)}>
+              + Neu
             </button>
           </div>
         </div>
 
-        {/* Day View Header */}
-        {isDayView && (
-          <div className="day-view-header">
-            <div className="day-name">
-              {WOCHENTAGE_LANG[currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1]}
-            </div>
-            <div className="day-date">{currentDate.getDate()}</div>
-            <div className="day-month">
-              {currentDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
-            </div>
-          </div>
-        )}
 
-        <div className={`calendar-grid ${isDayView ? 'day-view' : ''}`}>
-          {/* Header Row - only for week view */}
-          {!isDayView && (
-            <>
-              <div className="calendar-header-cell"></div>
-              {weekDates.map((date, i) => (
-                <div key={i} className="calendar-header-cell">
-                  <div>{WOCHENTAGE[i]}</div>
-                  <div>{date.getDate()}.{date.getMonth() + 1}</div>
-                </div>
-              ))}
-            </>
-          )}
-
-          {/* Time Rows */}
-          {timeSlots.map((time) => (
-            <div key={`row-${time}`} style={{ display: 'contents' }}>
-              <div className="calendar-time-cell">{time}</div>
-              {(isDayView ? [currentDate] : weekDates).map((date, dayIndex) => {
-                const dayTrainings = getTrainingsForDay(date)
-                const slotTrainings = dayTrainings.filter((t) => {
-                  const [h] = t.uhrzeit_von.split(':').map(Number)
-                  return h === parseInt(time)
-                })
-
-                return (
-                  <div key={`cell-${dayIndex}-${time}`} className="calendar-day-cell">
-                    {slotTrainings.map((training) => {
-                      const pos = getTrainingPosition(training, isDayView)
-                      const tarifName = getTarifName(training.tarif_id)
-                      return (
-                        <div
-                          key={training.id}
-                          className={`training-block status-${training.status}`}
-                          style={{ top: pos.top % cellHeight, height: pos.height }}
-                          onClick={() => setEditingTraining(training)}
-                          onDoubleClick={() => handleDoubleClick(training)}
-                        >
-                          <div className="training-title">{getSpielerNames(training.spieler_ids)}</div>
-                          <div className="training-time">
-                            {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
-                          </div>
-                          {isDayView && tarifName && (
-                            <div className="training-tarif">{tarifName}</div>
-                          )}
-                        </div>
-                      )
-                    })}
+        <div className="calendar-scroll-container">
+          <div className="swipe-hint mobile-only"></div>
+          <div className={`calendar-grid ${isDayView ? 'day-view' : ''}`}>
+            {/* Header Row - only for week view */}
+            {!isDayView && (
+              <>
+                <div className="calendar-header-cell"></div>
+                {weekDates.map((date, i) => (
+                  <div key={i} className="calendar-header-cell">
+                    <div>{WOCHENTAGE[i]}</div>
+                    <div>{date.getDate()}.{date.getMonth() + 1}</div>
                   </div>
-                )
-              })}
-            </div>
-          ))}
+                ))}
+              </>
+            )}
+
+            {/* Time Rows */}
+            {timeSlots.map((time) => (
+              <div key={`row-${time}`} style={{ display: 'contents' }}>
+                <div className="calendar-time-cell">{time}</div>
+                {(isDayView ? [currentDate] : weekDates).map((date, dayIndex) => {
+                  const dayTrainings = getTrainingsForDay(date)
+                  const slotTrainings = dayTrainings.filter((t) => {
+                    const [h] = t.uhrzeit_von.split(':').map(Number)
+                    return h === parseInt(time)
+                  })
+
+                  return (
+                    <div key={`cell-${dayIndex}-${time}`} className="calendar-day-cell">
+                      {slotTrainings.map((training) => {
+                        const pos = getTrainingPosition(training, isDayView)
+                        const tarifName = getTarifName(training.tarif_id)
+                        return (
+                          <div
+                            key={training.id}
+                            className={`training-block status-${training.status}`}
+                            style={{ top: pos.top % cellHeight, height: pos.height }}
+                            onClick={() => setEditingTraining(training)}
+                            onDoubleClick={() => handleDoubleClick(training)}
+                          >
+                            <div className="training-title">{getSpielerNames(training.spieler_ids)}</div>
+                            <div className="training-time">
+                              {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
+                            </div>
+                            {isDayView && tarifName && (
+                              <div className="training-tarif">{tarifName}</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -636,7 +649,8 @@ function TrainingView({
           />
         </div>
 
-        <div className="table-container">
+        {/* Desktop Table */}
+        <div className="table-container desktop-table">
           <table>
             <thead>
               <tr>
@@ -668,6 +682,42 @@ function TrainingView({
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card List */}
+        <div className="mobile-card-list">
+          {filteredTrainings.map((training) => (
+            <div key={training.id} className="mobile-card">
+              <div className="mobile-card-header">
+                <div>
+                  <div className="mobile-card-title">{formatDateGerman(training.datum)}</div>
+                  <div className="mobile-card-subtitle">
+                    {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
+                  </div>
+                </div>
+                <span className={`status-badge ${training.status}`}>
+                  {training.status === 'geplant' ? 'Geplant' :
+                    training.status === 'durchgefuehrt' ? 'Durchgeführt' : 'Abgesagt'}
+                </span>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Spieler</span>
+                  <span className="mobile-card-value">{getSpielerNames(training.spieler_ids)}</span>
+                </div>
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Tarif</span>
+                  <span className="mobile-card-value">{getTarifName(training.tarif_id)}</span>
+                </div>
+              </div>
+              <div className="mobile-card-actions">
+                <button className="btn btn-sm btn-secondary">Bearbeiten</button>
+              </div>
+            </div>
+          ))}
+          {filteredTrainings.length === 0 && (
+            <div className="empty-state">Keine Trainings gefunden</div>
+          )}
         </div>
       </div>
 
@@ -715,8 +765,12 @@ function TrainingModal({
   const [barBezahlt, setBarBezahlt] = useState(training?.bar_bezahlt || false)
   const [customPreis, setCustomPreis] = useState(training?.custom_preis_pro_stunde?.toString() || '')
   const [wiederholen, setWiederholen] = useState(false)
-  const [wiederholenBis, setWiederholenBis] = useState('')
+  const [wiederholenBis, setWiederholenBis] = useState('2026-03-29')
+  const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
+
+  // Prüfen ob Training Teil einer Serie ist
+  const istSerie = training?.serie_id != null
 
   const toggleSpieler = (id: string) => {
     setSelectedSpieler((prev) =>
@@ -746,7 +800,34 @@ function TrainingModal({
       }
 
       if (training) {
-        await supabase.from('trainings').update(trainingData).eq('id', training.id)
+        if (serienAktion === 'nachfolgende' && training.serie_id) {
+          // Alle nachfolgenden Trainings der Serie aktualisieren (gleicher Wochentag, >= Datum)
+          const { data: serienTrainings } = await supabase
+            .from('trainings')
+            .select('id, datum')
+            .eq('serie_id', training.serie_id)
+            .gte('datum', training.datum)
+
+          if (serienTrainings && serienTrainings.length > 0) {
+            // Berechne den Tages-Offset vom Original
+            const originalDate = new Date(training.datum)
+            const neuesDate = new Date(datum)
+            const tageOffset = Math.round((neuesDate.getTime() - originalDate.getTime()) / (1000 * 60 * 60 * 24))
+
+            for (const t of serienTrainings) {
+              const trainingsDate = new Date(t.datum)
+              trainingsDate.setDate(trainingsDate.getDate() + tageOffset)
+
+              await supabase.from('trainings').update({
+                ...trainingData,
+                datum: formatDate(trainingsDate)
+              }).eq('id', t.id)
+            }
+          }
+        } else {
+          // Nur dieses eine Training aktualisieren
+          await supabase.from('trainings').update(trainingData).eq('id', training.id)
+        }
       } else if (wiederholen && wiederholenBis) {
         // Create series of trainings
         const serieId = crypto.randomUUID()
@@ -779,9 +860,18 @@ function TrainingModal({
 
   const handleDelete = async () => {
     if (!training) return
-    if (!confirm('Training wirklich löschen?')) return
 
-    await supabase.from('trainings').delete().eq('id', training.id)
+    if (serienAktion === 'nachfolgende' && training.serie_id) {
+      if (!confirm('Dieses und alle nachfolgenden Trainings der Serie wirklich löschen?')) return
+      await supabase
+        .from('trainings')
+        .delete()
+        .eq('serie_id', training.serie_id)
+        .gte('datum', training.datum)
+    } else {
+      if (!confirm('Training wirklich löschen?')) return
+      await supabase.from('trainings').delete().eq('id', training.id)
+    }
     onSave()
   }
 
@@ -914,6 +1004,35 @@ function TrainingModal({
             </label>
           </div>
 
+          {/* Serienoptionen beim Bearbeiten */}
+          {training && istSerie && (
+            <div className="form-group" style={{ background: 'var(--primary-light)', padding: 12, borderRadius: 'var(--radius)' }}>
+              <label style={{ fontWeight: 500, marginBottom: 8, display: 'block', color: 'var(--primary)' }}>
+                Dieses Training ist Teil einer Serie
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label className="checkbox-group">
+                  <input
+                    type="radio"
+                    name="serienAktion"
+                    checked={serienAktion === 'einzeln'}
+                    onChange={() => setSerienAktion('einzeln')}
+                  />
+                  Nur dieses Training bearbeiten
+                </label>
+                <label className="checkbox-group">
+                  <input
+                    type="radio"
+                    name="serienAktion"
+                    checked={serienAktion === 'nachfolgende'}
+                    onChange={() => setSerienAktion('nachfolgende')}
+                  />
+                  Dieses und alle nachfolgenden Trainings bearbeiten
+                </label>
+              </div>
+            </div>
+          )}
+
           {!training && (
             <>
               <div className="form-group">
@@ -1034,7 +1153,8 @@ function VerwaltungView({
             />
           </div>
 
-          <div className="table-container">
+          {/* Desktop Table */}
+          <div className="table-container desktop-table">
             <table>
               <thead>
                 <tr>
@@ -1073,6 +1193,41 @@ function VerwaltungView({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card List */}
+          <div className="mobile-card-list">
+            {filteredSpieler.map((s) => (
+              <div key={s.id} className="mobile-card">
+                <div className="mobile-card-header">
+                  <div className="mobile-card-title">{s.name}</div>
+                </div>
+                <div className="mobile-card-body">
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">E-Mail</span>
+                    <span className="mobile-card-value">{s.kontakt_email || '-'}</span>
+                  </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Telefon</span>
+                    <span className="mobile-card-value">{s.kontakt_telefon || '-'}</span>
+                  </div>
+                </div>
+                <div className="mobile-card-actions">
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      setEditingSpieler(s)
+                      setShowSpielerModal(true)
+                    }}
+                  >
+                    Bearbeiten
+                  </button>
+                </div>
+              </div>
+            ))}
+            {filteredSpieler.length === 0 && (
+              <div className="empty-state">Keine Spieler gefunden</div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1085,7 +1240,8 @@ function VerwaltungView({
             </button>
           </div>
 
-          <div className="table-container">
+          {/* Desktop Table */}
+          <div className="table-container desktop-table">
             <table>
               <thead>
                 <tr>
@@ -1131,6 +1287,50 @@ function VerwaltungView({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card List */}
+          <div className="mobile-card-list">
+            {tarife.map((t) => (
+              <div key={t.id} className="mobile-card">
+                <div className="mobile-card-header">
+                  <div className="mobile-card-title">{t.name}</div>
+                  <div className="mobile-card-subtitle">{t.preis_pro_stunde} €/h</div>
+                </div>
+                <div className="mobile-card-body">
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Abrechnung</span>
+                    <span className="mobile-card-value">
+                      {t.abrechnung === 'proTraining'
+                        ? 'Pro Training'
+                        : t.abrechnung === 'proSpieler'
+                          ? 'Pro Spieler'
+                          : 'Monatlich'}
+                    </span>
+                  </div>
+                  {t.beschreibung && (
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">Beschreibung</span>
+                      <span className="mobile-card-value">{t.beschreibung}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mobile-card-actions">
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      setEditingTarif(t)
+                      setShowTarifModal(true)
+                    }}
+                  >
+                    Bearbeiten
+                  </button>
+                </div>
+              </div>
+            ))}
+            {tarife.length === 0 && (
+              <div className="empty-state">Keine Tarife angelegt</div>
+            )}
           </div>
         </div>
       )}
@@ -1340,7 +1540,15 @@ function TarifModal({
   const [preis, setPreis] = useState(tarif?.preis_pro_stunde?.toString() || '')
   const [abrechnung, setAbrechnung] = useState<Tarif['abrechnung']>(tarif?.abrechnung || 'proTraining')
   const [beschreibung, setBeschreibung] = useState(tarif?.beschreibung || '')
+  const [inklUst, setInklUst] = useState(tarif?.inkl_ust ?? true)
+  const [ustSatz, setUstSatz] = useState(tarif?.ust_satz?.toString() || '19')
   const [saving, setSaving] = useState(false)
+
+  // Berechne Netto/Brutto zur Anzeige
+  const bruttoPreis = parseFloat(preis) || 0
+  const ustSatzNum = parseFloat(ustSatz) || 19
+  const nettoPreis = inklUst ? bruttoPreis / (1 + ustSatzNum / 100) : bruttoPreis
+  const ustBetrag = inklUst ? bruttoPreis - nettoPreis : bruttoPreis * (ustSatzNum / 100)
 
   const handleSave = async () => {
     if (!name.trim() || !preis) {
@@ -1355,7 +1563,9 @@ function TarifModal({
         name: name.trim(),
         preis_pro_stunde: parseFloat(preis),
         abrechnung,
-        beschreibung: beschreibung || null
+        beschreibung: beschreibung || null,
+        inkl_ust: inklUst,
+        ust_satz: parseFloat(ustSatz) || 19
       }
 
       if (tarif) {
@@ -1399,7 +1609,7 @@ function TarifModal({
             />
           </div>
           <div className="form-group">
-            <label>Preis pro Stunde (€) *</label>
+            <label>Preis pro Stunde (€) * {inklUst ? '(inkl. USt)' : '(netto)'}</label>
             <input
               type="number"
               className="form-control"
@@ -1410,6 +1620,46 @@ function TarifModal({
               step="0.01"
             />
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="checkbox-group">
+                <input
+                  type="checkbox"
+                  checked={inklUst}
+                  onChange={(e) => setInklUst(e.target.checked)}
+                />
+                Preis inkl. USt
+              </label>
+            </div>
+            <div className="form-group">
+              <label>USt-Satz (%)</label>
+              <select
+                className="form-control"
+                value={ustSatz}
+                onChange={(e) => setUstSatz(e.target.value)}
+              >
+                <option value="19">19%</option>
+                <option value="7">7%</option>
+                <option value="0">0% (steuerfrei)</option>
+              </select>
+            </div>
+          </div>
+          {preis && parseFloat(ustSatz) > 0 && (
+            <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Netto:</span>
+                <span>{nettoPreis.toFixed(2)} €</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>USt ({ustSatz}%):</span>
+                <span>{ustBetrag.toFixed(2)} €</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                <span>Brutto:</span>
+                <span>{(inklUst ? bruttoPreis : bruttoPreis + ustBetrag).toFixed(2)} €</span>
+              </div>
+            </div>
+          )}
           <div className="form-group">
             <label>Abrechnungsart</label>
             <select
@@ -1603,6 +1853,7 @@ function AbrechnungView({
         trainings: Training[]
         summe: number
         barSumme: number
+        offeneSumme: number
         bezahlt: boolean
         adjustment: number
       }
@@ -1623,6 +1874,7 @@ function AbrechnungView({
             trainings: [],
             summe: 0,
             barSumme: 0,
+            offeneSumme: 0,
             bezahlt: false,
             adjustment: 0
           }
@@ -1639,6 +1891,9 @@ function AbrechnungView({
         summary[spielerId].summe += spielerPreis
         if (t.bar_bezahlt) {
           summary[spielerId].barSumme += spielerPreis
+        } else {
+          // Nur nicht-bar-bezahlte Trainings sind offen
+          summary[spielerId].offeneSumme += spielerPreis
         }
       })
     })
@@ -1652,9 +1907,12 @@ function AbrechnungView({
         (a) => a.spieler_id === spielerId && a.monat === selectedMonth
       )
 
-      summary[spielerId].bezahlt = payment?.bezahlt || false
       summary[spielerId].adjustment = adjustment?.betrag || 0
       summary[spielerId].summe += summary[spielerId].adjustment
+      summary[spielerId].offeneSumme += summary[spielerId].adjustment
+
+      // Bezahlt wenn: manuell als bezahlt markiert ODER keine offenen Beträge mehr
+      summary[spielerId].bezahlt = payment?.bezahlt || summary[spielerId].offeneSumme <= 0
     })
 
     return Object.values(summary)
@@ -1676,7 +1934,11 @@ function AbrechnungView({
   const stats = useMemo(() => {
     const total = spielerSummary.reduce((sum, s) => sum + s.summe, 0)
     const bar = spielerSummary.reduce((sum, s) => sum + s.barSumme, 0)
-    const bezahlt = spielerSummary.filter((s) => s.bezahlt).reduce((sum, s) => sum + s.summe, 0)
+    // Bezahlt = bar bezahlte Summe + manuell als bezahlt markierte offene Beträge
+    const manuellBezahlt = spielerSummary
+      .filter((s) => s.bezahlt && s.offeneSumme > 0)
+      .reduce((sum, s) => sum + s.offeneSumme, 0)
+    const bezahlt = bar + manuellBezahlt
     const offen = total - bezahlt
     return { total, bar, bezahlt, offen }
   }, [spielerSummary])
@@ -1729,32 +1991,35 @@ function AbrechnungView({
 
       <div className="card">
         <div className="card-header">
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <input
-              type="month"
-              className="form-control"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              style={{ width: 'auto' }}
-            />
-            <select
-              className="form-control"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as typeof filter)}
-              style={{ width: 'auto' }}
-            >
-              <option value="alle">Alle</option>
-              <option value="bezahlt">Nur bezahlt</option>
-              <option value="offen">Nur offen</option>
-              <option value="bar">Nur bar</option>
-            </select>
+          <div className="card-header-actions">
+            <div className="filter-pills">
+              <input
+                type="month"
+                className="form-control"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                style={{ width: 'auto', minWidth: 140 }}
+              />
+              <select
+                className="form-control"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as typeof filter)}
+                style={{ width: 'auto' }}
+              >
+                <option value="alle">Alle</option>
+                <option value="bezahlt">Nur bezahlt</option>
+                <option value="offen">Nur offen</option>
+                <option value="bar">Nur bar</option>
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={() => setShowInvoiceModal(true)}>
+              Rechnung erstellen
+            </button>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowInvoiceModal(true)}>
-            Rechnung erstellen
-          </button>
         </div>
 
-        <div className="table-container">
+        {/* Desktop Table */}
+        <div className="table-container desktop-table">
           <table>
             <thead>
               <tr>
@@ -1803,6 +2068,50 @@ function AbrechnungView({
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Card List */}
+        <div className="mobile-card-list">
+          {filteredSummary.map((item) => (
+            <div key={item.spieler.id} className="mobile-card">
+              <div className="mobile-card-header">
+                <div>
+                  <div className="mobile-card-title">{item.spieler.name}</div>
+                  <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
+                </div>
+                <span className={`status-badge ${item.bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
+                  {item.bezahlt ? 'Bezahlt' : 'Offen'}
+                </span>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Summe</span>
+                  <span className="mobile-card-value" style={{ fontWeight: 600 }}>
+                    {item.summe.toFixed(2)} €
+                  </span>
+                </div>
+                {item.barSumme > 0 && (
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">davon bar</span>
+                    <span className="mobile-card-value" style={{ color: 'var(--warning)' }}>
+                      {item.barSumme.toFixed(2)} €
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="mobile-card-actions">
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => toggleBezahlt(item.spieler.id, item.bezahlt)}
+                >
+                  {item.bezahlt ? 'Als offen' : 'Als bezahlt'}
+                </button>
+              </div>
+            </div>
+          ))}
+          {filteredSummary.length === 0 && (
+            <div className="empty-state">Keine Abrechnungen für diesen Monat</div>
+          )}
+        </div>
       </div>
 
       {/* Invoice Modal */}
@@ -1810,6 +2119,7 @@ function AbrechnungView({
         <InvoiceModal
           spieler={spieler}
           spielerSummary={spielerSummary}
+          tarife={tarife}
           profile={profile}
           selectedMonth={selectedMonth}
           onClose={() => {
@@ -1825,6 +2135,7 @@ function AbrechnungView({
 function InvoiceModal({
   spieler,
   spielerSummary,
+  tarife,
   profile,
   selectedMonth,
   onClose
@@ -1834,15 +2145,17 @@ function InvoiceModal({
     spieler: Spieler
     trainings: Training[]
     summe: number
+    offeneSumme: number
+    barSumme: number
     bezahlt: boolean
   }[]
+  tarife: Tarif[]
   profile: TrainerProfile | null
   selectedMonth: string
   onClose: () => void
 }) {
   const [step, setStep] = useState(1)
   const [selectedSpielerId, setSelectedSpielerId] = useState('')
-  const [rechnungsbetrag, setRechnungsbetrag] = useState('')
   const [iban, setIban] = useState(profile?.iban || '')
   const [adresse, setAdresse] = useState(profile?.adresse || '')
   const [ustIdNr, setUstIdNr] = useState(profile?.ust_id_nr || '')
@@ -1856,26 +2169,127 @@ function InvoiceModal({
   const [rechnungsempfaengerAdresse, setRechnungsempfaengerAdresse] = useState('')
   const [rechnungsnummer, setRechnungsnummer] = useState(generateRechnungsnummer())
   const [rechnungsdatum, setRechnungsdatum] = useState(formatDate(new Date()))
-  const [position, setPosition] = useState('Trainerstunden')
+
+  // Manuelle Korrektur (z.B. Regenausfall)
+  const [korrekturBetrag, setKorrekturBetrag] = useState('')
+  const [korrekturGrund, setKorrekturGrund] = useState('')
+
+  // Trainingsaufstellung für den ausgewählten Spieler
+  const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
+
+  // Berechne die Positionen mit USt-Details (ohne bar bezahlte Trainings)
+  const rechnungsPositionen = useMemo(() => {
+    if (!selectedSummary) return []
+
+    // Bar bezahlte Trainings sind bereits bezahlt und erscheinen nicht in der Rechnung
+    return selectedSummary.trainings.filter(t => !t.bar_bezahlt).map((t) => {
+      const tarif = tarife.find((ta) => ta.id === t.tarif_id)
+      const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+      const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+      const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+      let einzelPreis = preis * duration
+      if (abrechnungsart === 'proSpieler') {
+        einzelPreis = einzelPreis / t.spieler_ids.length
+      }
+
+      // USt-Berechnung basierend auf Tarif
+      const inklUst = tarif?.inkl_ust ?? true
+      const ustSatz = tarif?.ust_satz ?? 19
+
+      let netto: number
+      let ust: number
+      let brutto: number
+
+      if (kleinunternehmer || ustSatz === 0) {
+        netto = einzelPreis
+        ust = 0
+        brutto = einzelPreis
+      } else if (inklUst) {
+        // Preis ist bereits inkl. USt
+        brutto = einzelPreis
+        netto = brutto / (1 + ustSatz / 100)
+        ust = brutto - netto
+      } else {
+        // Preis ist netto
+        netto = einzelPreis
+        ust = netto * (ustSatz / 100)
+        brutto = netto + ust
+      }
+
+      return {
+        datum: t.datum,
+        zeit: `${t.uhrzeit_von} - ${t.uhrzeit_bis}`,
+        dauer: duration,
+        tarifName: tarif?.name || 'Unbekannt',
+        ustSatz,
+        netto,
+        ust,
+        brutto
+      }
+    }).sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [selectedSummary, tarife, kleinunternehmer])
+
+  // Berechne Gesamtsummen inkl. Korrektur
+  const summen = useMemo(() => {
+    const netto = rechnungsPositionen.reduce((sum, p) => sum + p.netto, 0)
+    const ust = rechnungsPositionen.reduce((sum, p) => sum + p.ust, 0)
+    const brutto = rechnungsPositionen.reduce((sum, p) => sum + p.brutto, 0)
+
+    // Korrektur (Brutto-Betrag, z.B. -10 für Gutschrift wegen Regenausfall)
+    const korrektur = parseFloat(korrekturBetrag) || 0
+    // USt aus Korrektur berechnen (wenn nicht Kleinunternehmer)
+    const korrekturUst = kleinunternehmer ? 0 : korrektur - (korrektur / 1.19)
+    const korrekturNetto = korrektur - korrekturUst
+
+    return {
+      netto,
+      ust,
+      brutto,
+      korrekturNetto,
+      korrekturUst,
+      korrektur,
+      gesamtNetto: netto + korrekturNetto,
+      gesamtUst: ust + korrekturUst,
+      gesamtBrutto: brutto + korrektur
+    }
+  }, [rechnungsPositionen, korrekturBetrag, kleinunternehmer])
 
   useEffect(() => {
     if (selectedSpielerId) {
-      const summary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
       const sp = spieler.find((s) => s.id === selectedSpielerId)
-      if (summary && sp) {
-        // Offenen Umsatz als Rechnungsbetrag übernehmen
-        setRechnungsbetrag(summary.summe.toFixed(2))
+      if (sp) {
         setRechnungsempfaengerName(sp.name)
         setRechnungsempfaengerAdresse(sp.rechnungs_adresse || '')
       }
     }
-  }, [selectedSpielerId, spielerSummary, spieler])
-
-  const zwischensumme = parseFloat(rechnungsbetrag) || 0
-  const mwst = kleinunternehmer ? 0 : zwischensumme * 0.19
-  const gesamtbetrag = zwischensumme + mwst
+  }, [selectedSpielerId, spieler])
 
   const generatePDF = () => {
+    // Erstelle Tabellenzeilen für jede Position
+    const positionenHtml = rechnungsPositionen.map((p) => `
+      <tr>
+        <td>${formatDateGerman(p.datum)}</td>
+        <td>${p.zeit}</td>
+        <td>${p.dauer.toFixed(1)} Std.</td>
+        <td>${p.tarifName}</td>
+        <td style="text-align: right">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="text-align: right">${p.brutto.toFixed(2)} €</td>
+      </tr>
+    `).join('')
+
+    // Korrekturzeile falls vorhanden
+    const korrekturHtml = summen.korrektur !== 0 ? `
+      <tr style="background: ${summen.korrektur < 0 ? '#fee2e2' : '#dcfce7'}">
+        <td colspan="3"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td><em>Korrektur</em></td>
+        <td style="text-align: right">${summen.korrekturNetto >= 0 ? '' : ''}${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="text-align: right">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="text-align: right">${summen.korrektur >= 0 ? '' : ''}${summen.korrektur.toFixed(2)} €</td>
+      </tr>
+    ` : ''
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -1883,15 +2297,18 @@ function InvoiceModal({
         <meta charset="utf-8">
         <title>Rechnung ${rechnungsnummer}</title>
         <style>
-          body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; }
-          h1 { text-align: center; margin-bottom: 40px; }
+          body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+          h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
           .section { margin-bottom: 20px; }
           .flex { display: flex; justify-content: space-between; }
           table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-          th { background: #f5f5f5; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background: #f5f5f5; font-size: 11px; }
           .total { text-align: right; margin-top: 20px; }
+          .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+          .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
           .footer { margin-top: 40px; }
+          @media print { body { padding: 20px; } }
         </style>
       </head>
       <body>
@@ -1904,7 +2321,7 @@ function InvoiceModal({
             ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
             ${ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''}
           </div>
-          <div class="section">
+          <div class="section" style="text-align: right;">
             <strong>Rechnungsempfänger:</strong><br>
             ${rechnungsempfaengerName}<br>
             ${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}
@@ -1923,22 +2340,36 @@ function InvoiceModal({
         <table>
           <thead>
             <tr>
-              <th>Position</th>
-              <th>Betrag</th>
+              <th>Datum</th>
+              <th>Zeit</th>
+              <th>Dauer</th>
+              <th>Tarif</th>
+              <th style="text-align: right">Netto</th>
+              ${!kleinunternehmer ? '<th style="text-align: right">USt</th>' : ''}
+              <th style="text-align: right">Brutto</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>${position}</td>
-              <td>${zwischensumme.toFixed(2)} €</td>
-            </tr>
+            ${positionenHtml}
+            ${korrekturHtml}
           </tbody>
         </table>
 
         <div class="total">
-          <strong>Nettobetrag:</strong> ${zwischensumme.toFixed(2)} €<br>
-          ${!kleinunternehmer ? `<strong>MwSt. 19%:</strong> ${mwst.toFixed(2)} €<br>` : ''}
-          <strong>Gesamtbetrag:</strong> ${gesamtbetrag.toFixed(2)} €
+          <div class="total-row">
+            <span>Nettobetrag:</span>
+            <span>${summen.gesamtNetto.toFixed(2)} €</span>
+          </div>
+          ${!kleinunternehmer ? `
+          <div class="total-row">
+            <span>USt (19%):</span>
+            <span>${summen.gesamtUst.toFixed(2)} €</span>
+          </div>
+          ` : ''}
+          <div class="total-row highlight">
+            <span>Gesamtbetrag:</span>
+            <span>${summen.gesamtBrutto.toFixed(2)} €</span>
+          </div>
         </div>
 
         ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
@@ -1966,7 +2397,7 @@ function InvoiceModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 600 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Rechnung erstellen - Schritt {step}/2</h3>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -1982,26 +2413,111 @@ function InvoiceModal({
                   onChange={(e) => setSelectedSpielerId(e.target.value)}
                 >
                   <option value="">-- Spieler auswählen --</option>
-                  {spielerSummary.filter(s => s.summe > 0).map((s) => (
-                    <option key={s.spieler.id} value={s.spieler.id}>
-                      {s.spieler.name} - {s.summe.toFixed(2)} € offen
-                    </option>
-                  ))}
+                  {spielerSummary.filter(s => s.offeneSumme > 0).map((s) => {
+                    const offeneTrainings = s.trainings.filter(t => !t.bar_bezahlt).length
+                    return (
+                      <option key={s.spieler.id} value={s.spieler.id}>
+                        {s.spieler.name} - {s.offeneSumme.toFixed(2)} € offen ({offeneTrainings} Trainings)
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
-              {selectedSpielerId && (
-                <div className="form-group" style={{ background: 'var(--success-light)', padding: 12, borderRadius: 'var(--radius)' }}>
-                  <label style={{ color: 'var(--success)', marginBottom: 4 }}>Rechnungsbetrag (offener Betrag übernommen)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={rechnungsbetrag}
-                    onChange={(e) => setRechnungsbetrag(e.target.value)}
-                    step="0.01"
-                    style={{ fontWeight: 600, fontSize: 18 }}
-                  />
+
+              {selectedSpielerId && rechnungsPositionen.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontWeight: 500, marginBottom: 8, display: 'block' }}>
+                    Trainings-Aufstellung ({rechnungsPositionen.length} Einheiten)
+                  </label>
+                  <div className="table-container" style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)' }}>
+                    <table style={{ fontSize: 12 }}>
+                      <thead>
+                        <tr>
+                          <th>Datum</th>
+                          <th>Zeit</th>
+                          <th>Tarif</th>
+                          <th style={{ textAlign: 'right' }}>Brutto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rechnungsPositionen.map((p, i) => (
+                          <tr key={i}>
+                            <td>{formatDateGerman(p.datum)}</td>
+                            <td>{p.zeit}</td>
+                            <td>{p.tarifName}</td>
+                            <td style={{ textAlign: 'right' }}>{p.brutto.toFixed(2)} €</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ background: 'var(--success-light)', padding: 12, borderRadius: 'var(--radius)', marginTop: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span>Zwischensumme Netto:</span>
+                      <span>{summen.netto.toFixed(2)} €</span>
+                    </div>
+                    {!kleinunternehmer && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                        <span>Zwischensumme USt:</span>
+                        <span>{summen.ust.toFixed(2)} €</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 500, fontSize: 14 }}>
+                      <span>Zwischensumme Brutto:</span>
+                      <span>{summen.brutto.toFixed(2)} €</span>
+                    </div>
+                    {summen.korrektur !== 0 && (
+                      <>
+                        <div style={{ borderTop: '1px dashed var(--gray-400)', margin: '8px 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: summen.korrektur < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                          <span>Korrektur ({korrekturGrund || 'manuell'}):</span>
+                          <span>{summen.korrektur >= 0 ? '+' : ''}{summen.korrektur.toFixed(2)} €</span>
+                        </div>
+                      </>
+                    )}
+                    <div style={{ borderTop: '1px solid var(--gray-400)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 16 }}>
+                      <span>Gesamtbetrag (brutto):</span>
+                      <span>{summen.gesamtBrutto.toFixed(2)} €</span>
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Manuelle Korrektur */}
+              {selectedSpielerId && (
+                <div style={{ background: 'var(--warning-light)', padding: 12, borderRadius: 'var(--radius)', marginBottom: 16 }}>
+                  <label style={{ fontWeight: 500, marginBottom: 8, display: 'block', color: 'var(--warning)' }}>
+                    Manuelle Korrektur (optional)
+                  </label>
+                  <p style={{ fontSize: 12, color: 'var(--gray-600)', marginBottom: 8 }}>
+                    Für Gutschriften (z.B. Regenausfall) einen negativen Betrag eingeben, für Zuschläge einen positiven.
+                  </p>
+                  <div className="form-row">
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>Betrag (brutto, €)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={korrekturBetrag}
+                        onChange={(e) => setKorrekturBetrag(e.target.value)}
+                        placeholder="z.B. -15.00"
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>Grund</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={korrekturGrund}
+                        onChange={(e) => setKorrekturGrund(e.target.value)}
+                        placeholder="z.B. Regenausfall 05.12."
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="form-group">
                 <label>IBAN</label>
                 <input
@@ -2039,7 +2555,7 @@ function InvoiceModal({
                     checked={kleinunternehmer}
                     onChange={(e) => setKleinunternehmer(e.target.checked)}
                   />
-                  Kleinunternehmer (§19 UStG)
+                  Kleinunternehmer (§19 UStG) - keine USt ausweisen
                 </label>
               </div>
             </>
@@ -2105,30 +2621,42 @@ function InvoiceModal({
                   rows={2}
                 />
               </div>
-              <div className="form-group">
-                <label>Position</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                />
-              </div>
 
               <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Nettobetrag:</span>
-                  <strong>{zwischensumme.toFixed(2)} €</strong>
+                <div style={{ marginBottom: 8, fontWeight: 500 }}>Rechnungsvorschau:</div>
+                <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                  {rechnungsPositionen.length} Positionen im Zeitraum {selectedMonth}
+                  {summen.korrektur !== 0 && ` + 1 Korrektur`}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                  <span>Zwischensumme Netto:</span>
+                  <span>{summen.netto.toFixed(2)} €</span>
                 </div>
                 {!kleinunternehmer && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>MwSt. 19%:</span>
-                    <strong>{mwst.toFixed(2)} €</strong>
+                    <span>Zwischensumme USt:</span>
+                    <span>{summen.ust.toFixed(2)} €</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, marginTop: 8 }}>
+                {summen.korrektur !== 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: summen.korrektur < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                    <span>Korrektur ({korrekturGrund || 'manuell'}):</span>
+                    <span>{summen.korrektur >= 0 ? '+' : ''}{summen.korrektur.toFixed(2)} €</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                  <span>Nettobetrag gesamt:</span>
+                  <strong>{summen.gesamtNetto.toFixed(2)} €</strong>
+                </div>
+                {!kleinunternehmer && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>USt gesamt:</span>
+                    <strong>{summen.gesamtUst.toFixed(2)} €</strong>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, marginTop: 8, borderTop: '1px solid var(--gray-300)', paddingTop: 8 }}>
                   <span>Gesamtbetrag:</span>
-                  <strong>{gesamtbetrag.toFixed(2)} €</strong>
+                  <strong>{summen.gesamtBrutto.toFixed(2)} €</strong>
                 </div>
               </div>
             </>
@@ -2232,7 +2760,8 @@ function AbrechnungTrainerView({
           />
         </div>
 
-        <div className="table-container">
+        {/* Desktop Table */}
+        <div className="table-container desktop-table">
           <table>
             <thead>
               <tr>
@@ -2269,6 +2798,59 @@ function AbrechnungTrainerView({
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        {/* Mobile Card List */}
+        <div className="mobile-card-list">
+          {trainerSummary.map((item) => (
+            <div key={item.trainer.id} className="mobile-card">
+              <div className="mobile-card-header">
+                <div className="mobile-card-title">{item.trainer.name}</div>
+                <div className="mobile-card-subtitle">{item.trainer.stundensatz} €/h</div>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Trainings</span>
+                  <span className="mobile-card-value">{item.trainings.length}</span>
+                </div>
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Stunden</span>
+                  <span className="mobile-card-value">{item.stunden.toFixed(1)} h</span>
+                </div>
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Summe</span>
+                  <span className="mobile-card-value" style={{ fontWeight: 600 }}>
+                    {item.summe.toFixed(2)} €
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {trainerSummary.length === 0 && (
+            <div className="empty-state">Keine Trainer vorhanden</div>
+          )}
+          {/* Mobile Total Card */}
+          {trainerSummary.length > 0 && (
+            <div className="mobile-card" style={{ background: 'var(--gray-100)' }}>
+              <div className="mobile-card-header">
+                <div className="mobile-card-title">Gesamt</div>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Stunden</span>
+                  <span className="mobile-card-value" style={{ fontWeight: 600 }}>
+                    {totalStats.totalStunden.toFixed(1)} h
+                  </span>
+                </div>
+                <div className="mobile-card-row">
+                  <span className="mobile-card-label">Summe</span>
+                  <span className="mobile-card-value" style={{ fontWeight: 600 }}>
+                    {totalStats.totalSumme.toFixed(2)} €
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
