@@ -373,14 +373,26 @@ function KalenderView({
       .join(', ')
   }
 
-  const getTrainingPosition = (training: Training) => {
+  const getTarifName = (tarifId?: string) => {
+    if (!tarifId) return null
+    return tarife.find((t) => t.id === tarifId)?.name
+  }
+
+  const getTrainingPosition = (training: Training, isDayView: boolean) => {
     const [startH, startM] = training.uhrzeit_von.split(':').map(Number)
     const [endH, endM] = training.uhrzeit_bis.split(':').map(Number)
+    const cellHeight = isDayView ? 80 : 60
     const startMinutes = startH * 60 + startM - 7 * 60
     const endMinutes = endH * 60 + endM - 7 * 60
-    const top = (startMinutes / 60) * 60
-    const height = ((endMinutes - startMinutes) / 60) * 60
-    return { top, height: Math.max(height, 30) }
+    const top = (startMinutes / 60) * cellHeight
+    const height = ((endMinutes - startMinutes) / 60) * cellHeight
+    return { top, height: Math.max(height, isDayView ? 50 : 30) }
+  }
+
+  const navigateDay = (direction: number) => {
+    const newDate = new Date(currentDate)
+    newDate.setDate(newDate.getDate() + direction)
+    setCurrentDate(newDate)
   }
 
   const handleDoubleClick = async (training: Training) => {
@@ -399,19 +411,24 @@ function KalenderView({
     setCurrentDate(new Date())
   }
 
+  const isDayView = viewMode === 'day'
+  const cellHeight = isDayView ? 80 : 60
+
   return (
     <div>
       <div className="card">
         <div className="calendar-header">
           <div className="calendar-nav">
-            <button className="btn btn-secondary" onClick={() => navigateWeek(-1)}>←</button>
+            <button className="btn btn-secondary" onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
             <button className="btn btn-primary" onClick={goToToday}>Heute</button>
-            <button className="btn btn-secondary" onClick={() => navigateWeek(1)}>→</button>
+            <button className="btn btn-secondary" onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
-          <h3>
-            {weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })} -
-            {weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}
-          </h3>
+          {!isDayView && (
+            <h3>
+              {weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })} -
+              {weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </h3>
+          )}
           <div className="tabs" style={{ marginBottom: 0, borderBottom: 'none' }}>
             <button
               className={`tab ${viewMode === 'week' ? 'active' : ''}`}
@@ -428,21 +445,38 @@ function KalenderView({
           </div>
         </div>
 
-        <div className="calendar-grid">
-          {/* Header Row */}
-          <div className="calendar-header-cell"></div>
-          {(viewMode === 'week' ? weekDates : [currentDate]).map((date, i) => (
-            <div key={i} className="calendar-header-cell">
-              <div>{viewMode === 'week' ? WOCHENTAGE[i] : WOCHENTAGE_LANG[date.getDay() === 0 ? 6 : date.getDay() - 1]}</div>
-              <div>{date.getDate()}.{date.getMonth() + 1}</div>
+        {/* Day View Header */}
+        {isDayView && (
+          <div className="day-view-header">
+            <div className="day-name">
+              {WOCHENTAGE_LANG[currentDate.getDay() === 0 ? 6 : currentDate.getDay() - 1]}
             </div>
-          ))}
+            <div className="day-date">{currentDate.getDate()}</div>
+            <div className="day-month">
+              {currentDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
+            </div>
+          </div>
+        )}
+
+        <div className={`calendar-grid ${isDayView ? 'day-view' : ''}`}>
+          {/* Header Row - only for week view */}
+          {!isDayView && (
+            <>
+              <div className="calendar-header-cell"></div>
+              {weekDates.map((date, i) => (
+                <div key={i} className="calendar-header-cell">
+                  <div>{WOCHENTAGE[i]}</div>
+                  <div>{date.getDate()}.{date.getMonth() + 1}</div>
+                </div>
+              ))}
+            </>
+          )}
 
           {/* Time Rows */}
           {timeSlots.map((time) => (
-            <>
-              <div key={`time-${time}`} className="calendar-time-cell">{time}</div>
-              {(viewMode === 'week' ? weekDates : [currentDate]).map((date, dayIndex) => {
+            <div key={`row-${time}`} style={{ display: 'contents' }}>
+              <div className="calendar-time-cell">{time}</div>
+              {(isDayView ? [currentDate] : weekDates).map((date, dayIndex) => {
                 const dayTrainings = getTrainingsForDay(date)
                 const slotTrainings = dayTrainings.filter((t) => {
                   const [h] = t.uhrzeit_von.split(':').map(Number)
@@ -452,12 +486,13 @@ function KalenderView({
                 return (
                   <div key={`cell-${dayIndex}-${time}`} className="calendar-day-cell">
                     {slotTrainings.map((training) => {
-                      const pos = getTrainingPosition(training)
+                      const pos = getTrainingPosition(training, isDayView)
+                      const tarifName = getTarifName(training.tarif_id)
                       return (
                         <div
                           key={training.id}
                           className={`training-block status-${training.status}`}
-                          style={{ top: pos.top % 60, height: pos.height }}
+                          style={{ top: pos.top % cellHeight, height: pos.height }}
                           onClick={() => setEditingTraining(training)}
                           onDoubleClick={() => handleDoubleClick(training)}
                         >
@@ -465,13 +500,16 @@ function KalenderView({
                           <div className="training-time">
                             {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
                           </div>
+                          {isDayView && tarifName && (
+                            <div className="training-tarif">{tarifName}</div>
+                          )}
                         </div>
                       )
                     })}
                   </div>
                 )
               })}
-            </>
+            </div>
           ))}
         </div>
       </div>

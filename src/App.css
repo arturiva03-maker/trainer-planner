@@ -353,6 +353,77 @@ tr:hover {
   overflow: hidden;
 }
 
+.calendar-grid.day-view {
+  grid-template-columns: 70px 1fr;
+}
+
+.calendar-grid.day-view .calendar-time-cell {
+  height: 80px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.calendar-grid.day-view .calendar-day-cell {
+  min-height: 80px;
+}
+
+.calendar-grid.day-view .training-block {
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 6px;
+  left: 4px;
+  right: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.calendar-grid.day-view .training-block .training-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  white-space: normal;
+}
+
+.calendar-grid.day-view .training-block .training-time {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.calendar-grid.day-view .training-block .training-tarif {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.calendar-grid.day-view .calendar-header-cell {
+  padding: 16px;
+  font-size: 16px;
+}
+
+.day-view-header {
+  text-align: center;
+  padding: 10px;
+  background: var(--primary-light);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.day-view-header .day-name {
+  font-size: 14px;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.day-view-header .day-date {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.day-view-header .day-month {
+  font-size: 14px;
+  color: var(--gray-600);
+}
+
 .calendar-header-cell {
   background: var(--gray-100);
   padding: 10px;
