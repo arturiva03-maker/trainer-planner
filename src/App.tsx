@@ -248,7 +248,10 @@ function MainApp({ user }: { user: User }) {
       {/* Mobile Header */}
       <div className="mobile-header">
         <button className="burger-btn" onClick={() => setSidebarOpen(true)}>☰</button>
-        <h2>Trainer Planner</h2>
+        <div className="header-content">
+          <h1 className="header-title">Tennistrainer Planung</h1>
+          <p className="header-subtitle">Admin · {profile?.name || 'Trainer'}</p>
+        </div>
         <div style={{ width: 44 }} />
       </div>
 

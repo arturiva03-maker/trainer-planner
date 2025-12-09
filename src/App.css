@@ -875,6 +875,15 @@ tr:hover {
   margin-top: 20px;
 }
 
+/* Mobile-only elements (hidden on desktop) */
+.mobile-only {
+  display: none;
+}
+
+.mobile-header {
+  display: none;
+}
+
 /* Mobile Bottom Navigation */
 .mobile-bottom-nav {
   display: none;
@@ -935,157 +944,313 @@ tr:hover {
 
 /* MOBILE OPTIMIZATIONS */
 @media (max-width: 768px) {
-  /* Problem 1: Sidebar schmaler - max 75% / 280px */
-  .sidebar {
-    width: 75%;
-    max-width: 280px;
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: none;
+  /* ===== 1. CONTAINER & BREITE - VOLLE BILDSCHIRMNUTZUNG ===== */
+  .app-container {
+    padding: 0;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
-    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
-  }
-
-  /* Sidebar Overlay dunkler */
-  .sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 99;
-    opacity: 1;
-  }
-
-  /* Problem 2: Kalender volle Breite - weniger Padding */
   .main-content {
     margin-left: 0;
-    padding: 8px;
+    padding: 0;
     padding-bottom: 80px;
   }
 
+  /* ===== 2. HEADER DESIGN WIE IN REFERENZ ===== */
+  .mobile-header {
+    background: white;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--gray-200);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .mobile-header .header-content {
+    flex: 1;
+  }
+
+  .mobile-header .header-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
+    color: var(--gray-800);
+  }
+
+  .mobile-header .header-subtitle {
+    font-size: 14px;
+    color: var(--gray-600);
+    margin: 2px 0 0 0;
+  }
+
+  .mobile-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+  }
+
+  .burger-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: none;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+
+  .burger-btn:active {
+    background: var(--gray-100);
+  }
+
+  /* ===== 3. KALENDER-CARDS MIT SCHATTEN UND RUNDUNGEN ===== */
   .card {
-    padding: 10px;
-    margin-bottom: 10px;
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
-  /* Calendar volle Breite */
-  .calendar-scroll-container {
-    margin: 0 -8px;
-    padding: 0 8px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-  }
-
-  .calendar-grid {
-    min-width: 100%;
-    grid-template-columns: 35px repeat(7, 1fr);
-    font-size: 10px;
-  }
-
-  .calendar-grid.day-view {
-    grid-template-columns: 35px 1fr;
-    min-width: 100%;
-  }
-
-  .calendar-header-cell {
-    padding: 4px 2px;
-    font-size: 9px;
-  }
-
-  .calendar-time-cell {
-    font-size: 8px;
-    padding: 2px;
-    height: 45px;
-  }
-
-  .calendar-day-cell {
-    min-height: 45px;
-  }
-
-  .training-block {
-    font-size: 8px;
-    padding: 2px 3px;
-  }
-
-  .training-block .training-title {
-    font-size: 8px;
-  }
-
-  .training-block .training-time {
-    font-size: 7px;
-  }
-
-  /* Calendar Header */
+  /* ===== 4. VIEW-CONTROLS UND TOGGLE ===== */
   .calendar-header {
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
     align-items: stretch;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
   }
 
   .calendar-nav {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     width: 100%;
   }
 
+  .calendar-nav button {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: var(--gray-100);
+    border: none;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .calendar-nav button:active {
+    background: var(--gray-200);
+  }
+
   .calendar-nav h3 {
-    font-size: 13px;
+    font-weight: 600;
+    font-size: 16px;
     min-width: auto;
+    text-align: center;
   }
 
   .view-toggle {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     width: 100%;
   }
 
   .view-toggle .btn {
     flex: 1;
-    padding: 8px 6px;
-    font-size: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: var(--gray-100);
+    font-weight: 500;
+    font-size: 15px;
+    cursor: pointer;
+    min-height: 44px;
   }
 
-  /* Mobile Header kompakter */
-  .mobile-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
+  .view-toggle .btn.btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+
+  .view-toggle .btn.btn-success {
+    background: var(--success);
+    color: white;
+    flex: 0 0 auto;
+    padding: 12px 16px;
+  }
+
+  /* Swipe Hint */
+  .swipe-hint {
+    text-align: center;
+    color: var(--gray-400);
+    font-size: 13px;
+    margin-bottom: 16px;
+    padding: 4px;
+  }
+
+  .swipe-hint::before {
+    content: "← swipe →";
+  }
+
+  /* ===== 5. KALENDER-GRID LAYOUT ===== */
+  .calendar-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
+  }
+
+  .calendar-grid {
     background: white;
+    border-radius: 8px;
+    min-width: 600px;
+    grid-template-columns: 50px repeat(7, 1fr);
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .calendar-grid.day-view {
+    grid-template-columns: 50px 1fr;
+    min-width: 100%;
+  }
+
+  .calendar-header-cell {
+    background: var(--gray-50);
+    padding: 8px 4px;
+    font-size: 12px;
+    font-weight: 600;
     border-bottom: 1px solid var(--gray-200);
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 10;
   }
 
-  .mobile-header h2 {
-    font-size: 15px;
-    color: var(--primary);
+  .calendar-time-cell {
+    position: sticky;
+    left: 0;
+    background: var(--gray-50);
+    z-index: 5;
+    font-size: 11px;
+    padding: 4px;
+    height: 50px;
   }
 
-  .burger-btn {
-    background: none;
-    border: none;
-    font-size: 22px;
-    cursor: pointer;
-    padding: 6px;
-    min-width: 40px;
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .calendar-day-cell {
+    border: 1px solid var(--gray-200);
+    border-top: none;
+    padding: 2px;
+    min-height: 50px;
+    vertical-align: top;
   }
 
-  /* Problem 3: Training-Cards optimieren */
+  /* Training-Blocks im Kalender */
+  .training-block {
+    background: var(--primary);
+    color: white;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 11px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+
+  .training-block .training-title {
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .training-block .training-time {
+    font-size: 10px;
+    opacity: 0.9;
+  }
+
+  /* ===== 8. SIDEBAR FIX ===== */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 75%;
+    max-width: 280px;
+    background: white;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    box-shadow: none;
+    z-index: 1000;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  }
+
+  /* ===== 7. GENERELLES SPACING & TYPOGRAPHY ===== */
+  /* Konsistente Margins für Cards und Sections */
+  .card,
+  .section,
+  .content-section {
+    margin: 0 16px 16px 16px;
+    border-radius: 12px;
+    background: white;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  /* Größere Touch-Targets */
+  button,
+  a.btn,
+  .clickable {
+    min-height: 44px;
+  }
+
+  /* Schriftgrößen */
+  h1 { font-size: 20px; font-weight: 600; }
+  h2 { font-size: 18px; font-weight: 600; }
+  h3 { font-size: 16px; font-weight: 600; }
+
+  body, input, button, select, textarea {
+    font-size: 16px;
+  }
+
+  small, .text-small {
+    font-size: 14px;
+  }
+
+  /* Tab Content - Platz für Bottom-Nav */
+  .tab-content {
+    padding-bottom: 80px;
+  }
+
+  /* Mobile Cards optimieren */
   .mobile-card {
-    padding: 10px;
-    margin-bottom: 6px;
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 0 16px 12px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   .mobile-card-header {
@@ -1093,14 +1258,14 @@ tr:hover {
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     flex-wrap: wrap;
   }
 
   .mobile-card-title {
     font-weight: 600;
     color: var(--gray-800);
-    font-size: 13px;
+    font-size: 15px;
     flex: 1;
     min-width: 0;
     word-break: break-word;
@@ -1108,21 +1273,21 @@ tr:hover {
   }
 
   .mobile-card-subtitle {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--gray-500);
   }
 
   .mobile-card-body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    font-size: 12px;
+    gap: 4px;
+    font-size: 14px;
   }
 
   .mobile-card-row {
     display: flex;
     justify-content: space-between;
-    padding: 3px 0;
+    padding: 4px 0;
     border-bottom: 1px solid var(--gray-100);
   }
 
@@ -1132,62 +1297,63 @@ tr:hover {
 
   .mobile-card-label {
     color: var(--gray-500);
-    font-size: 11px;
+    font-size: 13px;
   }
 
   .mobile-card-value {
     font-weight: 500;
     text-align: right;
-    font-size: 12px;
+    font-size: 14px;
     word-break: break-word;
     max-width: 60%;
   }
 
   .mobile-card-actions {
     display: flex;
-    gap: 6px;
-    margin-top: 8px;
-    padding-top: 8px;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid var(--gray-200);
   }
 
   .mobile-card-actions .btn {
     flex: 1;
-    padding: 8px;
-    font-size: 12px;
-    min-height: 38px;
+    padding: 12px;
+    font-size: 14px;
+    min-height: 44px;
   }
 
-  /* Status Badge kompakter */
+  /* Status Badge */
   .status-badge {
-    padding: 3px 6px;
-    font-size: 10px;
+    padding: 4px 8px;
+    font-size: 12px;
     flex-shrink: 0;
+    border-radius: 6px;
   }
 
-  /* Problem 4: Verwaltung kompakter */
+  /* Card Headers */
   .card-header {
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     align-items: stretch;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
   }
 
   .card-header h3 {
-    font-size: 15px;
+    font-size: 18px;
   }
 
   .card-header .btn {
     width: 100%;
-    padding: 10px;
+    padding: 12px 16px;
   }
 
-  /* Problem 5: Abrechnung Filter scrollbar */
+  /* Abrechnung Filter scrollbar */
   .filter-pills {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     overflow-x: auto;
-    padding: 4px 0;
+    padding: 8px 0;
     -webkit-overflow-scrolling: touch;
     flex-wrap: nowrap;
     width: 100%;
@@ -1198,60 +1364,76 @@ tr:hover {
   }
 
   .filter-pill {
-    padding: 6px 10px;
-    border-radius: 16px;
-    font-size: 11px;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 13px;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  /* Problem 6: Buttons optimieren */
+  /* Buttons optimieren */
   .btn {
-    padding: 10px 14px;
-    font-size: 13px;
-    min-height: 40px;
+    padding: 12px 16px;
+    font-size: 15px;
+    min-height: 44px;
+    border-radius: 8px;
   }
 
   .btn-sm {
-    padding: 6px 10px;
-    font-size: 11px;
-    min-height: 32px;
+    padding: 8px 12px;
+    font-size: 13px;
+    min-height: 36px;
   }
 
-  /* Stats kompakter */
+  /* Stats Grid */
   .stats-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 12px;
+    margin: 0 16px 16px 16px;
   }
 
   .stat-card {
-    padding: 10px;
+    padding: 16px;
+    border-radius: 12px;
+    margin: 0;
   }
 
   .stat-value {
-    font-size: 16px;
+    font-size: 20px;
   }
 
   .stat-label {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   /* Tables */
   .table-container {
-    margin: 0 -8px;
-    padding: 0 8px;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Form Controls */
   .form-row {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 12px;
   }
 
   .form-control {
-    padding: 10px;
+    padding: 12px;
     font-size: 16px;
-    min-height: 40px;
+    min-height: 44px;
+    border-radius: 8px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    font-size: 14px;
+    margin-bottom: 8px;
   }
 
   /* Modal Optimierungen */
@@ -1263,21 +1445,25 @@ tr:hover {
   .modal {
     max-width: 100%;
     max-height: 90vh;
-    border-radius: 12px 12px 0 0;
+    border-radius: 16px 16px 0 0;
   }
 
   .modal-header {
-    padding: 12px 16px;
+    padding: 16px;
+  }
+
+  .modal-header h3 {
+    font-size: 18px;
   }
 
   .modal-body {
-    padding: 12px 16px;
+    padding: 16px;
   }
 
   .modal-footer {
-    padding: 12px 16px;
+    padding: 16px;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
   .modal-footer .btn {
@@ -1290,7 +1476,8 @@ tr:hover {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     flex-wrap: nowrap;
-    gap: 2px;
+    gap: 4px;
+    margin: 0 16px 16px 16px;
   }
 
   .tabs::-webkit-scrollbar {
@@ -1298,8 +1485,8 @@ tr:hover {
   }
 
   .tab {
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -1308,53 +1495,64 @@ tr:hover {
   .planung-scroll-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    margin: 0 -8px;
-    padding: 0 8px;
+    margin: 0;
+    padding: 0;
   }
 
   .planung-grid {
     min-width: 550px;
-    grid-template-columns: 45px repeat(7, 1fr);
-    font-size: 9px;
+    grid-template-columns: 50px repeat(7, 1fr);
+    font-size: 11px;
   }
 
   .planung-cell {
-    padding: 3px;
-    min-height: 40px;
-    font-size: 9px;
+    padding: 4px;
+    min-height: 45px;
+    font-size: 11px;
   }
 
-  /* Bottom Nav */
+  /* ===== 6. BOTTOM NAVIGATION ===== */
   .mobile-bottom-nav {
     display: block;
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+  }
+
+  .mobile-bottom-nav.hidden {
+    transform: translateY(100%);
   }
 
   .mobile-nav-item {
-    padding: 4px 8px;
-    min-width: 55px;
-    font-size: 9px;
+    padding: 6px 10px;
+    min-width: 60px;
+    font-size: 10px;
   }
 
   .mobile-nav-item .nav-icon {
-    font-size: 18px;
-    margin-bottom: 1px;
+    font-size: 20px;
+    margin-bottom: 2px;
   }
 
   /* Multi-select */
   .multi-select-item {
-    padding: 10px;
-    min-height: 40px;
+    padding: 12px;
+    min-height: 44px;
   }
 
   /* Search */
+  .search-box {
+    margin: 0 16px 16px 16px;
+  }
+
   .search-box input {
-    padding: 10px 10px 10px 36px;
+    padding: 12px 12px 12px 40px;
     font-size: 16px;
+    border-radius: 8px;
   }
 
   .search-box::before {
-    left: 10px;
-    font-size: 12px;
+    left: 12px;
+    font-size: 14px;
   }
 
   /* Show mobile elements */
@@ -1369,67 +1567,88 @@ tr:hover {
   .mobile-only {
     display: block;
   }
-
-  .swipe-hint {
-    text-align: center;
-    color: var(--gray-400);
-    font-size: 10px;
-    padding: 2px;
-  }
-
-  .swipe-hint::before {
-    content: "← swipe →";
-  }
 }
 
 /* Extra small devices */
 @media (max-width: 375px) {
   .main-content {
-    padding: 6px;
+    padding: 0;
+    padding-bottom: 80px;
   }
 
-  .card {
-    padding: 8px;
+  .card,
+  .mobile-card {
+    margin: 0 12px 12px 12px;
+    padding: 12px;
   }
 
   .calendar-grid {
-    grid-template-columns: 30px repeat(7, 1fr);
+    min-width: 500px;
+    grid-template-columns: 40px repeat(7, 1fr);
   }
 
   .calendar-time-cell {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   .calendar-header-cell {
-    font-size: 8px;
-    padding: 3px 1px;
+    font-size: 10px;
+    padding: 6px 2px;
   }
 
   .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 4px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0 12px 12px 12px;
   }
 
   .mobile-nav-item {
-    padding: 4px 6px;
-    min-width: 48px;
-    font-size: 8px;
+    padding: 4px 8px;
+    min-width: 52px;
+    font-size: 9px;
   }
 
   .mobile-nav-item .nav-icon {
-    font-size: 16px;
+    font-size: 18px;
   }
 
   .btn {
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    min-height: 40px;
   }
 
   .mobile-card-title {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .mobile-card-value {
-    font-size: 11px;
+    font-size: 13px;
+  }
+
+  .mobile-header {
+    padding: 10px 12px;
+  }
+
+  .mobile-header .header-title,
+  .mobile-header h2 {
+    font-size: 16px;
+  }
+
+  .mobile-header .header-subtitle {
+    font-size: 12px;
+  }
+
+  .view-toggle .btn {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .search-box {
+    margin: 0 12px 12px 12px;
+  }
+
+  .tabs {
+    margin: 0 12px 12px 12px;
   }
 }
