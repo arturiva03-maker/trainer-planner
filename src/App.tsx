@@ -903,7 +903,14 @@ function TrainingModal({
                 type="time"
                 className="form-control"
                 value={uhrzeitVon}
-                onChange={(e) => setUhrzeitVon(e.target.value)}
+                onChange={(e) => {
+                  const neueStartzeit = e.target.value
+                  setUhrzeitVon(neueStartzeit)
+                  // Automatisch Endzeit auf +1 Stunde setzen
+                  const [h, m] = neueStartzeit.split(':').map(Number)
+                  const endH = (h + 1) % 24
+                  setUhrzeitBis(`${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`)
+                }}
               />
             </div>
             <div className="form-group">

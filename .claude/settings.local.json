@@ -7,7 +7,9 @@
       "Bash(git push:*)",
       "Bash(npx netlify deploy --prod)",
       "Bash(git commit -m \"$(cat <<''EOF''\nKalender zeigt nur Vornamen, abweichender Rechnungsempfänger\n\n- Kalender: Nur Vornamen für bessere Übersicht\n- Spieler: Checkbox für abweichenden Rechnungsempfänger (z.B. bei Kindern)\n- Spieler: Feld für Rechnungsempfänger-Name\n- Rechnungen verwenden automatisch den abweichenden Empfänger\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(cat:*)"
     ]
   }
 }
