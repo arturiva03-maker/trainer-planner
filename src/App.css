@@ -947,12 +947,16 @@ tr:hover {
   /* ===== 1. CONTAINER & BREITE - VOLLE BILDSCHIRMNUTZUNG ===== */
   .app-container {
     padding: 0;
+    display: block;
+    width: 100%;
   }
 
   .main-content {
-    margin-left: 0;
+    margin-left: 0 !important;
     padding: 0;
     padding-bottom: 80px;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* ===== 2. HEADER DESIGN WIE IN REFERENZ ===== */

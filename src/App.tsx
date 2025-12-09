@@ -395,8 +395,24 @@ function KalenderView({
   userId: string
 }) {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<'week' | 'day'>('week')
+  const [viewMode, setViewMode] = useState<'week' | 'day'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
+  )
   const [editingTraining, setEditingTraining] = useState<Training | null>(null)
+
+  // Automatisch zwischen Tag- und Wochenansicht wechseln bei Resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setViewMode('day')
+      } else {
+        setViewMode('week')
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate])
   const timeSlots = useMemo(() => {
