@@ -415,9 +415,12 @@ function KalenderView({
     return trainingsForWeek.filter((t) => t.datum === dateStr)
   }
 
-  const getSpielerNames = (ids: string[]) => {
+  const getSpielerNames = (ids: string[], vornameOnly = false) => {
     return ids
-      .map((id) => spieler.find((s) => s.id === id)?.name || 'Unbekannt')
+      .map((id) => {
+        const name = spieler.find((s) => s.id === id)?.name || 'Unbekannt'
+        return vornameOnly ? name.split(' ')[0] : name
+      })
       .join(', ')
   }
 
@@ -538,7 +541,7 @@ function KalenderView({
                             onClick={() => setEditingTraining(training)}
                             onDoubleClick={() => handleDoubleClick(training)}
                           >
-                            <div className="training-title">{getSpielerNames(training.spieler_ids)}</div>
+                            <div className="training-title">{getSpielerNames(training.spieler_ids, true)}</div>
                             <div className="training-time">
                               {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
                             </div>
@@ -1405,6 +1408,8 @@ function SpielerModal({
   const [email, setEmail] = useState(spieler?.kontakt_email || '')
   const [telefon, setTelefon] = useState(spieler?.kontakt_telefon || '')
   const [adresse, setAdresse] = useState(spieler?.rechnungs_adresse || '')
+  const [abweichendeRechnung, setAbweichendeRechnung] = useState(spieler?.abweichende_rechnung || false)
+  const [rechnungsEmpfaenger, setRechnungsEmpfaenger] = useState(spieler?.rechnungs_empfaenger || '')
   const [notizen, setNotizen] = useState(spieler?.notizen || '')
   const [saving, setSaving] = useState(false)
 
@@ -1422,6 +1427,8 @@ function SpielerModal({
         kontakt_email: email || null,
         kontakt_telefon: telefon || null,
         rechnungs_adresse: adresse || null,
+        abweichende_rechnung: abweichendeRechnung,
+        rechnungs_empfaenger: abweichendeRechnung ? rechnungsEmpfaenger || null : null,
         notizen: notizen || null
       }
 
@@ -1495,6 +1502,34 @@ function SpielerModal({
               placeholder="Straße, PLZ Ort"
             />
           </div>
+          <div className="form-group">
+            <div className="checkbox-group">
+              <input
+                type="checkbox"
+                id="abweichendeRechnung"
+                checked={abweichendeRechnung}
+                onChange={(e) => setAbweichendeRechnung(e.target.checked)}
+              />
+              <label htmlFor="abweichendeRechnung">
+                Abweichender Rechnungsempfänger (z.B. bei Kindern)
+              </label>
+            </div>
+          </div>
+          {abweichendeRechnung && (
+            <div className="form-group" style={{ background: 'var(--gray-50)', padding: 12, borderRadius: 'var(--radius)', marginTop: -8 }}>
+              <label>Rechnungsempfänger (Name)</label>
+              <input
+                type="text"
+                className="form-control"
+                value={rechnungsEmpfaenger}
+                onChange={(e) => setRechnungsEmpfaenger(e.target.value)}
+                placeholder="z.B. Eltern des Kindes"
+              />
+              <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+                Die Rechnungsadresse oben wird dann für diesen Empfänger verwendet.
+              </p>
+            </div>
+          )}
           <div className="form-group">
             <label>Notizen</label>
             <textarea
@@ -2259,7 +2294,12 @@ function InvoiceModal({
     if (selectedSpielerId) {
       const sp = spieler.find((s) => s.id === selectedSpielerId)
       if (sp) {
-        setRechnungsempfaengerName(sp.name)
+        // Wenn abweichender Rechnungsempfänger eingestellt, diesen verwenden
+        if (sp.abweichende_rechnung && sp.rechnungs_empfaenger) {
+          setRechnungsempfaengerName(sp.rechnungs_empfaenger)
+        } else {
+          setRechnungsempfaengerName(sp.name)
+        }
         setRechnungsempfaengerAdresse(sp.rechnungs_adresse || '')
       }
     }

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nUmfassende Mobile-Optimierung mit Card-Layouts\n\n- Tabellen werden auf Mobile (<768px) als Card-Layout angezeigt\n- Kalender horizontal scrollbar mit Swipe-Hinweis\n- Sub-Tabs horizontal scrollbar\n- Modal-Footer stapelt Buttons vertikal auf Mobile\n- Filter-Gruppen und Card-Header für Mobile optimiert\n- Tarif-Interface um USt-Felder erweitert (inkl_ust, ust_satz)\n- Rechnungen mit detaillierter USt-Aufstellung\n- Rechnungskorrektur-Funktion hinzugefügt\n- Bar-bezahlte Trainings automatisch als bezahlt markiert\n- Serien-Bearbeitung für wiederkehrende Trainings\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(npx netlify deploy --prod)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nKalender zeigt nur Vornamen, abweichender Rechnungsempfänger\n\n- Kalender: Nur Vornamen für bessere Übersicht\n- Spieler: Checkbox für abweichenden Rechnungsempfänger (z.B. bei Kindern)\n- Spieler: Feld für Rechnungsempfänger-Name\n- Rechnungen verwenden automatisch den abweichenden Empfänger\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")"
+    ]
+  }
+}
