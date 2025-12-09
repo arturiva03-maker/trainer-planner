@@ -554,7 +554,7 @@ function KalenderView({
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          <div className="swipe-hint mobile-only"></div>
+          {isDayView && <div className="swipe-hint mobile-only"></div>}
           <div className={`calendar-grid ${isDayView ? 'day-view' : ''}`}>
             {/* Header Row - only for week view */}
             {!isDayView && (
