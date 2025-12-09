@@ -1279,15 +1279,18 @@ tr:hover {
 
   .mobile-card-label {
     color: var(--gray-500);
-    font-size: 13px;
+    font-size: 12px;
+    flex-shrink: 0;
   }
 
   .mobile-card-value {
     font-weight: 500;
     text-align: right;
-    font-size: 14px;
-    word-break: break-word;
-    max-width: 60%;
+    font-size: 12px;
+    word-break: break-all;
+    max-width: 65%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .mobile-card-actions {
@@ -1605,7 +1608,11 @@ tr:hover {
   }
 
   .mobile-card-value {
-    font-size: 13px;
+    font-size: 11px;
+  }
+
+  .mobile-card-label {
+    font-size: 11px;
   }
 
   .mobile-header {
