@@ -787,6 +787,11 @@ function TrainingModal({
       return
     }
 
+    if (!tarifId && !customPreis) {
+      alert('Bitte einen Tarif auswählen oder einen individuellen Preis eingeben')
+      return
+    }
+
     setSaving(true)
     try {
       const trainingData = {
