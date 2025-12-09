@@ -2514,7 +2514,13 @@ function InvoiceModal({
           .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
           .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
           .footer { margin-top: 40px; }
-          @media print { body { padding: 20px; } }
+          @media print {
+            body { padding: 20px; margin: 0; }
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+          }
         </style>
       </head>
       <body>
@@ -2593,11 +2599,16 @@ function InvoiceModal({
       </html>
     `
 
-    const printWindow = window.open('', '_blank')
+    // Blob erstellen für saubere URL (ohne "about:blank")
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const printWindow = window.open(url, '_blank')
     if (printWindow) {
-      printWindow.document.write(html)
-      printWindow.document.close()
-      printWindow.print()
+      printWindow.onload = () => {
+        printWindow.print()
+        // URL nach dem Drucken freigeben
+        URL.revokeObjectURL(url)
+      }
     }
   }
 
