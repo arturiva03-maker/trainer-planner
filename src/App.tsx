@@ -1843,8 +1843,6 @@ function InvoiceModal({
   const [step, setStep] = useState(1)
   const [selectedSpielerId, setSelectedSpielerId] = useState('')
   const [rechnungsbetrag, setRechnungsbetrag] = useState('')
-  const [stunden, setStunden] = useState('')
-  const [preisProStunde, setPreisProStunde] = useState(profile?.stundensatz?.toString() || '25')
   const [iban, setIban] = useState(profile?.iban || '')
   const [adresse, setAdresse] = useState(profile?.adresse || '')
   const [ustIdNr, setUstIdNr] = useState(profile?.ust_id_nr || '')
@@ -1865,10 +1863,6 @@ function InvoiceModal({
       const summary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
       const sp = spieler.find((s) => s.id === selectedSpielerId)
       if (summary && sp) {
-        const totalHours = summary.trainings.reduce((sum, t) => {
-          return sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-        }, 0)
-        setStunden(totalHours.toString())
         // Offenen Umsatz als Rechnungsbetrag übernehmen
         setRechnungsbetrag(summary.summe.toFixed(2))
         setRechnungsempfaengerName(sp.name)
@@ -1877,8 +1871,7 @@ function InvoiceModal({
     }
   }, [selectedSpielerId, spielerSummary, spieler])
 
-  // Verwende Rechnungsbetrag wenn gesetzt, sonst Stunden x Preis
-  const zwischensumme = rechnungsbetrag ? parseFloat(rechnungsbetrag) : parseFloat(stunden || '0') * parseFloat(preisProStunde || '0')
+  const zwischensumme = parseFloat(rechnungsbetrag) || 0
   const mwst = kleinunternehmer ? 0 : zwischensumme * 0.19
   const gesamtbetrag = zwischensumme + mwst
 
@@ -1931,23 +1924,19 @@ function InvoiceModal({
           <thead>
             <tr>
               <th>Position</th>
-              <th>Anzahl</th>
-              <th>Preis</th>
-              <th>Gesamt</th>
+              <th>Betrag</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>${position}</td>
-              <td>${stunden}</td>
-              <td>${parseFloat(preisProStunde).toFixed(2)} €</td>
               <td>${zwischensumme.toFixed(2)} €</td>
             </tr>
           </tbody>
         </table>
 
         <div class="total">
-          <strong>Zwischensumme:</strong> ${zwischensumme.toFixed(2)} €<br>
+          <strong>Nettobetrag:</strong> ${zwischensumme.toFixed(2)} €<br>
           ${!kleinunternehmer ? `<strong>MwSt. 19%:</strong> ${mwst.toFixed(2)} €<br>` : ''}
           <strong>Gesamtbetrag:</strong> ${gesamtbetrag.toFixed(2)} €
         </div>
@@ -2002,7 +1991,7 @@ function InvoiceModal({
               </div>
               {selectedSpielerId && (
                 <div className="form-group" style={{ background: 'var(--success-light)', padding: 12, borderRadius: 'var(--radius)' }}>
-                  <label style={{ color: 'var(--success)', marginBottom: 4 }}>Offener Betrag (übernommen)</label>
+                  <label style={{ color: 'var(--success)', marginBottom: 4 }}>Rechnungsbetrag (offener Betrag übernommen)</label>
                   <input
                     type="number"
                     className="form-control"
@@ -2013,27 +2002,6 @@ function InvoiceModal({
                   />
                 </div>
               )}
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Anzahl Stunden (Info)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={stunden}
-                    onChange={(e) => setStunden(e.target.value)}
-                    step="0.5"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Preis pro Stunde (€)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={preisProStunde}
-                    onChange={(e) => setPreisProStunde(e.target.value)}
-                  />
-                </div>
-              </div>
               <div className="form-group">
                 <label>IBAN</label>
                 <input
@@ -2137,30 +2105,19 @@ function InvoiceModal({
                   rows={2}
                 />
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Position</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Stunden / Preis</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={`${stunden} × ${preisProStunde} €`}
-                    readOnly
-                  />
-                </div>
+              <div className="form-group">
+                <label>Position</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
+                />
               </div>
 
               <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Zwischensumme:</span>
+                  <span>Nettobetrag:</span>
                   <strong>{zwischensumme.toFixed(2)} €</strong>
                 </div>
                 {!kleinunternehmer && (
