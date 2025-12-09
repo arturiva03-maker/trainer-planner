@@ -1421,26 +1421,35 @@ function SpielerModal({
 
     setSaving(true)
     try {
-      const data = {
+      const data: Record<string, unknown> = {
         user_id: userId,
         name: name.trim(),
         kontakt_email: email || null,
         kontakt_telefon: telefon || null,
         rechnungs_adresse: adresse || null,
-        abweichende_rechnung: abweichendeRechnung,
-        rechnungs_empfaenger: abweichendeRechnung ? rechnungsEmpfaenger || null : null,
         notizen: notizen || null
       }
 
-      if (spieler) {
-        await supabase.from('spieler').update(data).eq('id', spieler.id)
+      // Neue Felder nur hinzufügen wenn sie verwendet werden (für DB-Kompatibilität)
+      if (abweichendeRechnung) {
+        data.abweichende_rechnung = true
+        data.rechnungs_empfaenger = rechnungsEmpfaenger || null
       } else {
-        await supabase.from('spieler').insert(data)
+        data.abweichende_rechnung = false
+        data.rechnungs_empfaenger = null
+      }
+
+      if (spieler) {
+        const { error } = await supabase.from('spieler').update(data).eq('id', spieler.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('spieler').insert(data)
+        if (error) throw error
       }
       onSave()
     } catch (err) {
       console.error('Error saving spieler:', err)
-      alert('Fehler beim Speichern')
+      alert('Fehler beim Speichern: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
     } finally {
       setSaving(false)
     }
@@ -1873,6 +1882,7 @@ function AbrechnungView({
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -2067,8 +2077,12 @@ function AbrechnungView({
             </thead>
             <tbody>
               {filteredSummary.map((item) => (
-                <tr key={item.spieler.id}>
-                  <td>{item.spieler.name}</td>
+                <tr
+                  key={item.spieler.id}
+                  onClick={() => setSelectedSpielerDetail(item.spieler.id)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{item.spieler.name}</td>
                   <td>{item.trainings.length} Trainings</td>
                   <td>
                     {item.summe.toFixed(2)} €
@@ -2086,7 +2100,10 @@ function AbrechnungView({
                   <td>
                     <button
                       className="btn btn-sm btn-secondary"
-                      onClick={() => toggleBezahlt(item.spieler.id, item.bezahlt)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleBezahlt(item.spieler.id, item.bezahlt)
+                      }}
                     >
                       {item.bezahlt ? 'Als offen' : 'Als bezahlt'}
                     </button>
@@ -2107,10 +2124,15 @@ function AbrechnungView({
         {/* Mobile Card List */}
         <div className="mobile-card-list">
           {filteredSummary.map((item) => (
-            <div key={item.spieler.id} className="mobile-card">
+            <div
+              key={item.spieler.id}
+              className="mobile-card"
+              onClick={() => setSelectedSpielerDetail(item.spieler.id)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="mobile-card-header">
                 <div>
-                  <div className="mobile-card-title">{item.spieler.name}</div>
+                  <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{item.spieler.name}</div>
                   <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
                 </div>
                 <span className={`status-badge ${item.bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
@@ -2136,7 +2158,10 @@ function AbrechnungView({
               <div className="mobile-card-actions">
                 <button
                   className="btn btn-sm btn-secondary"
-                  onClick={() => toggleBezahlt(item.spieler.id, item.bezahlt)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleBezahlt(item.spieler.id, item.bezahlt)
+                  }}
                 >
                   {item.bezahlt ? 'Als offen' : 'Als bezahlt'}
                 </button>
@@ -2148,6 +2173,83 @@ function AbrechnungView({
           )}
         </div>
       </div>
+
+      {/* Spieler Detail Modal */}
+      {selectedSpielerDetail && (() => {
+        const detail = spielerSummary.find(s => s.spieler.id === selectedSpielerDetail)
+        if (!detail) return null
+
+        // Berechne Betrag pro Training
+        const trainingsDetail = detail.trainings.map(t => {
+          const tarif = tarife.find(ta => ta.id === t.tarif_id)
+          const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+          const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+          const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+          let betrag = preis * duration
+          if (abrechnungsart === 'proSpieler') {
+            betrag = betrag / t.spieler_ids.length
+          }
+          return { training: t, betrag, tarif }
+        }).sort((a, b) => a.training.datum.localeCompare(b.training.datum))
+
+        return (
+          <div className="modal-overlay" onClick={() => setSelectedSpielerDetail(null)}>
+            <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Trainings von {detail.spieler.name}</h3>
+                <button className="modal-close" onClick={() => setSelectedSpielerDetail(null)}>×</button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: 16 }}>
+                  <strong>Monat:</strong> {selectedMonth} |
+                  <strong> Gesamt:</strong> {detail.summe.toFixed(2)} €
+                  {detail.barSumme > 0 && (
+                    <span style={{ color: 'var(--warning)' }}> (davon {detail.barSumme.toFixed(2)} € bar)</span>
+                  )}
+                </div>
+                <div className="table-container" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Datum</th>
+                        <th>Uhrzeit</th>
+                        <th>Tarif</th>
+                        <th style={{ textAlign: 'right' }}>Betrag</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trainingsDetail.map(({ training, betrag, tarif }) => (
+                        <tr key={training.id} style={training.bar_bezahlt ? { background: 'var(--warning-light)' } : {}}>
+                          <td>{formatDateGerman(training.datum)}</td>
+                          <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
+                          <td>
+                            {tarif?.name || '-'}
+                            {training.bar_bezahlt && (
+                              <span style={{ fontSize: 10, color: 'var(--warning)', marginLeft: 4 }}>(bar)</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 500 }}>{betrag.toFixed(2)} €</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
+                        <td colSpan={3}>Summe</td>
+                        <td style={{ textAlign: 'right' }}>{detail.summe.toFixed(2)} €</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
+                  Schließen
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Invoice Modal */}
       {showInvoiceModal && (
