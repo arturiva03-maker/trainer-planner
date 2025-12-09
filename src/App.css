@@ -1176,35 +1176,13 @@ tr:hover {
     opacity: 0.9;
   }
 
-  /* ===== 8. SIDEBAR FIX ===== */
-  .sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-  }
-
+  /* ===== 8. SIDEBAR - AUF MOBILE VERSTECKEN ===== */
   .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 75%;
-    max-width: 280px;
-    background: white;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    overflow-y: auto;
-    box-shadow: none;
-    z-index: 1000;
+    display: none !important;
   }
 
-  .sidebar.open {
-    transform: translateX(0);
-    box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  .sidebar-overlay {
+    display: none !important;
   }
 
   /* ===== 7. GENERELLES SPACING & TYPOGRAPHY ===== */
