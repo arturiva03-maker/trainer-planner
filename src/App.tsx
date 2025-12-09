@@ -499,17 +499,17 @@ function KalenderView({
   }
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
+    if (!touchStart || !touchEnd || !isDayView) return // Nur in Tagesansicht aktiv
     const distance = touchStart - touchEnd
     const isLeftSwipe = distance > minSwipeDistance
     const isRightSwipe = distance < -minSwipeDistance
 
     if (isLeftSwipe) {
-      // Swipe nach links = nächster Tag/Woche
-      isDayView ? navigateDay(1) : navigateWeek(1)
+      // Swipe nach links = nächster Tag
+      navigateDay(1)
     } else if (isRightSwipe) {
-      // Swipe nach rechts = vorheriger Tag/Woche
-      isDayView ? navigateDay(-1) : navigateWeek(-1)
+      // Swipe nach rechts = vorheriger Tag
+      navigateDay(-1)
     }
   }
 
