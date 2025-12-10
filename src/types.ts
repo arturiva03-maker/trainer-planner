@@ -9,6 +9,7 @@ export interface TrainerProfile {
   ust_id_nr?: string
   kleinunternehmer: boolean
   approved: boolean
+  email_vorlage?: string
   notiz?: string
   created_at: string
   updated_at: string

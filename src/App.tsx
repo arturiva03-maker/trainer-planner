@@ -3107,9 +3107,60 @@ function InvoiceModal({
               Weiter
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={generatePDF}>
-              PDF erstellen
-            </button>
+            <>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  const spielerEmail = selectedSummary?.spieler.kontakt_email
+                  if (!spielerEmail) {
+                    alert('Keine E-Mail-Adresse für diesen Spieler hinterlegt!')
+                    return
+                  }
+
+                  // Monat formatieren
+                  const [year, month] = selectedMonth.split('-')
+                  const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+                  const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
+
+                  // Vorlage mit Platzhaltern füllen
+                  let emailText = profile?.email_vorlage || `Hallo {spieler_name},
+
+anbei erhältst du die Rechnung für den Tennisunterricht im {monat}.
+
+Rechnungsbetrag: {betrag} €
+Rechnungsnummer: {rechnungsnummer}
+
+Bitte überweise den Betrag auf folgendes Konto:
+IBAN: {iban}
+
+Bei Fragen melde dich gerne.
+
+Sportliche Grüße
+{trainer_name}`
+
+                  emailText = emailText
+                    .replace(/{spieler_name}/g, rechnungsempfaengerName || selectedSummary?.spieler.name || '')
+                    .replace(/{monat}/g, monatFormatiert)
+                    .replace(/{betrag}/g, summen.gesamtBrutto.toFixed(2))
+                    .replace(/{rechnungsnummer}/g, rechnungsnummer)
+                    .replace(/{iban}/g, iban || '')
+                    .replace(/{trainer_name}/g, rechnungsstellerName || '')
+
+                  const subject = `Rechnung ${rechnungsnummer} - Tennisunterricht ${monatFormatiert}`
+
+                  // mailto-Link öffnen
+                  const mailtoLink = `mailto:${spielerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailText)}`
+                  window.open(mailtoLink, '_blank')
+                }}
+                disabled={!selectedSummary?.spieler.kontakt_email}
+                title={!selectedSummary?.spieler.kontakt_email ? 'Keine E-Mail hinterlegt' : ''}
+              >
+                Per E-Mail senden
+              </button>
+              <button className="btn btn-primary" onClick={generatePDF}>
+                PDF erstellen
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -4568,6 +4619,20 @@ function WeiteresView({
   const [iban, setIban] = useState(profile?.iban || '')
   const [ustIdNr, setUstIdNr] = useState(profile?.ust_id_nr || '')
   const [kleinunternehmer, setKleinunternehmer] = useState(profile?.kleinunternehmer || false)
+  const [emailVorlage, setEmailVorlage] = useState(profile?.email_vorlage || `Hallo {spieler_name},
+
+anbei erhältst du die Rechnung für den Tennisunterricht im {monat}.
+
+Rechnungsbetrag: {betrag} €
+Rechnungsnummer: {rechnungsnummer}
+
+Bitte überweise den Betrag auf folgendes Konto:
+IBAN: {iban}
+
+Bei Fragen melde dich gerne.
+
+Sportliche Grüße
+{trainer_name}`)
   const [notiz, setNotiz] = useState(profile?.notiz || '')
   const [saving, setSaving] = useState(false)
 
@@ -4582,6 +4647,7 @@ function WeiteresView({
         iban: iban || null,
         ust_id_nr: ustIdNr || null,
         kleinunternehmer,
+        email_vorlage: emailVorlage || null,
         notiz: notiz || null,
         updated_at: new Date().toISOString()
       }
@@ -4699,6 +4765,20 @@ function WeiteresView({
                 Kleinunternehmer (§19 UStG)
               </label>
             </div>
+          </div>
+
+          <div className="form-group">
+            <label>E-Mail-Vorlage für Rechnungen</label>
+            <textarea
+              className="form-control"
+              value={emailVorlage}
+              onChange={(e) => setEmailVorlage(e.target.value)}
+              rows={12}
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+            <small style={{ color: 'var(--gray-500)', marginTop: 4, display: 'block' }}>
+              Platzhalter: {'{spieler_name}'}, {'{monat}'}, {'{betrag}'}, {'{rechnungsnummer}'}, {'{iban}'}, {'{trainer_name}'}
+            </small>
           </div>
 
           <div className="form-group">
