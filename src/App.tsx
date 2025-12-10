@@ -3122,34 +3122,61 @@ function InvoiceModal({
                   const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
                   const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
 
-                  // Vorlage mit Platzhaltern füllen
-                  let emailText = profile?.email_vorlage || `Hallo {spieler_name},
+                  // Positionen als Text formatieren
+                  const positionenText = rechnungsPositionen.map(p =>
+                    `${formatDateGerman(p.datum)} | ${p.zeit} | ${p.dauer.toFixed(1)} Std. | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+                  ).join('\n')
 
-anbei erhältst du die Rechnung für den Tennisunterricht im {monat}.
+                  // Korrektur falls vorhanden
+                  const korrekturNum = parseFloat(korrekturBetrag) || 0
+                  const korrekturText = korrekturNum !== 0
+                    ? `\nKorrektur: ${korrekturNum > 0 ? '+' : ''}${korrekturNum.toFixed(2)} €`
+                    : ''
 
-Rechnungsbetrag: {betrag} €
-Rechnungsnummer: {rechnungsnummer}
+                  // Komplette Rechnung als Text
+                  const rechnungText = `
+══════════════════════════════════════
+           R E C H N U N G
+══════════════════════════════════════
 
-Bitte überweise den Betrag auf folgendes Konto:
-IBAN: {iban}
+Rechnungssteller:
+${rechnungsstellerName}
+${rechnungsstellerAdresse}${ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''}
 
-Bei Fragen melde dich gerne.
+Rechnungsempfänger:
+${rechnungsempfaengerName}
+${rechnungsempfaengerAdresse}
 
-Sportliche Grüße
-{trainer_name}`
+──────────────────────────────────────
+Rechnungsnummer: ${rechnungsnummer}
+Rechnungsdatum:  ${formatDateGerman(rechnungsdatum)}
+Leistungszeitraum: ${monatFormatiert}
+──────────────────────────────────────
 
-                  emailText = emailText
-                    .replace(/{spieler_name}/g, rechnungsempfaengerName || selectedSummary?.spieler.name || '')
-                    .replace(/{monat}/g, monatFormatiert)
-                    .replace(/{betrag}/g, summen.gesamtBrutto.toFixed(2))
-                    .replace(/{rechnungsnummer}/g, rechnungsnummer)
-                    .replace(/{iban}/g, iban || '')
-                    .replace(/{trainer_name}/g, rechnungsstellerName || '')
+Positionen:
+${positionenText}${korrekturText}
+
+──────────────────────────────────────
+${!kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €
+USt (19%):     ${summen.gesamtUst.toFixed(2)} €
+` : ''}GESAMTBETRAG:  ${summen.gesamtBrutto.toFixed(2)} €
+──────────────────────────────────────
+${kleinunternehmer ? '\nGemäß §19 UStG wird keine Umsatzsteuer berechnet.\n' : ''}
+Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf:
+IBAN: ${iban}
+Kontoinhaber: ${rechnungsstellerName}
+
+Vielen Dank für die Zusammenarbeit!
+
+Mit freundlichen Grüßen
+${rechnungsstellerName}
+══════════════════════════════════════
+`
 
                   const subject = `Rechnung ${rechnungsnummer} - Tennisunterricht ${monatFormatiert}`
 
                   // mailto-Link öffnen
-                  const mailtoLink = `mailto:${spielerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailText)}`
+                  const mailtoLink = `mailto:${spielerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(rechnungText.trim())}`
                   window.open(mailtoLink, '_blank')
                 }}
                 disabled={!selectedSummary?.spieler.kontakt_email}
