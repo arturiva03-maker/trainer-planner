@@ -3578,7 +3578,7 @@ function BuchhaltungView({
   userEmail: string
 }) {
   const isAdmin = userEmail === 'arturiva03@gmail.com'
-  const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
+  const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer' | 'rechnung'>('einnahmen')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [ustZeitraumTyp, setUstZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
   const [euerZeitraumTyp, setEuerZeitraumTyp] = useState<'monat' | 'jahr'>('monat')
@@ -3812,8 +3812,8 @@ function BuchhaltungView({
 
   // Tabs für Navigation - USt nur wenn kein Kleinunternehmer
   const availableTabs = kleinunternehmer
-    ? (['einnahmen', 'ausgaben', 'euer'] as const)
-    : (['einnahmen', 'ausgaben', 'ust', 'euer'] as const)
+    ? (['einnahmen', 'ausgaben', 'euer', 'rechnung'] as const)
+    : (['einnahmen', 'ausgaben', 'ust', 'euer', 'rechnung'] as const)
 
   return (
     <div>
@@ -3827,7 +3827,8 @@ function BuchhaltungView({
           >
             {tab === 'einnahmen' ? 'Einnahmen' :
              tab === 'ausgaben' ? 'Ausgaben' :
-             tab === 'ust' ? 'USt' : 'EÜR'}
+             tab === 'ust' ? 'USt' :
+             tab === 'euer' ? 'EÜR' : 'Rechnung'}
           </button>
         ))}
       </div>
@@ -4633,6 +4634,370 @@ function BuchhaltungView({
           )}
         </div>
       )}
+
+      {/* Manuelle Rechnung Tab */}
+      {activeSubTab === 'rechnung' && (() => {
+        // State für manuelle Rechnung (innerhalb der Render-Funktion)
+        const [rechnungData, setRechnungData] = useState({
+          empfaengerName: '',
+          empfaengerAdresse: '',
+          rechnungsnummer: generateRechnungsnummer(),
+          rechnungsdatum: formatDate(new Date()),
+          leistungszeitraum: '',
+          beschreibung: 'Vermietung Tennisplatz',
+          positionen: [{ beschreibung: '', menge: 1, einzelpreis: 0 }] as { beschreibung: string; menge: number; einzelpreis: number }[],
+          ustSatz: kleinunternehmer ? 0 : 19,
+          zahlungsziel: 14,
+          freitext: ''
+        })
+
+        const addPosition = () => {
+          setRechnungData(prev => ({
+            ...prev,
+            positionen: [...prev.positionen, { beschreibung: '', menge: 1, einzelpreis: 0 }]
+          }))
+        }
+
+        const removePosition = (index: number) => {
+          if (rechnungData.positionen.length > 1) {
+            setRechnungData(prev => ({
+              ...prev,
+              positionen: prev.positionen.filter((_, i) => i !== index)
+            }))
+          }
+        }
+
+        const updatePosition = (index: number, field: string, value: string | number) => {
+          setRechnungData(prev => ({
+            ...prev,
+            positionen: prev.positionen.map((p, i) => i === index ? { ...p, [field]: value } : p)
+          }))
+        }
+
+        const nettoGesamt = rechnungData.positionen.reduce((s, p) => s + (p.menge * p.einzelpreis), 0)
+        const ustBetrag = kleinunternehmer ? 0 : (nettoGesamt * rechnungData.ustSatz / 100)
+        const bruttoGesamt = nettoGesamt + ustBetrag
+
+        const generateManuelleRechnungPDF = () => {
+          const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`
+          const rechnungsstellerAdresse = profile?.adresse || ''
+          const ustIdNrValue = profile?.ust_id_nr || ''
+          const ibanValue = profile?.iban || ''
+
+          const positionenHtml = rechnungData.positionen.map((p, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${p.beschreibung || '-'}</td>
+              <td style="text-align: right">${p.menge}</td>
+              <td style="text-align: right">${p.einzelpreis.toFixed(2)} €</td>
+              <td style="text-align: right">${(p.menge * p.einzelpreis).toFixed(2)} €</td>
+            </tr>
+          `).join('')
+
+          const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Rechnung ${rechnungData.rechnungsnummer}</title>
+              <style>
+                body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+                h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+                .section { margin-bottom: 20px; }
+                .flex { display: flex; justify-content: space-between; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f5f5f5; font-size: 11px; }
+                .total { text-align: right; margin-top: 20px; }
+                .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+                .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
+                .footer { margin-top: 40px; }
+                @media print {
+                  body { padding: 20px; margin: 0; }
+                  @page { size: A4; margin: 15mm; }
+                }
+              </style>
+            </head>
+            <body>
+              <h1>RECHNUNG</h1>
+
+              <div class="flex">
+                <div class="section">
+                  <strong>Rechnungssteller:</strong><br>
+                  ${rechnungsstellerName}<br>
+                  ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+                  ${ustIdNrValue ? `<br>USt-IdNr: ${ustIdNrValue}` : ''}
+                </div>
+                <div class="section" style="text-align: right;">
+                  <strong>Rechnungsempfänger:</strong><br>
+                  ${rechnungData.empfaengerName}<br>
+                  ${rechnungData.empfaengerAdresse.replace(/\n/g, '<br>')}
+                </div>
+              </div>
+
+              <div class="section">
+                <strong>Rechnungsnummer:</strong> ${rechnungData.rechnungsnummer}<br>
+                <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungData.rechnungsdatum)}<br>
+                ${rechnungData.leistungszeitraum ? `<strong>Leistungszeitraum:</strong> ${rechnungData.leistungszeitraum}<br>` : ''}
+              </div>
+
+              <p>Sehr geehrte Damen und Herren,</p>
+              <p>${rechnungData.beschreibung ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:` : 'ich erlaube mir, folgende Rechnung zu stellen:'}</p>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pos.</th>
+                    <th>Beschreibung</th>
+                    <th style="text-align: right">Menge</th>
+                    <th style="text-align: right">Einzelpreis</th>
+                    <th style="text-align: right">Gesamt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${positionenHtml}
+                </tbody>
+              </table>
+
+              <div class="total">
+                <div class="total-row">
+                  <span>Nettobetrag:</span>
+                  <span>${nettoGesamt.toFixed(2)} €</span>
+                </div>
+                ${!kleinunternehmer ? `
+                <div class="total-row">
+                  <span>USt (${rechnungData.ustSatz}%):</span>
+                  <span>${ustBetrag.toFixed(2)} €</span>
+                </div>
+                ` : ''}
+                <div class="total-row highlight">
+                  <span>Gesamtbetrag:</span>
+                  <span>${bruttoGesamt.toFixed(2)} €</span>
+                </div>
+              </div>
+
+              ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+
+              ${rechnungData.freitext ? `<p>${rechnungData.freitext.replace(/\n/g, '<br>')}</p>` : ''}
+
+              <div class="footer">
+                <p>Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:</p>
+                <p>
+                  <strong>IBAN:</strong> ${ibanValue}<br>
+                  <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
+                </p>
+                <p>Vielen Dank für Ihr Vertrauen.</p>
+                <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
+              </div>
+            </body>
+            </html>
+          `
+
+          const blob = new Blob([html], { type: 'text/html' })
+          const url = URL.createObjectURL(blob)
+          const printWindow = window.open(url, '_blank')
+          if (printWindow) {
+            printWindow.onload = () => {
+              printWindow.print()
+              URL.revokeObjectURL(url)
+            }
+          }
+        }
+
+        return (
+          <div className="card">
+            <div className="card-header">
+              <h3>Manuelle Rechnung erstellen</h3>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Rechnungsnummer *</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={rechnungData.rechnungsnummer}
+                  onChange={e => setRechnungData(prev => ({ ...prev, rechnungsnummer: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Rechnungsdatum *</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={rechnungData.rechnungsdatum}
+                  onChange={e => setRechnungData(prev => ({ ...prev, rechnungsdatum: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Empfänger Name *</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={rechnungData.empfaengerName}
+                  onChange={e => setRechnungData(prev => ({ ...prev, empfaengerName: e.target.value }))}
+                  placeholder="Name des Rechnungsempfängers"
+                />
+              </div>
+              <div className="form-group">
+                <label>Leistungszeitraum</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={rechnungData.leistungszeitraum}
+                  onChange={e => setRechnungData(prev => ({ ...prev, leistungszeitraum: e.target.value }))}
+                  placeholder="z.B. Januar 2025"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Empfänger Adresse</label>
+              <textarea
+                className="form-control"
+                value={rechnungData.empfaengerAdresse}
+                onChange={e => setRechnungData(prev => ({ ...prev, empfaengerAdresse: e.target.value }))}
+                rows={2}
+                placeholder="Straße, PLZ Ort"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Rechnungsbeschreibung</label>
+              <input
+                type="text"
+                className="form-control"
+                value={rechnungData.beschreibung}
+                onChange={e => setRechnungData(prev => ({ ...prev, beschreibung: e.target.value }))}
+                placeholder="z.B. Vermietung Tennisplatz"
+              />
+            </div>
+
+            <h4 style={{ margin: '24px 0 12px' }}>Positionen</h4>
+            {rechnungData.positionen.map((pos, index) => (
+              <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-end' }}>
+                <div className="form-group" style={{ flex: 3, marginBottom: 0 }}>
+                  {index === 0 && <label>Beschreibung</label>}
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={pos.beschreibung}
+                    onChange={e => updatePosition(index, 'beschreibung', e.target.value)}
+                    placeholder="Leistungsbeschreibung"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                  {index === 0 && <label>Menge</label>}
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={pos.menge}
+                    onChange={e => updatePosition(index, 'menge', parseFloat(e.target.value) || 0)}
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                  {index === 0 && <label>Einzelpreis (€)</label>}
+                  <input
+                    type="number"
+                    className="form-control"
+                    value={pos.einzelpreis}
+                    onChange={e => updatePosition(index, 'einzelpreis', parseFloat(e.target.value) || 0)}
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1, marginBottom: 0, textAlign: 'right' }}>
+                  {index === 0 && <label>Gesamt</label>}
+                  <div style={{ padding: '8px 12px', background: 'var(--gray-100)', borderRadius: 'var(--radius)' }}>
+                    {(pos.menge * pos.einzelpreis).toFixed(2)} €
+                  </div>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'var(--danger)', color: 'white', marginBottom: index === 0 ? 0 : 0 }}
+                  onClick={() => removePosition(index)}
+                  disabled={rechnungData.positionen.length <= 1}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button className="btn btn-secondary" onClick={addPosition} style={{ marginTop: 8 }}>
+              + Position hinzufügen
+            </button>
+
+            <div className="form-row" style={{ marginTop: 24 }}>
+              {!kleinunternehmer && (
+                <div className="form-group">
+                  <label>USt-Satz (%)</label>
+                  <select
+                    className="form-control"
+                    value={rechnungData.ustSatz}
+                    onChange={e => setRechnungData(prev => ({ ...prev, ustSatz: parseInt(e.target.value) }))}
+                  >
+                    <option value={19}>19%</option>
+                    <option value={7}>7%</option>
+                    <option value={0}>0%</option>
+                  </select>
+                </div>
+              )}
+              <div className="form-group">
+                <label>Zahlungsziel (Tage)</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={rechnungData.zahlungsziel}
+                  onChange={e => setRechnungData(prev => ({ ...prev, zahlungsziel: parseInt(e.target.value) || 14 }))}
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Freitext (optional)</label>
+              <textarea
+                className="form-control"
+                value={rechnungData.freitext}
+                onChange={e => setRechnungData(prev => ({ ...prev, freitext: e.target.value }))}
+                rows={2}
+                placeholder="Zusätzlicher Text auf der Rechnung..."
+              />
+            </div>
+
+            {/* Zusammenfassung */}
+            <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span>Nettobetrag:</span>
+                <span>{nettoGesamt.toFixed(2)} €</span>
+              </div>
+              {!kleinunternehmer && rechnungData.ustSatz > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span>USt ({rechnungData.ustSatz}%):</span>
+                  <span>{ustBetrag.toFixed(2)} €</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16, borderTop: '2px solid var(--gray-300)', paddingTop: 8 }}>
+                <span>Gesamtbetrag:</span>
+                <span>{bruttoGesamt.toFixed(2)} €</span>
+              </div>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: 24, width: '100%' }}
+              onClick={generateManuelleRechnungPDF}
+              disabled={!rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
+            >
+              PDF erstellen
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Ausgabe Modal */}
       {showAusgabeModal && (
