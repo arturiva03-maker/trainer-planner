@@ -4785,17 +4785,17 @@ function BuchhaltungView({
                     if (!periodeData) return
 
                     // Bemessungsgrundlage berechnen (Netto-Einnahmen)
-                    let periodeEinnahmen: typeof einnahmenPositionen = []
+                    let periodeEinnahmen: typeof alleEinnahmen = []
                     if (isQuartal) {
                       const q = parseInt(detailPeriode.split('Q')[1])
                       const startMonth = (q - 1) * 3 + 1
                       const endMonth = q * 3
-                      periodeEinnahmen = einnahmenPositionen.filter(e => {
+                      periodeEinnahmen = alleEinnahmen.filter(e => {
                         const m = parseInt(e.datum.substring(5, 7))
                         return m >= startMonth && m <= endMonth
                       })
                     } else {
-                      periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
+                      periodeEinnahmen = alleEinnahmen.filter(e => e.datum.startsWith(detailPeriode))
                     }
                     const bemessungsgrundlage = periodeEinnahmen.reduce((s, e) => s + e.netto, 0)
 
@@ -4887,14 +4887,14 @@ function BuchhaltungView({
           ) : detailPeriode ? (() => {
             // Detailansicht für gewählten Zeitraum
             const isQuartal = detailPeriode.includes('Q')
-            let periodeEinnahmen: typeof einnahmenPositionen = []
+            let periodeEinnahmen: typeof alleEinnahmen = []
             let periodeAusgaben: typeof jahresAusgaben = []
 
             if (isQuartal) {
               const q = parseInt(detailPeriode.split('Q')[1])
               const startMonth = (q - 1) * 3 + 1
               const endMonth = q * 3
-              periodeEinnahmen = einnahmenPositionen.filter(e => {
+              periodeEinnahmen = alleEinnahmen.filter(e => {
                 const m = parseInt(e.datum.substring(5, 7))
                 return m >= startMonth && m <= endMonth
               })
@@ -4903,7 +4903,7 @@ function BuchhaltungView({
                 return m >= startMonth && m <= endMonth
               })
             } else {
-              periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
+              periodeEinnahmen = alleEinnahmen.filter(e => e.datum.startsWith(detailPeriode))
               periodeAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(detailPeriode))
             }
 
@@ -5173,16 +5173,16 @@ function BuchhaltungView({
           {detailPeriode ? (() => {
             // Detailansicht für gewählten Zeitraum (nur Monat oder Jahr)
             const isJahr = detailPeriode.length === 4 // nur Jahreszahl
-            let periodeEinnahmen: typeof einnahmenPositionen = []
+            let periodeEinnahmen: typeof alleEinnahmen = []
             let periodeAusgaben: typeof jahresAusgaben = []
 
             if (isJahr) {
               // Ganzes Jahr
-              periodeEinnahmen = einnahmenPositionen
+              periodeEinnahmen = alleEinnahmen
               periodeAusgaben = jahresAusgaben
             } else {
               // Monat
-              periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
+              periodeEinnahmen = alleEinnahmen.filter(e => e.datum.startsWith(detailPeriode))
               periodeAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(detailPeriode))
             }
 
