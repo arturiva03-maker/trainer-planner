@@ -401,6 +401,7 @@ function MainApp({ user }: { user: User }) {
                 profile={profile}
                 onUpdate={loadAllData}
                 userId={user.id}
+                userEmail={user.email || ''}
               />
             )}
             {activeTab === 'weiteres' && (
@@ -3482,7 +3483,8 @@ function BuchhaltungView({
   ausgaben,
   profile,
   onUpdate,
-  userId
+  userId,
+  userEmail
 }: {
   trainings: Training[]
   tarife: Tarif[]
@@ -3491,7 +3493,9 @@ function BuchhaltungView({
   profile: TrainerProfile | null
   onUpdate: () => void
   userId: string
+  userEmail: string
 }) {
+  const isAdmin = userEmail === 'arturiva03@gmail.com'
   const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [zeitraumTyp, setZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
@@ -3784,7 +3788,7 @@ function BuchhaltungView({
               </select>
             </div>
           )}
-          {(activeSubTab === 'einnahmen' || activeSubTab === 'euer') && (
+          {isAdmin && (activeSubTab === 'einnahmen' || activeSubTab === 'euer') && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 0 }}>
               <input
                 type="checkbox"
