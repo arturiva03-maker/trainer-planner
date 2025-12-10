@@ -3472,6 +3472,7 @@ function BuchhaltungView({
   const [zeitraumTyp, setZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
   const [showAusgabeModal, setShowAusgabeModal] = useState(false)
   const [editingAusgabe, setEditingAusgabe] = useState<Ausgabe | null>(null)
+  const [inclBarEinnahmen, setInclBarEinnahmen] = useState(true)
 
   const kleinunternehmer = profile?.kleinunternehmer ?? false
 
@@ -3486,10 +3487,16 @@ function BuchhaltungView({
 
   // Einnahmen aus bezahlten Trainings berechnen
   const einnahmenPositionen = useMemo(() => {
-    const bezahlteTrainings = trainings.filter(t =>
-      t.status === 'durchgefuehrt' && (t.bezahlt || t.bar_bezahlt) &&
-      t.datum.startsWith(selectedYear.toString())
-    )
+    const bezahlteTrainings = trainings.filter(t => {
+      if (t.status !== 'durchgefuehrt') return false
+      if (!t.datum.startsWith(selectedYear.toString())) return false
+      // Prüfe Zahlungsstatus basierend auf Bar-Einnahmen-Filter
+      if (inclBarEinnahmen) {
+        return t.bezahlt || t.bar_bezahlt
+      } else {
+        return t.bezahlt && !t.bar_bezahlt
+      }
+    })
 
     return bezahlteTrainings.flatMap(t => {
       const tarif = tarife.find(ta => ta.id === t.tarif_id)
@@ -3537,7 +3544,7 @@ function BuchhaltungView({
         }
       })
     }).sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [trainings, tarife, spieler, selectedYear, kleinunternehmer])
+  }, [trainings, tarife, spieler, selectedYear, kleinunternehmer, inclBarEinnahmen])
 
   // Einnahmen nach Monat gruppiert
   const einnahmenNachMonat = useMemo(() => {
@@ -3702,14 +3709,19 @@ function BuchhaltungView({
     .filter(a => a.hat_vorsteuer)
     .reduce((s, a) => s + (a.betrag * a.vorsteuer_satz / (100 + a.vorsteuer_satz)), 0)
 
+  // Tabs für Navigation - USt nur wenn kein Kleinunternehmer
+  const availableTabs = kleinunternehmer
+    ? (['einnahmen', 'ausgaben', 'euer'] as const)
+    : (['einnahmen', 'ausgaben', 'ust', 'euer'] as const)
+
   return (
     <div>
-      {/* Sub-Tab Navigation */}
-      <div className="sub-tabs" style={{ marginBottom: 16 }}>
-        {(['einnahmen', 'ausgaben', 'ust', 'euer'] as const).map(tab => (
+      {/* Tab Navigation wie in Verwaltung */}
+      <div className="tabs">
+        {availableTabs.map(tab => (
           <button
             key={tab}
-            className={`sub-tab ${activeSubTab === tab ? 'active' : ''}`}
+            className={`tab ${activeSubTab === tab ? 'active' : ''}`}
             onClick={() => setActiveSubTab(tab)}
           >
             {tab === 'einnahmen' ? 'Einnahmen' :
@@ -3719,7 +3731,7 @@ function BuchhaltungView({
         ))}
       </div>
 
-      {/* Jahr-Auswahl */}
+      {/* Filter-Optionen */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -3746,6 +3758,16 @@ function BuchhaltungView({
                 <option value="quartal">Quartalsweise</option>
               </select>
             </div>
+          )}
+          {(activeSubTab === 'einnahmen' || activeSubTab === 'euer') && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 0 }}>
+              <input
+                type="checkbox"
+                checked={inclBarEinnahmen}
+                onChange={e => setInclBarEinnahmen(e.target.checked)}
+              />
+              Bar-Einnahmen einbeziehen
+            </label>
           )}
         </div>
       </div>
