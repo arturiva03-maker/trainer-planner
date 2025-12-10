@@ -4641,24 +4641,9 @@ function WeiteresView({
   const [name, setName] = useState(profile?.name || '')
   const [nachname, setNachname] = useState(profile?.nachname || '')
   const [adresse, setAdresse] = useState(profile?.adresse || '')
-  const [stundensatz, setStundensatz] = useState(profile?.stundensatz?.toString() || '25')
   const [iban, setIban] = useState(profile?.iban || '')
   const [ustIdNr, setUstIdNr] = useState(profile?.ust_id_nr || '')
   const [kleinunternehmer, setKleinunternehmer] = useState(profile?.kleinunternehmer || false)
-  const [emailVorlage, setEmailVorlage] = useState(profile?.email_vorlage || `Hallo {spieler_name},
-
-anbei erhältst du die Rechnung für den Tennisunterricht im {monat}.
-
-Rechnungsbetrag: {betrag} €
-Rechnungsnummer: {rechnungsnummer}
-
-Bitte überweise den Betrag auf folgendes Konto:
-IBAN: {iban}
-
-Bei Fragen melde dich gerne.
-
-Sportliche Grüße
-{trainer_name}`)
   const [notiz, setNotiz] = useState(profile?.notiz || '')
   const [saving, setSaving] = useState(false)
 
@@ -4669,11 +4654,9 @@ Sportliche Grüße
         name,
         nachname: nachname || null,
         adresse: adresse || null,
-        stundensatz: parseFloat(stundensatz),
         iban: iban || null,
         ust_id_nr: ustIdNr || null,
         kleinunternehmer,
-        email_vorlage: emailVorlage || null,
         notiz: notiz || null,
         updated_at: new Date().toISOString()
       }
@@ -4751,15 +4734,6 @@ Sportliche Grüße
 
           <div className="form-row">
             <div className="form-group">
-              <label>Standard-Stundensatz (€)</label>
-              <input
-                type="number"
-                className="form-control"
-                value={stundensatz}
-                onChange={(e) => setStundensatz(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
               <label>IBAN</label>
               <input
                 type="text"
@@ -4769,9 +4743,6 @@ Sportliche Grüße
                 placeholder="DE..."
               />
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
               <label>USt-IdNr (optional)</label>
               <input
@@ -4781,30 +4752,17 @@ Sportliche Grüße
                 onChange={(e) => setUstIdNr(e.target.value)}
               />
             </div>
-            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <label className="checkbox-group" style={{ marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={kleinunternehmer}
-                  onChange={(e) => setKleinunternehmer(e.target.checked)}
-                />
-                Kleinunternehmer (§19 UStG)
-              </label>
-            </div>
           </div>
 
-          <div className="form-group">
-            <label>E-Mail-Vorlage für Rechnungen</label>
-            <textarea
-              className="form-control"
-              value={emailVorlage}
-              onChange={(e) => setEmailVorlage(e.target.value)}
-              rows={12}
-              style={{ fontFamily: 'monospace', fontSize: 13 }}
-            />
-            <small style={{ color: 'var(--gray-500)', marginTop: 4, display: 'block' }}>
-              Platzhalter: {'{spieler_name}'}, {'{monat}'}, {'{betrag}'}, {'{rechnungsnummer}'}, {'{iban}'}, {'{trainer_name}'}
-            </small>
+          <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <label className="checkbox-group" style={{ marginBottom: 12 }}>
+              <input
+                type="checkbox"
+                checked={kleinunternehmer}
+                onChange={(e) => setKleinunternehmer(e.target.checked)}
+              />
+              Kleinunternehmer (§19 UStG)
+            </label>
           </div>
 
           <div className="form-group">
