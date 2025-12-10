@@ -4239,11 +4239,131 @@ function BuchhaltungView({
         <div className="card">
           <div className="card-header">
             <h3>Einnahme-Überschuss-Rechnung {selectedYear}</h3>
-            {detailPeriode && (
-              <button className="btn btn-secondary" onClick={() => setDetailPeriode(null)}>
-                Zurück zur Übersicht
+            <div style={{ display: 'flex', gap: 8 }}>
+              {detailPeriode && (
+                <button className="btn btn-secondary" onClick={() => setDetailPeriode(null)}>
+                  Zurück zur Übersicht
+                </button>
+              )}
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  // EÜR-Bericht für Steuerberater generieren
+                  const trainerName = profile?.name || 'Trainer'
+                  const trainerNachname = profile?.nachname || ''
+
+                  let bericht = `EINNAHME-ÜBERSCHUSS-RECHNUNG ${selectedYear}\n`
+                  bericht += `=========================================\n`
+                  bericht += `Erstellt am: ${formatDateGerman(formatDate(new Date()))}\n`
+                  bericht += `Trainer: ${trainerName}${trainerNachname ? ' ' + trainerNachname : ''}\n`
+                  if (profile?.adresse) bericht += `Adresse: ${profile.adresse.replace(/\n/g, ', ')}\n`
+                  if (profile?.ust_id_nr) bericht += `USt-IdNr: ${profile.ust_id_nr}\n`
+                  if (kleinunternehmer) bericht += `Status: Kleinunternehmer (§19 UStG)\n`
+                  bericht += `\n`
+
+                  // Zusammenfassung
+                  bericht += `ZUSAMMENFASSUNG\n`
+                  bericht += `-----------------------------------------\n`
+                  bericht += `Einnahmen (netto):     ${gesamtEinnahmenNetto.toFixed(2).padStart(12)} EUR\n`
+                  bericht += `Ausgaben (netto):      ${gesamtAusgabenNetto.toFixed(2).padStart(12)} EUR\n`
+                  bericht += `-----------------------------------------\n`
+                  bericht += `Gewinn/Verlust:        ${(gesamtEinnahmenNetto - gesamtAusgabenNetto).toFixed(2).padStart(12)} EUR\n`
+                  bericht += `\n`
+
+                  if (!kleinunternehmer) {
+                    bericht += `UMSATZSTEUER\n`
+                    bericht += `-----------------------------------------\n`
+                    bericht += `USt aus Einnahmen:     ${gesamtEinnahmenUst.toFixed(2).padStart(12)} EUR\n`
+                    bericht += `Vorsteuer aus Ausgaben:${gesamtVorsteuer.toFixed(2).padStart(12)} EUR\n`
+                    bericht += `Zahllast:              ${(gesamtEinnahmenUst - gesamtVorsteuer).toFixed(2).padStart(12)} EUR\n`
+                    bericht += `\n`
+                  }
+
+                  // Monatliche Übersicht
+                  bericht += `MONATLICHE ÜBERSICHT\n`
+                  bericht += `-----------------------------------------\n`
+                  const monatlicheZeilen = euerZeitraumTyp === 'monat' ? euerZeilen : (() => {
+                    const zeilen = []
+                    for (let m = 1; m <= 12; m++) {
+                      const monatStr = `${selectedYear}-${m.toString().padStart(2, '0')}`
+                      const monatEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(monatStr))
+                      const monatAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(monatStr))
+                      const einnahmenNetto = monatEinnahmen.reduce((s, e) => s + e.netto, 0)
+                      const ausgabenNetto = monatAusgaben.reduce((s, a) => {
+                        if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
+                        return s + a.betrag
+                      }, 0)
+                      zeilen.push({ label: formatMonthGerman(monatStr), einnahmenNetto, ausgabenNetto, gewinn: einnahmenNetto - ausgabenNetto })
+                    }
+                    return zeilen
+                  })()
+
+                  monatlicheZeilen.forEach(z => {
+                    bericht += `${z.label.padEnd(15)} | Einn: ${z.einnahmenNetto.toFixed(2).padStart(10)} | Ausg: ${z.ausgabenNetto.toFixed(2).padStart(10)} | G/V: ${z.gewinn.toFixed(2).padStart(10)}\n`
+                  })
+                  bericht += `\n`
+
+                  // Detaillierte Einnahmen
+                  bericht += `EINNAHMEN (DETAIL)\n`
+                  bericht += `=========================================\n`
+                  bericht += `Datum       | Spieler                    | Tarif              | Netto      | Brutto     | USt\n`
+                  bericht += `---------------------------------------------------------------------------------------------------------\n`
+                  einnahmenPositionen.forEach(e => {
+                    bericht += `${formatDateGerman(e.datum)} | ${e.spielerName.substring(0, 26).padEnd(26)} | ${e.tarifName.substring(0, 18).padEnd(18)} | ${e.netto.toFixed(2).padStart(10)} | ${e.brutto.toFixed(2).padStart(10)} | ${e.ust.toFixed(2).padStart(8)}\n`
+                  })
+                  bericht += `---------------------------------------------------------------------------------------------------------\n`
+                  bericht += `SUMME EINNAHMEN:                                                        | ${gesamtEinnahmenNetto.toFixed(2).padStart(10)} | ${gesamtEinnahmenBrutto.toFixed(2).padStart(10)} | ${gesamtEinnahmenUst.toFixed(2).padStart(8)}\n`
+                  bericht += `\n`
+
+                  // Detaillierte Ausgaben
+                  bericht += `AUSGABEN (DETAIL)\n`
+                  bericht += `=========================================\n`
+                  bericht += `Datum       | Kategorie      | Beschreibung                     | Brutto     | Netto      | Vorsteuer\n`
+                  bericht += `---------------------------------------------------------------------------------------------------------\n`
+                  jahresAusgaben.forEach(a => {
+                    const kategorie = AUSGABE_KATEGORIEN.find(k => k.value === a.kategorie)?.label || a.kategorie
+                    const netto = a.hat_vorsteuer ? a.betrag / (1 + a.vorsteuer_satz / 100) : a.betrag
+                    const vorsteuer = a.hat_vorsteuer ? a.betrag * a.vorsteuer_satz / (100 + a.vorsteuer_satz) : 0
+                    bericht += `${formatDateGerman(a.datum)} | ${kategorie.substring(0, 14).padEnd(14)} | ${(a.beschreibung || '-').substring(0, 32).padEnd(32)} | ${a.betrag.toFixed(2).padStart(10)} | ${netto.toFixed(2).padStart(10)} | ${vorsteuer.toFixed(2).padStart(8)}\n`
+                  })
+                  bericht += `---------------------------------------------------------------------------------------------------------\n`
+                  const summeAusgabenBrutto = jahresAusgaben.reduce((s, a) => s + a.betrag, 0)
+                  bericht += `SUMME AUSGABEN:                                                         | ${summeAusgabenBrutto.toFixed(2).padStart(10)} | ${gesamtAusgabenNetto.toFixed(2).padStart(10)} | ${gesamtVorsteuer.toFixed(2).padStart(8)}\n`
+                  bericht += `\n`
+
+                  // Ausgaben nach Kategorie
+                  bericht += `AUSGABEN NACH KATEGORIE\n`
+                  bericht += `-----------------------------------------\n`
+                  AUSGABE_KATEGORIEN.forEach(kat => {
+                    const katAusgaben = jahresAusgaben.filter(a => a.kategorie === kat.value)
+                    const summe = katAusgaben.reduce((s, a) => {
+                      if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
+                      return s + a.betrag
+                    }, 0)
+                    if (summe > 0) {
+                      bericht += `${kat.label.padEnd(20)} ${summe.toFixed(2).padStart(12)} EUR\n`
+                    }
+                  })
+                  bericht += `\n`
+
+                  bericht += `=========================================\n`
+                  bericht += `Ende des Berichts\n`
+
+                  // Download als Textdatei
+                  const blob = new Blob([bericht], { type: 'text/plain;charset=utf-8' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `EUER_${selectedYear}_${trainerName.replace(/\s/g, '_')}.txt`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  URL.revokeObjectURL(url)
+                }}
+              >
+                Bericht exportieren
               </button>
-            )}
+            </div>
           </div>
 
           {detailPeriode ? (() => {
