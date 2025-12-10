@@ -12,7 +12,8 @@ import type {
   PlanungSheet,
   PlanungData,
   Tab,
-  Ausgabe
+  Ausgabe,
+  ManuelleRechnung
 } from './types'
 import { AUSGABE_KATEGORIEN } from './types'
 import {
@@ -170,6 +171,7 @@ function MainApp({ user }: { user: User }) {
   const [notizen, setNotizen] = useState<Notiz[]>([])
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
   const [ausgaben, setAusgaben] = useState<Ausgabe[]>([])
+  const [manuelleRechnungen, setManuelleRechnungen] = useState<ManuelleRechnung[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
   // Load all data
@@ -189,7 +191,8 @@ function MainApp({ user }: { user: User }) {
         adjustmentsRes,
         notizenRes,
         planungRes,
-        ausgabenRes
+        ausgabenRes,
+        manuelleRechnungenRes
       ] = await Promise.all([
         supabase.from('trainer_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('spieler').select('*').eq('user_id', user.id).order('name'),
@@ -199,7 +202,8 @@ function MainApp({ user }: { user: User }) {
         supabase.from('monthly_adjustments').select('*').eq('user_id', user.id),
         supabase.from('notizen').select('*').eq('user_id', user.id).order('erstellt_am', { ascending: false }),
         supabase.from('planung_sheets').select('*').eq('user_id', user.id).order('created_at'),
-        supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false })
+        supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
+        supabase.from('manuelle_rechnungen').select('*').eq('user_id', user.id).order('rechnungsdatum', { ascending: false })
       ])
 
       if (profileRes.data) setProfile(profileRes.data)
@@ -211,6 +215,7 @@ function MainApp({ user }: { user: User }) {
       if (notizenRes.data) setNotizen(notizenRes.data)
       if (planungRes.data) setPlanungSheets(planungRes.data)
       if (ausgabenRes.data) setAusgaben(ausgabenRes.data)
+      if (manuelleRechnungenRes.data) setManuelleRechnungen(manuelleRechnungenRes.data)
     } catch (err) {
       console.error('Error loading data:', err)
     } finally {
@@ -371,8 +376,10 @@ function MainApp({ user }: { user: User }) {
                 tarife={tarife}
                 adjustments={adjustments}
                 profile={profile}
+                manuelleRechnungen={manuelleRechnungen}
                 onUpdate={loadAllData}
                 onNavigateToTraining={handleNavigateToTraining}
+                userId={user.id}
               />
             )}
             {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
@@ -398,6 +405,7 @@ function MainApp({ user }: { user: User }) {
                 tarife={tarife}
                 spieler={spieler}
                 ausgaben={ausgaben}
+                manuelleRechnungen={manuelleRechnungen}
                 profile={profile}
                 onUpdate={loadAllData}
                 userId={user.id}
@@ -1902,16 +1910,20 @@ function AbrechnungView({
   tarife,
   adjustments,
   profile,
+  manuelleRechnungen,
   onUpdate,
-  onNavigateToTraining
+  onNavigateToTraining,
+  userId
 }: {
   trainings: Training[]
   spieler: Spieler[]
   tarife: Tarif[]
   adjustments: MonthlyAdjustment[]
   profile: TrainerProfile | null
+  manuelleRechnungen: ManuelleRechnung[]
   onUpdate: () => void
   onNavigateToTraining: (training: Training) => void
+  userId: string
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
@@ -1919,6 +1931,7 @@ function AbrechnungView({
   const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
   const [selectedTag, setSelectedTag] = useState<string>('')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showManuelleRechnungModal, setShowManuelleRechnungModal] = useState(false)
   const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
 
   const monthTrainings = useMemo(() => {
@@ -2079,13 +2092,45 @@ function AbrechnungView({
     return result
   }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag, tarife])
 
+  // Manuelle Rechnungen des ausgewählten Monats
+  const monthManuelleRechnungen = useMemo(() => {
+    return manuelleRechnungen.filter(r => r.monat === selectedMonth)
+  }, [manuelleRechnungen, selectedMonth])
+
+  // Gefilterte manuelle Rechnungen basierend auf Status-Filter
+  const filteredManuelleRechnungen = useMemo(() => {
+    switch (filter) {
+      case 'bezahlt':
+        return monthManuelleRechnungen.filter(r => r.bezahlt && !r.bar_bezahlt)
+      case 'offen':
+        return monthManuelleRechnungen.filter(r => !r.bezahlt && !r.bar_bezahlt)
+      case 'bar':
+        return monthManuelleRechnungen.filter(r => r.bar_bezahlt)
+      default:
+        return monthManuelleRechnungen
+    }
+  }, [monthManuelleRechnungen, filter])
+
   const stats = useMemo(() => {
-    const total = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
-    const bar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
-    const bezahlt = bar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
-    const offen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
-    return { total, bar, bezahlt, offen }
-  }, [filteredSummary])
+    // Trainings-Stats
+    const trainingsTotal = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
+    const trainingsBar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
+    const trainingsBezahlt = trainingsBar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
+    const trainingsOffen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
+
+    // Manuelle Rechnungen Stats
+    const manuelleTotal = monthManuelleRechnungen.reduce((sum, r) => sum + r.brutto_gesamt, 0)
+    const manuelleBar = monthManuelleRechnungen.filter(r => r.bar_bezahlt).reduce((sum, r) => sum + r.brutto_gesamt, 0)
+    const manuelleBezahlt = monthManuelleRechnungen.filter(r => r.bezahlt || r.bar_bezahlt).reduce((sum, r) => sum + r.brutto_gesamt, 0)
+    const manuelleOffen = monthManuelleRechnungen.filter(r => !r.bezahlt && !r.bar_bezahlt).reduce((sum, r) => sum + r.brutto_gesamt, 0)
+
+    return {
+      total: trainingsTotal + manuelleTotal,
+      bar: trainingsBar + manuelleBar,
+      bezahlt: trainingsBezahlt + manuelleBezahlt,
+      offen: trainingsOffen + manuelleOffen
+    }
+  }, [filteredSummary, monthManuelleRechnungen])
 
   // Alle Trainings eines Spielers im Monat als bezahlt/offen markieren
   const toggleAlleBezahlt = async (spielerId: string, currentStatus: boolean) => {
@@ -2109,6 +2154,31 @@ function AbrechnungView({
       .update({ bezahlt: !currentStatus })
       .eq('id', trainingId)
 
+    onUpdate()
+  }
+
+  // Manuelle Rechnung als bezahlt/offen markieren
+  const toggleManuelleRechnungBezahlt = async (rechnungId: string, currentBezahlt: boolean, barBezahlt?: boolean) => {
+    if (barBezahlt !== undefined) {
+      // Bar-Status umschalten
+      await supabase
+        .from('manuelle_rechnungen')
+        .update({ bar_bezahlt: barBezahlt, bezahlt: barBezahlt ? false : false })
+        .eq('id', rechnungId)
+    } else {
+      // Normal bezahlt umschalten
+      await supabase
+        .from('manuelle_rechnungen')
+        .update({ bezahlt: !currentBezahlt, bar_bezahlt: false })
+        .eq('id', rechnungId)
+    }
+    onUpdate()
+  }
+
+  // Manuelle Rechnung löschen
+  const deleteManuelleRechnung = async (rechnungId: string) => {
+    if (!confirm('Rechnung wirklich löschen?')) return
+    await supabase.from('manuelle_rechnungen').delete().eq('id', rechnungId)
     onUpdate()
   }
 
@@ -2207,11 +2277,132 @@ function AbrechnungView({
                 </select>
               )}
             </div>
-            <button className="btn btn-primary" onClick={() => setShowInvoiceModal(true)}>
-              Rechnung erstellen
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-secondary" onClick={() => setShowManuelleRechnungModal(true)}>
+                + Sonstige Rechnung
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowInvoiceModal(true)}>
+                Rechnung erstellen
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Manuelle Rechnungen Sektion */}
+        {filteredManuelleRechnungen.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <h4 style={{ margin: '0 0 12px', color: 'var(--gray-600)' }}>Sonstige Rechnungen</h4>
+            <div className="table-container desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nr.</th>
+                    <th>Empfänger</th>
+                    <th>Beschreibung</th>
+                    <th>Betrag</th>
+                    <th>Status</th>
+                    <th>Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredManuelleRechnungen.map(rechnung => (
+                    <tr key={rechnung.id}>
+                      <td>{rechnung.rechnungsnummer}</td>
+                      <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{rechnung.empfaenger_name}</td>
+                      <td>{rechnung.beschreibung || '-'}</td>
+                      <td>{rechnung.brutto_gesamt.toFixed(2)} €</td>
+                      <td>
+                        <span className={`status-badge ${rechnung.bezahlt || rechnung.bar_bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
+                          {rechnung.bar_bezahlt ? 'Bar' : rechnung.bezahlt ? 'Bezahlt' : 'Offen'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, rechnung.bezahlt)}
+                            title={rechnung.bezahlt ? 'Als offen markieren' : 'Als bezahlt markieren'}
+                          >
+                            {rechnung.bezahlt || rechnung.bar_bezahlt ? '↩' : '✓'}
+                          </button>
+                          {!rechnung.bezahlt && !rechnung.bar_bezahlt && (
+                            <button
+                              className="btn btn-sm"
+                              style={{ background: 'var(--warning)', color: 'white' }}
+                              onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, false, true)}
+                              title="Als bar bezahlt markieren"
+                            >
+                              Bar
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: 'var(--danger)', color: 'white' }}
+                            onClick={() => deleteManuelleRechnung(rechnung.id)}
+                            title="Löschen"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile Cards für manuelle Rechnungen */}
+            <div className="mobile-card-list">
+              {filteredManuelleRechnungen.map(rechnung => (
+                <div key={rechnung.id} className="mobile-card">
+                  <div className="mobile-card-header">
+                    <div>
+                      <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{rechnung.empfaenger_name}</div>
+                      <div className="mobile-card-subtitle">{rechnung.rechnungsnummer} - {rechnung.beschreibung || 'Sonstige Rechnung'}</div>
+                    </div>
+                    <span className={`status-badge ${rechnung.bezahlt || rechnung.bar_bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
+                      {rechnung.bar_bezahlt ? 'Bar' : rechnung.bezahlt ? 'Bezahlt' : 'Offen'}
+                    </span>
+                  </div>
+                  <div className="mobile-card-content">
+                    <div className="mobile-card-row">
+                      <span>Betrag</span>
+                      <strong>{rechnung.brutto_gesamt.toFixed(2)} €</strong>
+                    </div>
+                  </div>
+                  <div className="mobile-card-actions">
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, rechnung.bezahlt)}
+                    >
+                      {rechnung.bezahlt || rechnung.bar_bezahlt ? 'Offen' : 'Bezahlt'}
+                    </button>
+                    {!rechnung.bezahlt && !rechnung.bar_bezahlt && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ background: 'var(--warning)', color: 'white' }}
+                        onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, false, true)}
+                      >
+                        Bar
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: 'var(--danger)', color: 'white' }}
+                      onClick={() => deleteManuelleRechnung(rechnung.id)}
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Spieler-Trainings Überschrift */}
+        {filteredSummary.length > 0 && filteredManuelleRechnungen.length > 0 && (
+          <h4 style={{ margin: '0 0 12px', color: 'var(--gray-600)' }}>Trainings</h4>
+        )}
 
         {/* Desktop Table */}
         <div className="table-container desktop-table">
@@ -2469,6 +2660,20 @@ function AbrechnungView({
           selectedMonth={selectedMonth}
           onClose={() => {
             setShowInvoiceModal(false)
+          }}
+        />
+      )}
+
+      {/* Manuelle Rechnung Modal */}
+      {showManuelleRechnungModal && (
+        <ManuelleRechnungModal
+          profile={profile}
+          selectedMonth={selectedMonth}
+          userId={userId}
+          onClose={() => setShowManuelleRechnungModal(false)}
+          onSave={() => {
+            setShowManuelleRechnungModal(false)
+            onUpdate()
           }}
         />
       )}
@@ -3199,6 +3404,461 @@ ${rechnungsstellerName}
   )
 }
 
+// ============ MANUELLE RECHNUNG MODAL ============
+function ManuelleRechnungModal({
+  profile,
+  selectedMonth,
+  userId,
+  onClose,
+  onSave
+}: {
+  profile: TrainerProfile | null
+  selectedMonth: string
+  userId: string
+  onClose: () => void
+  onSave: () => void
+}) {
+  const kleinunternehmer = profile?.kleinunternehmer ?? false
+
+  const [rechnungData, setRechnungData] = useState({
+    empfaengerName: '',
+    empfaengerAdresse: '',
+    rechnungsnummer: generateRechnungsnummer(),
+    rechnungsdatum: formatDate(new Date()),
+    leistungszeitraum: '',
+    beschreibung: '',
+    positionen: [{ beschreibung: '', menge: 1, einzelpreis: 0 }] as { beschreibung: string; menge: number; einzelpreis: number }[],
+    ustSatz: kleinunternehmer ? 0 : 19,
+    zahlungsziel: 14,
+    freitext: '',
+    alsOffenPostenSpeichern: true
+  })
+
+  const [saving, setSaving] = useState(false)
+
+  const addPosition = () => {
+    setRechnungData(prev => ({
+      ...prev,
+      positionen: [...prev.positionen, { beschreibung: '', menge: 1, einzelpreis: 0 }]
+    }))
+  }
+
+  const removePosition = (index: number) => {
+    if (rechnungData.positionen.length > 1) {
+      setRechnungData(prev => ({
+        ...prev,
+        positionen: prev.positionen.filter((_, i) => i !== index)
+      }))
+    }
+  }
+
+  const updatePosition = (index: number, field: string, value: string | number) => {
+    setRechnungData(prev => ({
+      ...prev,
+      positionen: prev.positionen.map((p, i) => i === index ? { ...p, [field]: value } : p)
+    }))
+  }
+
+  const nettoGesamt = rechnungData.positionen.reduce((s, p) => s + (p.menge * p.einzelpreis), 0)
+  const ustBetrag = kleinunternehmer ? 0 : (nettoGesamt * rechnungData.ustSatz / 100)
+  const bruttoGesamt = nettoGesamt + ustBetrag
+
+  const saveRechnung = async () => {
+    if (!rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)) {
+      alert('Bitte Empfänger und mindestens eine Position mit Preis angeben.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      // Speichere in Datenbank
+      await supabase.from('manuelle_rechnungen').insert({
+        user_id: userId,
+        rechnungsnummer: rechnungData.rechnungsnummer,
+        rechnungsdatum: rechnungData.rechnungsdatum,
+        monat: selectedMonth,
+        empfaenger_name: rechnungData.empfaengerName,
+        empfaenger_adresse: rechnungData.empfaengerAdresse || null,
+        leistungszeitraum: rechnungData.leistungszeitraum || null,
+        beschreibung: rechnungData.beschreibung || null,
+        positionen: rechnungData.positionen,
+        ust_satz: rechnungData.ustSatz,
+        netto_gesamt: nettoGesamt,
+        ust_betrag: ustBetrag,
+        brutto_gesamt: bruttoGesamt,
+        zahlungsziel: rechnungData.zahlungsziel,
+        freitext: rechnungData.freitext || null,
+        bezahlt: false,
+        bar_bezahlt: false
+      })
+
+      onSave()
+    } catch (err) {
+      console.error('Fehler beim Speichern:', err)
+      alert('Fehler beim Speichern der Rechnung')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const generateAndSavePDF = async () => {
+    // Zuerst speichern
+    if (rechnungData.alsOffenPostenSpeichern) {
+      await saveRechnung()
+    }
+
+    // Dann PDF generieren
+    const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`
+    const rechnungsstellerAdresse = profile?.adresse || ''
+    const ustIdNrValue = profile?.ust_id_nr || ''
+    const ibanValue = profile?.iban || ''
+
+    const positionenHtml = rechnungData.positionen.map((p, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${p.beschreibung || '-'}</td>
+        <td style="text-align: right">${p.menge}</td>
+        <td style="text-align: right">${p.einzelpreis.toFixed(2)} EUR</td>
+        <td style="text-align: right">${(p.menge * p.einzelpreis).toFixed(2)} EUR</td>
+      </tr>
+    `).join('')
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Rechnung ${rechnungData.rechnungsnummer}</title>
+        <style>
+          body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+          h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+          .section { margin-bottom: 20px; }
+          .flex { display: flex; justify-content: space-between; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background: #f5f5f5; font-size: 11px; }
+          .total { text-align: right; margin-top: 20px; }
+          .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+          .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
+          .footer { margin-top: 40px; }
+          @media print {
+            body { padding: 20px; margin: 0; }
+            @page { size: A4; margin: 15mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>RECHNUNG</h1>
+
+        <div class="flex">
+          <div class="section">
+            <strong>Rechnungssteller:</strong><br>
+            ${rechnungsstellerName}<br>
+            ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+            ${ustIdNrValue ? `<br>USt-IdNr: ${ustIdNrValue}` : ''}
+          </div>
+          <div class="section" style="text-align: right;">
+            <strong>Rechnungsempfänger:</strong><br>
+            ${rechnungData.empfaengerName}<br>
+            ${rechnungData.empfaengerAdresse.replace(/\n/g, '<br>')}
+          </div>
+        </div>
+
+        <div class="section">
+          <strong>Rechnungsnummer:</strong> ${rechnungData.rechnungsnummer}<br>
+          <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungData.rechnungsdatum)}<br>
+          ${rechnungData.leistungszeitraum ? `<strong>Leistungszeitraum:</strong> ${rechnungData.leistungszeitraum}<br>` : ''}
+        </div>
+
+        <p>Sehr geehrte Damen und Herren,</p>
+        <p>${rechnungData.beschreibung ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:` : 'ich erlaube mir, folgende Rechnung zu stellen:'}</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Pos.</th>
+              <th>Beschreibung</th>
+              <th style="text-align: right">Menge</th>
+              <th style="text-align: right">Einzelpreis</th>
+              <th style="text-align: right">Gesamt</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${positionenHtml}
+          </tbody>
+        </table>
+
+        <div class="total">
+          <div class="total-row">
+            <span>Nettobetrag:</span>
+            <span>${nettoGesamt.toFixed(2)} EUR</span>
+          </div>
+          ${!kleinunternehmer && rechnungData.ustSatz > 0 ? `
+          <div class="total-row">
+            <span>USt (${rechnungData.ustSatz}%):</span>
+            <span>${ustBetrag.toFixed(2)} EUR</span>
+          </div>
+          ` : ''}
+          <div class="total-row highlight">
+            <span>Gesamtbetrag:</span>
+            <span>${bruttoGesamt.toFixed(2)} EUR</span>
+          </div>
+        </div>
+
+        ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+
+        ${rechnungData.freitext ? `<p>${rechnungData.freitext.replace(/\n/g, '<br>')}</p>` : ''}
+
+        <div class="footer">
+          <p>Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:</p>
+          <p>
+            <strong>IBAN:</strong> ${ibanValue}<br>
+            <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
+          </p>
+          <p>Vielen Dank für Ihr Vertrauen.</p>
+          <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
+        </div>
+      </body>
+      </html>
+    `
+
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const printWindow = window.open(url, '_blank')
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print()
+        URL.revokeObjectURL(url)
+      }
+    }
+
+    if (!rechnungData.alsOffenPostenSpeichern) {
+      onClose()
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '90vh', overflow: 'auto' }}>
+        <div className="modal-header">
+          <h2>Sonstige Rechnung erstellen</h2>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Rechnungsnummer *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={rechnungData.rechnungsnummer}
+              onChange={e => setRechnungData(prev => ({ ...prev, rechnungsnummer: e.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label>Rechnungsdatum *</label>
+            <input
+              type="date"
+              className="form-control"
+              value={rechnungData.rechnungsdatum}
+              onChange={e => setRechnungData(prev => ({ ...prev, rechnungsdatum: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Empfänger Name *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={rechnungData.empfaengerName}
+              onChange={e => setRechnungData(prev => ({ ...prev, empfaengerName: e.target.value }))}
+              placeholder="Name des Rechnungsempfängers"
+            />
+          </div>
+          <div className="form-group">
+            <label>Leistungszeitraum</label>
+            <input
+              type="text"
+              className="form-control"
+              value={rechnungData.leistungszeitraum}
+              onChange={e => setRechnungData(prev => ({ ...prev, leistungszeitraum: e.target.value }))}
+              placeholder="z.B. Januar 2025"
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Empfänger Adresse</label>
+          <textarea
+            className="form-control"
+            value={rechnungData.empfaengerAdresse}
+            onChange={e => setRechnungData(prev => ({ ...prev, empfaengerAdresse: e.target.value }))}
+            rows={2}
+            placeholder="Straße, PLZ Ort"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Rechnungsbeschreibung</label>
+          <input
+            type="text"
+            className="form-control"
+            value={rechnungData.beschreibung}
+            onChange={e => setRechnungData(prev => ({ ...prev, beschreibung: e.target.value }))}
+            placeholder="z.B. Vermietung Tennisplatz"
+          />
+        </div>
+
+        <h4 style={{ margin: '24px 0 12px' }}>Positionen</h4>
+        {rechnungData.positionen.map((pos, index) => (
+          <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-end' }}>
+            <div className="form-group" style={{ flex: 3, marginBottom: 0 }}>
+              {index === 0 && <label>Beschreibung</label>}
+              <input
+                type="text"
+                className="form-control"
+                value={pos.beschreibung}
+                onChange={e => updatePosition(index, 'beschreibung', e.target.value)}
+                placeholder="Leistungsbeschreibung"
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+              {index === 0 && <label>Menge</label>}
+              <input
+                type="number"
+                className="form-control"
+                value={pos.menge}
+                onChange={e => updatePosition(index, 'menge', parseFloat(e.target.value) || 0)}
+                min="0"
+                step="0.5"
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+              {index === 0 && <label>Preis (EUR)</label>}
+              <input
+                type="number"
+                className="form-control"
+                value={pos.einzelpreis}
+                onChange={e => updatePosition(index, 'einzelpreis', parseFloat(e.target.value) || 0)}
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <button
+              className="btn btn-sm"
+              style={{ background: 'var(--danger)', color: 'white' }}
+              onClick={() => removePosition(index)}
+              disabled={rechnungData.positionen.length <= 1}
+            >
+              x
+            </button>
+          </div>
+        ))}
+        <button className="btn btn-secondary" onClick={addPosition} style={{ marginTop: 8 }}>
+          + Position hinzufügen
+        </button>
+
+        <div className="form-row" style={{ marginTop: 24 }}>
+          {!kleinunternehmer && (
+            <div className="form-group">
+              <label>USt-Satz (%)</label>
+              <select
+                className="form-control"
+                value={rechnungData.ustSatz}
+                onChange={e => setRechnungData(prev => ({ ...prev, ustSatz: parseInt(e.target.value) }))}
+              >
+                <option value={19}>19%</option>
+                <option value={7}>7%</option>
+                <option value={0}>0%</option>
+              </select>
+            </div>
+          )}
+          <div className="form-group">
+            <label>Zahlungsziel (Tage)</label>
+            <input
+              type="number"
+              className="form-control"
+              value={rechnungData.zahlungsziel}
+              onChange={e => setRechnungData(prev => ({ ...prev, zahlungsziel: parseInt(e.target.value) || 14 }))}
+              min="1"
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Freitext (optional)</label>
+          <textarea
+            className="form-control"
+            value={rechnungData.freitext}
+            onChange={e => setRechnungData(prev => ({ ...prev, freitext: e.target.value }))}
+            rows={2}
+            placeholder="Zusätzlicher Text auf der Rechnung..."
+          />
+        </div>
+
+        {/* Zusammenfassung */}
+        <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span>Nettobetrag:</span>
+            <span>{nettoGesamt.toFixed(2)} EUR</span>
+          </div>
+          {!kleinunternehmer && rechnungData.ustSatz > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span>USt ({rechnungData.ustSatz}%):</span>
+              <span>{ustBetrag.toFixed(2)} EUR</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16, borderTop: '2px solid var(--gray-300)', paddingTop: 8 }}>
+            <span>Gesamtbetrag:</span>
+            <span>{bruttoGesamt.toFixed(2)} EUR</span>
+          </div>
+        </div>
+
+        {/* Option: Als offener Posten speichern */}
+        <div className="form-group" style={{ marginTop: 16 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={rechnungData.alsOffenPostenSpeichern}
+              onChange={e => setRechnungData(prev => ({ ...prev, alsOffenPostenSpeichern: e.target.checked }))}
+            />
+            Als offenen Posten speichern (erscheint in der Abrechnung)
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
+          <button
+            className="btn btn-secondary"
+            style={{ flex: 1 }}
+            onClick={onClose}
+          >
+            Abbrechen
+          </button>
+          {rechnungData.alsOffenPostenSpeichern && (
+            <button
+              className="btn btn-secondary"
+              style={{ flex: 1 }}
+              onClick={saveRechnung}
+              disabled={saving || !rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
+            >
+              {saving ? 'Speichern...' : 'Nur speichern'}
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            style={{ flex: 1 }}
+            onClick={generateAndSavePDF}
+            disabled={saving || !rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
+          >
+            {rechnungData.alsOffenPostenSpeichern ? 'Speichern & PDF' : 'PDF erstellen'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ============ ABRECHNUNG TRAINER VIEW ============
 function AbrechnungTrainerView({
@@ -3563,6 +4223,7 @@ function BuchhaltungView({
   tarife,
   spieler,
   ausgaben,
+  manuelleRechnungen,
   profile,
   onUpdate,
   userId,
@@ -3572,13 +4233,14 @@ function BuchhaltungView({
   tarife: Tarif[]
   spieler: Spieler[]
   ausgaben: Ausgabe[]
+  manuelleRechnungen: ManuelleRechnung[]
   profile: TrainerProfile | null
   onUpdate: () => void
   userId: string
   userEmail: string
 }) {
   const isAdmin = userEmail === 'arturiva03@gmail.com'
-  const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer' | 'rechnung'>('einnahmen')
+  const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [ustZeitraumTyp, setUstZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
   const [euerZeitraumTyp, setEuerZeitraumTyp] = useState<'monat' | 'jahr'>('monat')
@@ -3588,35 +4250,7 @@ function BuchhaltungView({
   const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
   const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
 
-  // State für manuelle Rechnung
-  const [rechnungData, setRechnungData] = useState({
-    empfaengerName: '',
-    empfaengerAdresse: '',
-    rechnungsnummer: '',
-    rechnungsdatum: formatDate(new Date()),
-    leistungszeitraum: '',
-    beschreibung: 'Vermietung Tennisplatz',
-    positionen: [{ beschreibung: '', menge: 1, einzelpreis: 0 }] as { beschreibung: string; menge: number; einzelpreis: number }[],
-    ustSatz: 19,
-    zahlungsziel: 14,
-    freitext: ''
-  })
-
   const kleinunternehmer = profile?.kleinunternehmer ?? false
-
-  // Rechnungsnummer beim ersten Laden generieren
-  useEffect(() => {
-    if (!rechnungData.rechnungsnummer) {
-      setRechnungData(prev => ({ ...prev, rechnungsnummer: generateRechnungsnummer() }))
-    }
-  }, [])
-
-  // USt-Satz anpassen wenn Kleinunternehmer
-  useEffect(() => {
-    if (kleinunternehmer && rechnungData.ustSatz !== 0) {
-      setRechnungData(prev => ({ ...prev, ustSatz: 0 }))
-    }
-  }, [kleinunternehmer])
 
   // Verfügbare Jahre berechnen
   const verfuegbareJahre = useMemo(() => {
@@ -3688,11 +4322,44 @@ function BuchhaltungView({
     }).sort((a, b) => a.datum.localeCompare(b.datum))
   }, [trainings, tarife, spieler, selectedYear, kleinunternehmer, inclBarEinnahmen])
 
+  // Einnahmen aus bezahlten manuellen Rechnungen
+  const manuelleEinnahmen = useMemo(() => {
+    return manuelleRechnungen
+      .filter(r => {
+        if (!r.rechnungsdatum.startsWith(selectedYear.toString())) return false
+        // Nur bezahlte Rechnungen
+        if (inclBarEinnahmen) {
+          return r.bezahlt || r.bar_bezahlt
+        } else {
+          return r.bezahlt && !r.bar_bezahlt
+        }
+      })
+      .map(r => ({
+        rechnungId: r.id,
+        datum: r.rechnungsdatum,
+        spielerName: r.empfaenger_name,
+        tarifName: r.beschreibung || 'Sonstige Rechnung',
+        brutto: r.brutto_gesamt,
+        netto: r.netto_gesamt,
+        ust: r.ust_betrag,
+        ustSatz: r.ust_satz,
+        barBezahlt: r.bar_bezahlt,
+        istManuelleRechnung: true
+      }))
+      .sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [manuelleRechnungen, selectedYear, inclBarEinnahmen])
+
+  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen)
+  const alleEinnahmen = useMemo(() => {
+    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false }))
+    return [...trainingsEinnahmen, ...manuelleEinnahmen].sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [einnahmenPositionen, manuelleEinnahmen])
+
   // Einnahmen nach Monat gruppiert
   const einnahmenNachMonat = useMemo(() => {
-    const grouped: { [monat: string]: typeof einnahmenPositionen } = {}
+    const grouped: { [monat: string]: typeof alleEinnahmen } = {}
 
-    einnahmenPositionen.forEach(e => {
+    alleEinnahmen.forEach(e => {
       const monat = e.datum.substring(0, 7)
       if (!grouped[monat]) grouped[monat] = []
       grouped[monat].push(e)
@@ -3707,7 +4374,7 @@ function BuchhaltungView({
         summeBrutto: positionen.reduce((s, p) => s + p.brutto, 0),
         summeUst: positionen.reduce((s, p) => s + p.ust, 0)
       }))
-  }, [einnahmenPositionen])
+  }, [alleEinnahmen])
 
   // Ausgaben des Jahres
   const jahresAusgaben = useMemo(() => {
@@ -3729,7 +4396,7 @@ function BuchhaltungView({
     if (ustZeitraumTyp === 'monat') {
       for (let m = 1; m <= 12; m++) {
         const monatStr = `${selectedYear}-${m.toString().padStart(2, '0')}`
-        const monatEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(monatStr))
+        const monatEinnahmen = alleEinnahmen.filter(e => e.datum.startsWith(monatStr))
         const monatAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(monatStr))
 
         const einnahmenUst = monatEinnahmen.reduce((s, e) => s + e.ust, 0)
@@ -3749,7 +4416,7 @@ function BuchhaltungView({
       for (let q = 1; q <= 4; q++) {
         const startMonth = (q - 1) * 3 + 1
         const endMonth = q * 3
-        const quartalEinnahmen = einnahmenPositionen.filter(e => {
+        const quartalEinnahmen = alleEinnahmen.filter(e => {
           const month = parseInt(e.datum.substring(5, 7))
           return month >= startMonth && month <= endMonth
         })
@@ -3774,7 +4441,7 @@ function BuchhaltungView({
     }
 
     return perioden
-  }, [einnahmenPositionen, jahresAusgaben, selectedYear, ustZeitraumTyp, kleinunternehmer])
+  }, [alleEinnahmen, jahresAusgaben, selectedYear, ustZeitraumTyp, kleinunternehmer])
 
   // EÜR-Berechnung
   const euerZeilen = useMemo(() => {
@@ -3789,7 +4456,7 @@ function BuchhaltungView({
     if (euerZeitraumTyp === 'monat') {
       for (let m = 1; m <= 12; m++) {
         const monatStr = `${selectedYear}-${m.toString().padStart(2, '0')}`
-        const monatEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(monatStr))
+        const monatEinnahmen = alleEinnahmen.filter(e => e.datum.startsWith(monatStr))
         const monatAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(monatStr))
 
         const einnahmenNetto = monatEinnahmen.reduce((s, e) => s + e.netto, 0)
@@ -3808,7 +4475,7 @@ function BuchhaltungView({
       }
     } else {
       // Jährliche Ansicht - nur eine Zeile für das ganze Jahr
-      const einnahmenNetto = einnahmenPositionen.reduce((s, e) => s + e.netto, 0)
+      const einnahmenNetto = alleEinnahmen.reduce((s, e) => s + e.netto, 0)
       const ausgabenNetto = jahresAusgaben.reduce((s, a) => {
         if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
         return s + a.betrag
@@ -3824,12 +4491,12 @@ function BuchhaltungView({
     }
 
     return zeilen
-  }, [einnahmenPositionen, jahresAusgaben, selectedYear, euerZeitraumTyp])
+  }, [alleEinnahmen, jahresAusgaben, selectedYear, euerZeitraumTyp])
 
   // Gesamtsummen
-  const gesamtEinnahmenNetto = einnahmenPositionen.reduce((s, e) => s + e.netto, 0)
-  const gesamtEinnahmenBrutto = einnahmenPositionen.reduce((s, e) => s + e.brutto, 0)
-  const gesamtEinnahmenUst = einnahmenPositionen.reduce((s, e) => s + e.ust, 0)
+  const gesamtEinnahmenNetto = alleEinnahmen.reduce((s, e) => s + e.netto, 0)
+  const gesamtEinnahmenBrutto = alleEinnahmen.reduce((s, e) => s + e.brutto, 0)
+  const gesamtEinnahmenUst = alleEinnahmen.reduce((s, e) => s + e.ust, 0)
   const gesamtAusgabenNetto = jahresAusgaben.reduce((s, a) => {
     if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
     return s + a.betrag
@@ -3840,8 +4507,8 @@ function BuchhaltungView({
 
   // Tabs für Navigation - USt nur wenn kein Kleinunternehmer
   const availableTabs = kleinunternehmer
-    ? (['einnahmen', 'ausgaben', 'euer', 'rechnung'] as const)
-    : (['einnahmen', 'ausgaben', 'ust', 'euer', 'rechnung'] as const)
+    ? (['einnahmen', 'ausgaben', 'euer'] as const)
+    : (['einnahmen', 'ausgaben', 'ust', 'euer'] as const)
 
   return (
     <div>
@@ -3855,8 +4522,7 @@ function BuchhaltungView({
           >
             {tab === 'einnahmen' ? 'Einnahmen' :
              tab === 'ausgaben' ? 'Ausgaben' :
-             tab === 'ust' ? 'USt' :
-             tab === 'euer' ? 'EÜR' : 'Rechnung'}
+             tab === 'ust' ? 'USt' : 'EÜR'}
           </button>
         ))}
       </div>
@@ -4663,357 +5329,7 @@ function BuchhaltungView({
         </div>
       )}
 
-      {/* Manuelle Rechnung Tab */}
-      {activeSubTab === 'rechnung' && (() => {
-        const addPosition = () => {
-          setRechnungData(prev => ({
-            ...prev,
-            positionen: [...prev.positionen, { beschreibung: '', menge: 1, einzelpreis: 0 }]
-          }))
-        }
-
-        const removePosition = (index: number) => {
-          if (rechnungData.positionen.length > 1) {
-            setRechnungData(prev => ({
-              ...prev,
-              positionen: prev.positionen.filter((_, i) => i !== index)
-            }))
-          }
-        }
-
-        const updatePosition = (index: number, field: string, value: string | number) => {
-          setRechnungData(prev => ({
-            ...prev,
-            positionen: prev.positionen.map((p, i) => i === index ? { ...p, [field]: value } : p)
-          }))
-        }
-
-        const nettoGesamt = rechnungData.positionen.reduce((s, p) => s + (p.menge * p.einzelpreis), 0)
-        const ustBetrag = kleinunternehmer ? 0 : (nettoGesamt * rechnungData.ustSatz / 100)
-        const bruttoGesamt = nettoGesamt + ustBetrag
-
-        const generateManuelleRechnungPDF = () => {
-          const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`
-          const rechnungsstellerAdresse = profile?.adresse || ''
-          const ustIdNrValue = profile?.ust_id_nr || ''
-          const ibanValue = profile?.iban || ''
-
-          const positionenHtml = rechnungData.positionen.map((p, i) => `
-            <tr>
-              <td>${i + 1}</td>
-              <td>${p.beschreibung || '-'}</td>
-              <td style="text-align: right">${p.menge}</td>
-              <td style="text-align: right">${p.einzelpreis.toFixed(2)} €</td>
-              <td style="text-align: right">${(p.menge * p.einzelpreis).toFixed(2)} €</td>
-            </tr>
-          `).join('')
-
-          const html = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Rechnung ${rechnungData.rechnungsnummer}</title>
-              <style>
-                body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
-                h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
-                .section { margin-bottom: 20px; }
-                .flex { display: flex; justify-content: space-between; }
-                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background: #f5f5f5; font-size: 11px; }
-                .total { text-align: right; margin-top: 20px; }
-                .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
-                .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
-                .footer { margin-top: 40px; }
-                @media print {
-                  body { padding: 20px; margin: 0; }
-                  @page { size: A4; margin: 15mm; }
-                }
-              </style>
-            </head>
-            <body>
-              <h1>RECHNUNG</h1>
-
-              <div class="flex">
-                <div class="section">
-                  <strong>Rechnungssteller:</strong><br>
-                  ${rechnungsstellerName}<br>
-                  ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
-                  ${ustIdNrValue ? `<br>USt-IdNr: ${ustIdNrValue}` : ''}
-                </div>
-                <div class="section" style="text-align: right;">
-                  <strong>Rechnungsempfänger:</strong><br>
-                  ${rechnungData.empfaengerName}<br>
-                  ${rechnungData.empfaengerAdresse.replace(/\n/g, '<br>')}
-                </div>
-              </div>
-
-              <div class="section">
-                <strong>Rechnungsnummer:</strong> ${rechnungData.rechnungsnummer}<br>
-                <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungData.rechnungsdatum)}<br>
-                ${rechnungData.leistungszeitraum ? `<strong>Leistungszeitraum:</strong> ${rechnungData.leistungszeitraum}<br>` : ''}
-              </div>
-
-              <p>Sehr geehrte Damen und Herren,</p>
-              <p>${rechnungData.beschreibung ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:` : 'ich erlaube mir, folgende Rechnung zu stellen:'}</p>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>Pos.</th>
-                    <th>Beschreibung</th>
-                    <th style="text-align: right">Menge</th>
-                    <th style="text-align: right">Einzelpreis</th>
-                    <th style="text-align: right">Gesamt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${positionenHtml}
-                </tbody>
-              </table>
-
-              <div class="total">
-                <div class="total-row">
-                  <span>Nettobetrag:</span>
-                  <span>${nettoGesamt.toFixed(2)} €</span>
-                </div>
-                ${!kleinunternehmer ? `
-                <div class="total-row">
-                  <span>USt (${rechnungData.ustSatz}%):</span>
-                  <span>${ustBetrag.toFixed(2)} €</span>
-                </div>
-                ` : ''}
-                <div class="total-row highlight">
-                  <span>Gesamtbetrag:</span>
-                  <span>${bruttoGesamt.toFixed(2)} €</span>
-                </div>
-              </div>
-
-              ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
-
-              ${rechnungData.freitext ? `<p>${rechnungData.freitext.replace(/\n/g, '<br>')}</p>` : ''}
-
-              <div class="footer">
-                <p>Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:</p>
-                <p>
-                  <strong>IBAN:</strong> ${ibanValue}<br>
-                  <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
-                </p>
-                <p>Vielen Dank für Ihr Vertrauen.</p>
-                <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
-              </div>
-            </body>
-            </html>
-          `
-
-          const blob = new Blob([html], { type: 'text/html' })
-          const url = URL.createObjectURL(blob)
-          const printWindow = window.open(url, '_blank')
-          if (printWindow) {
-            printWindow.onload = () => {
-              printWindow.print()
-              URL.revokeObjectURL(url)
-            }
-          }
-        }
-
-        return (
-          <div className="card">
-            <div className="card-header">
-              <h3>Manuelle Rechnung erstellen</h3>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Rechnungsnummer *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={rechnungData.rechnungsnummer}
-                  onChange={e => setRechnungData(prev => ({ ...prev, rechnungsnummer: e.target.value }))}
-                />
-              </div>
-              <div className="form-group">
-                <label>Rechnungsdatum *</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={rechnungData.rechnungsdatum}
-                  onChange={e => setRechnungData(prev => ({ ...prev, rechnungsdatum: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Empfänger Name *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={rechnungData.empfaengerName}
-                  onChange={e => setRechnungData(prev => ({ ...prev, empfaengerName: e.target.value }))}
-                  placeholder="Name des Rechnungsempfängers"
-                />
-              </div>
-              <div className="form-group">
-                <label>Leistungszeitraum</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={rechnungData.leistungszeitraum}
-                  onChange={e => setRechnungData(prev => ({ ...prev, leistungszeitraum: e.target.value }))}
-                  placeholder="z.B. Januar 2025"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Empfänger Adresse</label>
-              <textarea
-                className="form-control"
-                value={rechnungData.empfaengerAdresse}
-                onChange={e => setRechnungData(prev => ({ ...prev, empfaengerAdresse: e.target.value }))}
-                rows={2}
-                placeholder="Straße, PLZ Ort"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Rechnungsbeschreibung</label>
-              <input
-                type="text"
-                className="form-control"
-                value={rechnungData.beschreibung}
-                onChange={e => setRechnungData(prev => ({ ...prev, beschreibung: e.target.value }))}
-                placeholder="z.B. Vermietung Tennisplatz"
-              />
-            </div>
-
-            <h4 style={{ margin: '24px 0 12px' }}>Positionen</h4>
-            {rechnungData.positionen.map((pos, index) => (
-              <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-end' }}>
-                <div className="form-group" style={{ flex: 3, marginBottom: 0 }}>
-                  {index === 0 && <label>Beschreibung</label>}
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={pos.beschreibung}
-                    onChange={e => updatePosition(index, 'beschreibung', e.target.value)}
-                    placeholder="Leistungsbeschreibung"
-                  />
-                </div>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  {index === 0 && <label>Menge</label>}
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={pos.menge}
-                    onChange={e => updatePosition(index, 'menge', parseFloat(e.target.value) || 0)}
-                    min="0"
-                    step="0.5"
-                  />
-                </div>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  {index === 0 && <label>Einzelpreis (€)</label>}
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={pos.einzelpreis}
-                    onChange={e => updatePosition(index, 'einzelpreis', parseFloat(e.target.value) || 0)}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0, textAlign: 'right' }}>
-                  {index === 0 && <label>Gesamt</label>}
-                  <div style={{ padding: '8px 12px', background: 'var(--gray-100)', borderRadius: 'var(--radius)' }}>
-                    {(pos.menge * pos.einzelpreis).toFixed(2)} €
-                  </div>
-                </div>
-                <button
-                  className="btn btn-sm"
-                  style={{ background: 'var(--danger)', color: 'white', marginBottom: index === 0 ? 0 : 0 }}
-                  onClick={() => removePosition(index)}
-                  disabled={rechnungData.positionen.length <= 1}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            <button className="btn btn-secondary" onClick={addPosition} style={{ marginTop: 8 }}>
-              + Position hinzufügen
-            </button>
-
-            <div className="form-row" style={{ marginTop: 24 }}>
-              {!kleinunternehmer && (
-                <div className="form-group">
-                  <label>USt-Satz (%)</label>
-                  <select
-                    className="form-control"
-                    value={rechnungData.ustSatz}
-                    onChange={e => setRechnungData(prev => ({ ...prev, ustSatz: parseInt(e.target.value) }))}
-                  >
-                    <option value={19}>19%</option>
-                    <option value={7}>7%</option>
-                    <option value={0}>0%</option>
-                  </select>
-                </div>
-              )}
-              <div className="form-group">
-                <label>Zahlungsziel (Tage)</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={rechnungData.zahlungsziel}
-                  onChange={e => setRechnungData(prev => ({ ...prev, zahlungsziel: parseInt(e.target.value) || 14 }))}
-                  min="1"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Freitext (optional)</label>
-              <textarea
-                className="form-control"
-                value={rechnungData.freitext}
-                onChange={e => setRechnungData(prev => ({ ...prev, freitext: e.target.value }))}
-                rows={2}
-                placeholder="Zusätzlicher Text auf der Rechnung..."
-              />
-            </div>
-
-            {/* Zusammenfassung */}
-            <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span>Nettobetrag:</span>
-                <span>{nettoGesamt.toFixed(2)} €</span>
-              </div>
-              {!kleinunternehmer && rechnungData.ustSatz > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span>USt ({rechnungData.ustSatz}%):</span>
-                  <span>{ustBetrag.toFixed(2)} €</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16, borderTop: '2px solid var(--gray-300)', paddingTop: 8 }}>
-                <span>Gesamtbetrag:</span>
-                <span>{bruttoGesamt.toFixed(2)} €</span>
-              </div>
-            </div>
-
-            <button
-              className="btn btn-primary"
-              style={{ marginTop: 24, width: '100%' }}
-              onClick={generateManuelleRechnungPDF}
-              disabled={!rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
-            >
-              PDF erstellen
-            </button>
-          </div>
-        )
-      })()}
-
-      {/* Ausgabe Modal */}
+{/* Ausgabe Modal */}
       {showAusgabeModal && (
         <AusgabeModal
           ausgabe={editingAusgabe}

@@ -137,6 +137,7 @@ export interface ManuelleRechnung {
   user_id: string
   rechnungsnummer: string
   rechnungsdatum: string
+  monat: string // Format: YYYY-MM für die Zuordnung zur Abrechnung
   empfaenger_name: string
   empfaenger_adresse?: string
   leistungszeitraum?: string
@@ -148,5 +149,7 @@ export interface ManuelleRechnung {
   brutto_gesamt: number
   zahlungsziel: number
   freitext?: string
+  bezahlt: boolean
+  bar_bezahlt: boolean
   created_at: string
 }
