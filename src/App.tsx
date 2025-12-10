@@ -257,7 +257,7 @@ function MainApp({ user }: { user: User }) {
   ]
 
   // Warte-Bildschirm für nicht freigeschaltete User
-  if (!dataLoading && profile && !profile.approved) {
+  if (!dataLoading && profile && profile.approved !== true) {
     return (
       <div className="auth-container">
         <div className="auth-card">
