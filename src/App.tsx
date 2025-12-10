@@ -72,52 +72,99 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
 
   return (
     <div className="auth-container">
-      <div className="auth-box">
-        <h1>{isLogin ? 'Anmelden' : 'Registrieren'}</h1>
-        {error && <div className="error-message">{error}</div>}
-        <form onSubmit={handleSubmit}>
-          {!isLogin && (
+      {/* Info-Bereich links */}
+      <div className="auth-info">
+        <div className="auth-info-content">
+          <div className="auth-logo">
+            <span className="auth-logo-icon">🎾</span>
+            <h1>Tennis Trainer Planner</h1>
+          </div>
+          <p className="auth-tagline">Die All-in-One Verwaltung für Tennistrainer</p>
+
+          <div className="auth-features">
+            <div className="auth-feature">
+              <span className="auth-feature-icon">📅</span>
+              <div>
+                <strong>Terminplanung</strong>
+                <p>Kalender mit Wochen- und Tagesansicht, Serientermine und Status-Tracking</p>
+              </div>
+            </div>
+            <div className="auth-feature">
+              <span className="auth-feature-icon">👥</span>
+              <div>
+                <strong>Spieler & Tarife</strong>
+                <p>Verwalte Spieler, Kontaktdaten und flexible Tarifmodelle</p>
+              </div>
+            </div>
+            <div className="auth-feature">
+              <span className="auth-feature-icon">💰</span>
+              <div>
+                <strong>Abrechnung</strong>
+                <p>Automatische Rechnungserstellung, offene Posten und Zahlungsverfolgung</p>
+              </div>
+            </div>
+            <div className="auth-feature">
+              <span className="auth-feature-icon">📊</span>
+              <div>
+                <strong>Buchhaltung</strong>
+                <p>Einnahmen, Ausgaben, USt-Voranmeldung und EÜR auf einen Blick</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Login-Box rechts */}
+      <div className="auth-form-container">
+        <div className="auth-box">
+          <h2>{isLogin ? 'Willkommen zurück!' : 'Konto erstellen'}</h2>
+          <p className="auth-subtitle">{isLogin ? 'Melde dich an, um fortzufahren' : 'Starte jetzt mit deiner Trainerverwaltung'}</p>
+
+          {error && <div className="error-message">{error}</div>}
+          <form onSubmit={handleSubmit}>
+            {!isLogin && (
+              <div className="form-group">
+                <label>Name *</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required={!isLogin}
+                  placeholder="Dein Name"
+                />
+              </div>
+            )}
             <div className="form-group">
-              <label>Name *</label>
+              <label>E-Mail</label>
               <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required={!isLogin}
-                placeholder="Dein Name"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="email@beispiel.de"
               />
             </div>
-          )}
-          <div className="form-group">
-            <label>E-Mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="email@beispiel.de"
-            />
+            <div className="form-group">
+              <label>Passwort</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                minLength={6}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+              {loading ? 'Laden...' : isLogin ? 'Anmelden' : 'Registrieren'}
+            </button>
+          </form>
+          <div className="auth-toggle">
+            {isLogin ? 'Noch kein Konto?' : 'Bereits registriert?'}
+            <button onClick={() => setIsLogin(!isLogin)}>
+              {isLogin ? ' Registrieren' : ' Anmelden'}
+            </button>
           </div>
-          <div className="form-group">
-            <label>Passwort</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              minLength={6}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? 'Laden...' : isLogin ? 'Anmelden' : 'Registrieren'}
-          </button>
-        </form>
-        <div className="auth-toggle">
-          {isLogin ? 'Noch kein Konto?' : 'Bereits registriert?'}
-          <button onClick={() => setIsLogin(!isLogin)}>
-            {isLogin ? ' Registrieren' : ' Anmelden'}
-          </button>
         </div>
       </div>
     </div>
