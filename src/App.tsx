@@ -2244,8 +2244,13 @@ function AbrechnungView({
         const detail = spielerSummary.find(s => s.spieler.id === selectedSpielerDetail)
         if (!detail) return null
 
+        // Filtere Trainings nach Tag wenn Tag-Filter aktiv
+        const gefilterteTrainings = filterType === 'tag' && selectedTag
+          ? detail.trainings.filter(t => t.datum === selectedTag)
+          : detail.trainings
+
         // Berechne Betrag pro Training
-        const trainingsDetail = detail.trainings.map(t => {
+        const trainingsDetail = gefilterteTrainings.map(t => {
           const tarif = tarife.find(ta => ta.id === t.tarif_id)
           const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
           const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
@@ -2257,6 +2262,12 @@ function AbrechnungView({
           return { training: t, betrag, tarif }
         }).sort((a, b) => a.training.datum.localeCompare(b.training.datum))
 
+        // Berechne gefilterte Summen
+        const gefilterteSumme = trainingsDetail.reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteBarSumme = trainingsDetail.filter(t => t.training.bar_bezahlt).reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteBezahltSumme = trainingsDetail.filter(t => t.training.bezahlt && !t.training.bar_bezahlt).reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteOffeneSumme = trainingsDetail.filter(t => !t.training.bezahlt && !t.training.bar_bezahlt).reduce((sum, t) => sum + t.betrag, 0)
+
         return (
           <div className="modal-overlay" onClick={() => setSelectedSpielerDetail(null)}>
             <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
@@ -2267,24 +2278,24 @@ function AbrechnungView({
               <div className="modal-body">
                 <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                   <div>
-                    <strong>Monat:</strong> {selectedMonth}
+                    <strong>{filterType === 'tag' && selectedTag ? 'Tag:' : 'Monat:'}</strong> {filterType === 'tag' && selectedTag ? formatDateGerman(selectedTag) : selectedMonth}
                   </div>
                   <div>
-                    <strong>Gesamt:</strong> {detail.summe.toFixed(2)} €
+                    <strong>Gesamt:</strong> {gefilterteSumme.toFixed(2)} €
                   </div>
-                  {detail.barSumme > 0 && (
+                  {gefilterteBarSumme > 0 && (
                     <div style={{ color: 'var(--warning)' }}>
-                      <strong>Bar:</strong> {detail.barSumme.toFixed(2)} €
+                      <strong>Bar:</strong> {gefilterteBarSumme.toFixed(2)} €
                     </div>
                   )}
-                  {detail.bezahltSumme > 0 && (
+                  {gefilterteBezahltSumme > 0 && (
                     <div style={{ color: 'var(--success)' }}>
-                      <strong>Bezahlt:</strong> {detail.bezahltSumme.toFixed(2)} €
+                      <strong>Bezahlt:</strong> {gefilterteBezahltSumme.toFixed(2)} €
                     </div>
                   )}
-                  {detail.offeneSumme > 0 && (
+                  {gefilterteOffeneSumme > 0 && (
                     <div style={{ color: 'var(--danger)' }}>
-                      <strong>Offen:</strong> {detail.offeneSumme.toFixed(2)} €
+                      <strong>Offen:</strong> {gefilterteOffeneSumme.toFixed(2)} €
                     </div>
                   )}
                 </div>
@@ -2347,7 +2358,7 @@ function AbrechnungView({
                     <tfoot>
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
                         <td colSpan={4}>Summe</td>
-                        <td style={{ textAlign: 'right' }}>{detail.summe.toFixed(2)} €</td>
+                        <td style={{ textAlign: 'right' }}>{gefilterteSumme.toFixed(2)} €</td>
                       </tr>
                     </tfoot>
                   </table>
