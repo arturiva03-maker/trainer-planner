@@ -1969,6 +1969,49 @@ function AbrechnungView({
   const filteredSummary = useMemo(() => {
     let result = spielerSummary
 
+    // Bei Tag-Filter: Neu berechnen mit nur Trainings des Tages
+    if (filterType === 'tag' && selectedTag) {
+      result = result
+        .filter(s => s.trainings.some(t => t.datum === selectedTag))
+        .map(s => {
+          const tagTrainings = s.trainings.filter(t => t.datum === selectedTag)
+          let summe = 0
+          let barSumme = 0
+          let bezahltSumme = 0
+          let offeneSumme = 0
+
+          tagTrainings.forEach(t => {
+            const tarif = tarife.find(ta => ta.id === t.tarif_id)
+            const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+            const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+            let betrag = preis * duration
+            if (abrechnungsart === 'proSpieler') {
+              betrag = betrag / t.spieler_ids.length
+            }
+
+            summe += betrag
+            if (t.bar_bezahlt) {
+              barSumme += betrag
+            } else if (t.bezahlt) {
+              bezahltSumme += betrag
+            } else {
+              offeneSumme += betrag
+            }
+          })
+
+          return {
+            ...s,
+            trainings: tagTrainings,
+            summe,
+            barSumme,
+            bezahltSumme,
+            offeneSumme,
+            bezahlt: offeneSumme <= 0
+          }
+        })
+    }
+
     // Status-Filter (bezahlt/offen/bar)
     switch (filter) {
       case 'bezahlt':
@@ -1982,59 +2025,21 @@ function AbrechnungView({
         break
     }
 
-    // Zusätzlicher Filter nach Spieler oder Tag
+    // Zusätzlicher Filter nach Spieler
     if (filterType === 'spieler' && selectedSpielerId) {
       result = result.filter((s) => s.spieler.id === selectedSpielerId)
-    } else if (filterType === 'tag' && selectedTag) {
-      result = result.filter((s) =>
-        s.trainings.some(t => t.datum === selectedTag)
-      )
     }
 
     return result
-  }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag])
+  }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag, tarife])
 
   const stats = useMemo(() => {
-    // Bei Tag-Filter: Summen nur für Trainings des Tages berechnen
-    if (filterType === 'tag' && selectedTag) {
-      let total = 0
-      let bar = 0
-      let bezahlt = 0
-      let offen = 0
-
-      filteredSummary.forEach(s => {
-        s.trainings.filter(t => t.datum === selectedTag).forEach(t => {
-          const tarif = tarife.find(ta => ta.id === t.tarif_id)
-          const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-          const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-          const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-          let betrag = preis * duration
-          if (abrechnungsart === 'proSpieler') {
-            betrag = betrag / t.spieler_ids.length
-          }
-
-          total += betrag
-          if (t.bar_bezahlt) {
-            bar += betrag
-            bezahlt += betrag
-          } else if (t.bezahlt) {
-            bezahlt += betrag
-          } else {
-            offen += betrag
-          }
-        })
-      })
-
-      return { total, bar, bezahlt, offen }
-    }
-
-    // Sonst: Summen wie bisher
     const total = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
     const bar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
     const bezahlt = bar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
     const offen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
     return { total, bar, bezahlt, offen }
-  }, [filteredSummary, filterType, selectedTag, tarife])
+  }, [filteredSummary])
 
   // Alle Trainings eines Spielers im Monat als bezahlt/offen markieren
   const toggleAlleBezahlt = async (spielerId: string, currentStatus: boolean) => {
