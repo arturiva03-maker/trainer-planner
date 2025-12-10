@@ -3584,7 +3584,7 @@ function BuchhaltungView({
   const [euerZeitraumTyp, setEuerZeitraumTyp] = useState<'monat' | 'jahr'>('monat')
   const [showAusgabeModal, setShowAusgabeModal] = useState(false)
   const [editingAusgabe, setEditingAusgabe] = useState<Ausgabe | null>(null)
-  const [inclBarEinnahmen, setInclBarEinnahmen] = useState(true)
+  const [inclBarEinnahmen, setInclBarEinnahmen] = useState(!isAdmin)
   const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
   const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
 
