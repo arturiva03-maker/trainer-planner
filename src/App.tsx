@@ -3459,9 +3459,12 @@ function ManuelleRechnungModal({
     }))
   }
 
-  const nettoGesamt = rechnungData.positionen.reduce((s, p) => s + (p.menge * p.einzelpreis), 0)
-  const ustBetrag = kleinunternehmer ? 0 : (nettoGesamt * rechnungData.ustSatz / 100)
-  const bruttoGesamt = nettoGesamt + ustBetrag
+  // Positionen sind Brutto-Preise, daraus Netto berechnen
+  const bruttoGesamt = rechnungData.positionen.reduce((s, p) => s + (p.menge * p.einzelpreis), 0)
+  const nettoGesamt = kleinunternehmer || rechnungData.ustSatz === 0
+    ? bruttoGesamt
+    : bruttoGesamt / (1 + rechnungData.ustSatz / 100)
+  const ustBetrag = bruttoGesamt - nettoGesamt
 
   const saveRechnung = async () => {
     if (!rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)) {
@@ -3736,7 +3739,7 @@ function ManuelleRechnungModal({
               />
             </div>
             <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-              {index === 0 && <label>Preis (EUR)</label>}
+              {index === 0 && <label>Brutto (EUR)</label>}
               <input
                 type="number"
                 className="form-control"
@@ -3800,20 +3803,22 @@ function ManuelleRechnungModal({
 
         {/* Zusammenfassung */}
         <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span>Nettobetrag:</span>
-            <span>{nettoGesamt.toFixed(2)} EUR</span>
-          </div>
-          {!kleinunternehmer && rechnungData.ustSatz > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span>USt ({rechnungData.ustSatz}%):</span>
-              <span>{ustBetrag.toFixed(2)} EUR</span>
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16, borderTop: '2px solid var(--gray-300)', paddingTop: 8 }}>
-            <span>Gesamtbetrag:</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+            <span>Bruttobetrag:</span>
             <span>{bruttoGesamt.toFixed(2)} EUR</span>
           </div>
+          {!kleinunternehmer && rechnungData.ustSatz > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--gray-600)', fontSize: 14 }}>
+                <span>darin enth. USt ({rechnungData.ustSatz}%):</span>
+                <span>{ustBetrag.toFixed(2)} EUR</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--gray-600)', fontSize: 14 }}>
+                <span>Nettobetrag:</span>
+                <span>{nettoGesamt.toFixed(2)} EUR</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Option: Als offener Posten speichern */}
