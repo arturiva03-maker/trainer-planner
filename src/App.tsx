@@ -4069,11 +4069,115 @@ function BuchhaltungView({
         <div className="card">
           <div className="card-header">
             <h3>Umsatzsteuer {selectedYear}</h3>
-            {detailPeriode && (
-              <button className="btn btn-secondary" onClick={() => setDetailPeriode(null)}>
-                Zurück zur Übersicht
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {detailPeriode && (
+                <button className="btn btn-secondary" onClick={() => setDetailPeriode(null)}>
+                  Zurück zur Übersicht
+                </button>
+              )}
+              {!kleinunternehmer && detailPeriode && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    // USt-Voranmeldung generieren
+                    const isQuartal = detailPeriode.includes('Q')
+                    const periodeData = ustBerechnung.find(p => p.periode === detailPeriode)
+                    if (!periodeData) return
+
+                    // Bemessungsgrundlage berechnen (Netto-Einnahmen)
+                    let periodeEinnahmen: typeof einnahmenPositionen = []
+                    if (isQuartal) {
+                      const q = parseInt(detailPeriode.split('Q')[1])
+                      const startMonth = (q - 1) * 3 + 1
+                      const endMonth = q * 3
+                      periodeEinnahmen = einnahmenPositionen.filter(e => {
+                        const m = parseInt(e.datum.substring(5, 7))
+                        return m >= startMonth && m <= endMonth
+                      })
+                    } else {
+                      periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
+                    }
+                    const bemessungsgrundlage = periodeEinnahmen.reduce((s, e) => s + e.netto, 0)
+
+                    const trainerName = profile?.name || 'Trainer'
+                    const trainerNachname = profile?.nachname || ''
+                    const vollName = `${trainerName}${trainerNachname ? ' ' + trainerNachname : ''}`
+                    const finanzamtName = profile?.finanzamt || '[Finanzamt nicht hinterlegt]'
+                    const steuerNr = profile?.steuernummer || '[Steuernummer nicht hinterlegt]'
+                    const adresseText = profile?.adresse?.replace(/\n/g, ', ') || ''
+
+                    const now = new Date()
+                    const zeitraumLabel = isQuartal
+                      ? `${parseInt(detailPeriode.split('Q')[1])}. Quartal ${selectedYear}`
+                      : periodeData.label
+
+                    let bericht = `Transferticket: [wird vom Finanzamt vergeben]\n`
+                    bericht += `Eingang auf dem Server: ${formatDateGerman(formatDate(now))} ${now.toLocaleTimeString('de-DE')} Uhr\n\n`
+                    bericht += `═══════════════════════════════════════════════════════════════════════════════\n`
+                    bericht += `                    Umsatzsteuer-Voranmeldung - Übertragungsprotokoll\n`
+                    bericht += `═══════════════════════════════════════════════════════════════════════════════\n\n`
+
+                    bericht += `Tennistraining ${vollName}, ${adresseText}\n`
+                    bericht += `Übermittelt durch: ${vollName} am ${formatDateGerman(formatDate(now))} um ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr\n\n`
+
+                    bericht += `                                                          ${zeitraumLabel}\n`
+                    bericht += `                                                          Reguläre Meldung\n\n`
+
+                    bericht += `───────────────────────────────────────────────────────────────────────────────\n`
+                    bericht += `Finanzamt:                    Steuernummer:               Vorauszahlung:\n`
+                    bericht += `${finanzamtName.padEnd(30)}${steuerNr.padEnd(28)}${periodeData.zahllast.toFixed(2)} €\n`
+                    bericht += `───────────────────────────────────────────────────────────────────────────────\n\n`
+
+                    bericht += `A. Steuerpflichtige Lieferungen, sonstige Leistungen und        ${periodeData.einnahmenUst.toFixed(2)} €\n`
+                    bericht += `   unentgeltliche Wertabgaben\n\n`
+
+                    bericht += `   Zeile  Position  Bemessungsgrundlage  Steuerpos.    Steuer\n`
+                    bericht += `   ───────────────────────────────────────────────────────────\n`
+                    bericht += `   13  Umsätze zum Steuersatz 19%    81      ${bemessungsgrundlage.toFixed(2).padStart(10)} €              ${periodeData.einnahmenUst.toFixed(2)} €\n\n`
+
+                    if (periodeData.vorsteuer > 0) {
+                      bericht += `F. Abziehbare Vorsteuerbeträge und Berichtigung des            ${periodeData.vorsteuer.toFixed(2)} €\n`
+                      bericht += `   Vorsteuerabzugs\n\n`
+
+                      bericht += `   Zeile  Position  Bemessungsgrundlage  Steuerpos.    Steuer\n`
+                      bericht += `   ───────────────────────────────────────────────────────────\n`
+                      bericht += `   38  Abziehbare Vorsteuer                         66      ${periodeData.vorsteuer.toFixed(2)} €\n\n`
+                    }
+
+                    bericht += `H. Vorauszahlung / Überschuss                                   ${periodeData.zahllast.toFixed(2)} €\n\n`
+
+                    bericht += `   Zeile  Position  Bemessungsgrundlage  Steuerpos.    Steuer\n`
+                    bericht += `   ───────────────────────────────────────────────────────────\n`
+                    if (periodeData.zahllast >= 0) {
+                      bericht += `   50  Umsatzsteuer-Vorauszahlung                   83      ${periodeData.zahllast.toFixed(2)} €\n\n`
+                    } else {
+                      bericht += `   50  Umsatzsteuer-Vorauszahlung / Überschuss (-)  83      ${periodeData.zahllast.toFixed(2)} €\n\n`
+                    }
+
+                    bericht += `═══════════════════════════════════════════════════════════════════════════════\n`
+                    bericht += `                         Vorauszahlung: ${periodeData.zahllast.toFixed(2)} €\n`
+                    bericht += `═══════════════════════════════════════════════════════════════════════════════\n\n`
+
+                    bericht += `Diese Umsatzsteuer-Voranmeldung ist beim ${finanzamtName} am ${formatDateGerman(formatDate(now))} um ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr eingegangen.\n\n`
+                    bericht += `Dieser Protokollausdruck ist nicht für den Versand an das Finanzamt bestimmt und verbleibt beim Unternehmen.\n`
+
+                    // Download
+                    const blob = new Blob([bericht], { type: 'text/plain;charset=utf-8' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    const periodeFileName = isQuartal ? `Q${detailPeriode.split('Q')[1]}_${selectedYear}` : detailPeriode.replace('-', '_')
+                    a.download = `USt-Voranmeldung_${periodeFileName}_${trainerName.replace(/\s/g, '_')}.txt`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                  }}
+                >
+                  USt-Voranmeldung exportieren
+                </button>
+              )}
+            </div>
           </div>
 
           {kleinunternehmer ? (
@@ -4764,6 +4868,8 @@ function WeiteresView({
   const [iban, setIban] = useState(profile?.iban || '')
   const [ustIdNr, setUstIdNr] = useState(profile?.ust_id_nr || '')
   const [kleinunternehmer, setKleinunternehmer] = useState(profile?.kleinunternehmer || false)
+  const [finanzamt, setFinanzamt] = useState(profile?.finanzamt || '')
+  const [steuernummer, setSteuernummer] = useState(profile?.steuernummer || '')
   const [notiz, setNotiz] = useState(profile?.notiz || '')
   const [saving, setSaving] = useState(false)
 
@@ -4777,6 +4883,8 @@ function WeiteresView({
         iban: iban || null,
         ust_id_nr: ustIdNr || null,
         kleinunternehmer,
+        finanzamt: finanzamt || null,
+        steuernummer: steuernummer || null,
         notiz: notiz || null,
         updated_at: new Date().toISOString()
       }
@@ -4884,6 +4992,34 @@ function WeiteresView({
               Kleinunternehmer (§19 UStG)
             </label>
           </div>
+
+          {!kleinunternehmer && (
+            <>
+              <h4 style={{ margin: '24px 0 12px', color: 'var(--gray-700)' }}>USt-Voranmeldung</h4>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Finanzamt</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={finanzamt}
+                    onChange={(e) => setFinanzamt(e.target.value)}
+                    placeholder="z.B. Finanzamt Potsdam"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Steuernummer</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={steuernummer}
+                    onChange={(e) => setSteuernummer(e.target.value)}
+                    placeholder="z.B. 3046023501421"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="form-group">
             <label>Eigene Notiz</label>

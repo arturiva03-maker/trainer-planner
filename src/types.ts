@@ -11,6 +11,8 @@ export interface TrainerProfile {
   approved: boolean
   email_vorlage?: string
   notiz?: string
+  finanzamt?: string
+  steuernummer?: string
   created_at: string
   updated_at: string
 }
