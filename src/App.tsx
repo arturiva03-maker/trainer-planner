@@ -7,7 +7,6 @@ import type {
   Tarif,
   Training,
   Trainer,
-  Payment,
   MonthlyAdjustment,
   Notiz,
   PlanungSheet,
@@ -159,7 +158,6 @@ function MainApp({ user }: { user: User }) {
   const [tarife, setTarife] = useState<Tarif[]>([])
   const [trainings, setTrainings] = useState<Training[]>([])
   const [trainer, setTrainer] = useState<Trainer[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
   const [notizen, setNotizen] = useState<Notiz[]>([])
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
@@ -179,7 +177,6 @@ function MainApp({ user }: { user: User }) {
         tarifeRes,
         trainingsRes,
         trainerRes,
-        paymentsRes,
         adjustmentsRes,
         notizenRes,
         planungRes
@@ -189,7 +186,6 @@ function MainApp({ user }: { user: User }) {
         supabase.from('tarife').select('*').eq('user_id', user.id).order('name'),
         supabase.from('trainings').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('trainer').select('*').eq('user_id', user.id).order('name'),
-        supabase.from('payments').select('*').eq('user_id', user.id),
         supabase.from('monthly_adjustments').select('*').eq('user_id', user.id),
         supabase.from('notizen').select('*').eq('user_id', user.id).order('erstellt_am', { ascending: false }),
         supabase.from('planung_sheets').select('*').eq('user_id', user.id).order('created_at')
@@ -200,7 +196,6 @@ function MainApp({ user }: { user: User }) {
       if (tarifeRes.data) setTarife(tarifeRes.data)
       if (trainingsRes.data) setTrainings(trainingsRes.data)
       if (trainerRes.data) setTrainer(trainerRes.data)
-      if (paymentsRes.data) setPayments(paymentsRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
       if (notizenRes.data) setNotizen(notizenRes.data)
       if (planungRes.data) setPlanungSheets(planungRes.data)
@@ -339,11 +334,9 @@ function MainApp({ user }: { user: User }) {
                 trainings={trainings}
                 spieler={spieler}
                 tarife={tarife}
-                payments={payments}
                 adjustments={adjustments}
                 profile={profile}
                 onUpdate={loadAllData}
-                userId={user.id}
               />
             )}
             {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
@@ -1928,20 +1921,16 @@ function AbrechnungView({
   trainings,
   spieler,
   tarife,
-  payments,
   adjustments,
   profile,
-  onUpdate,
-  userId
+  onUpdate
 }: {
   trainings: Training[]
   spieler: Spieler[]
   tarife: Tarif[]
-  payments: Payment[]
   adjustments: MonthlyAdjustment[]
   profile: TrainerProfile | null
   onUpdate: () => void
-  userId: string
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
@@ -1962,6 +1951,7 @@ function AbrechnungView({
         trainings: Training[]
         summe: number
         barSumme: number
+        bezahltSumme: number
         offeneSumme: number
         bezahlt: boolean
         adjustment: number
@@ -1983,6 +1973,7 @@ function AbrechnungView({
             trainings: [],
             summe: 0,
             barSumme: 0,
+            bezahltSumme: 0,
             offeneSumme: 0,
             bezahlt: false,
             adjustment: 0
@@ -1998,34 +1989,37 @@ function AbrechnungView({
         }
 
         summary[spielerId].summe += spielerPreis
+
+        // Kategorisiere nach Bezahlstatus
         if (t.bar_bezahlt) {
           summary[spielerId].barSumme += spielerPreis
+        } else if (t.bezahlt) {
+          summary[spielerId].bezahltSumme += spielerPreis
         } else {
-          // Nur nicht-bar-bezahlte Trainings sind offen
           summary[spielerId].offeneSumme += spielerPreis
         }
       })
     })
 
-    // Apply adjustments and payments
+    // Apply adjustments
     Object.keys(summary).forEach((spielerId) => {
-      const payment = payments.find(
-        (p) => p.spieler_id === spielerId && p.monat === selectedMonth
-      )
       const adjustment = adjustments.find(
         (a) => a.spieler_id === spielerId && a.monat === selectedMonth
       )
 
       summary[spielerId].adjustment = adjustment?.betrag || 0
       summary[spielerId].summe += summary[spielerId].adjustment
-      summary[spielerId].offeneSumme += summary[spielerId].adjustment
+      // Anpassungen werden zu offenen Beträgen gezählt (können dann manuell als bezahlt markiert werden)
+      if (summary[spielerId].adjustment > 0) {
+        summary[spielerId].offeneSumme += summary[spielerId].adjustment
+      }
 
-      // Bezahlt wenn: manuell als bezahlt markiert ODER keine offenen Beträge mehr
-      summary[spielerId].bezahlt = payment?.bezahlt || summary[spielerId].offeneSumme <= 0
+      // Bezahlt nur wenn ALLE Trainings bezahlt sind (bar oder normal) UND keine offenen Beträge
+      summary[spielerId].bezahlt = summary[spielerId].offeneSumme <= 0
     })
 
     return Object.values(summary)
-  }, [monthTrainings, spieler, tarife, payments, adjustments, selectedMonth])
+  }, [monthTrainings, spieler, tarife, adjustments, selectedMonth])
 
   const filteredSummary = useMemo(() => {
     switch (filter) {
@@ -2043,33 +2037,33 @@ function AbrechnungView({
   const stats = useMemo(() => {
     const total = spielerSummary.reduce((sum, s) => sum + s.summe, 0)
     const bar = spielerSummary.reduce((sum, s) => sum + s.barSumme, 0)
-    // Bezahlt = bar bezahlte Summe + manuell als bezahlt markierte offene Beträge
-    const manuellBezahlt = spielerSummary
-      .filter((s) => s.bezahlt && s.offeneSumme > 0)
-      .reduce((sum, s) => sum + s.offeneSumme, 0)
-    const bezahlt = bar + manuellBezahlt
-    const offen = total - bezahlt
+    const bezahlt = bar + spielerSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
+    const offen = spielerSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
     return { total, bar, bezahlt, offen }
   }, [spielerSummary])
 
-  const toggleBezahlt = async (spielerId: string, currentStatus: boolean) => {
-    const existingPayment = payments.find(
-      (p) => p.spieler_id === spielerId && p.monat === selectedMonth
-    )
+  // Alle Trainings eines Spielers im Monat als bezahlt/offen markieren
+  const toggleAlleBezahlt = async (spielerId: string, currentStatus: boolean) => {
+    const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
+    if (!spielerData) return
 
-    if (existingPayment) {
-      await supabase
-        .from('payments')
-        .update({ bezahlt: !currentStatus })
-        .eq('id', existingPayment.id)
-    } else {
-      await supabase.from('payments').insert({
-        user_id: userId,
-        monat: selectedMonth,
-        spieler_id: spielerId,
-        bezahlt: true
-      })
-    }
+    const trainingIds = spielerData.trainings.map(t => t.id)
+
+    await supabase
+      .from('trainings')
+      .update({ bezahlt: !currentStatus })
+      .in('id', trainingIds)
+
+    onUpdate()
+  }
+
+  // Einzelnes Training als bezahlt markieren
+  const toggleTrainingBezahlt = async (trainingId: string, currentStatus: boolean) => {
+    await supabase
+      .from('trainings')
+      .update({ bezahlt: !currentStatus })
+      .eq('id', trainingId)
+
     onUpdate()
   }
 
@@ -2166,10 +2160,10 @@ function AbrechnungView({
                       className="btn btn-sm btn-secondary"
                       onClick={(e) => {
                         e.stopPropagation()
-                        toggleBezahlt(item.spieler.id, item.bezahlt)
+                        toggleAlleBezahlt(item.spieler.id, item.bezahlt)
                       }}
                     >
-                      {item.bezahlt ? 'Als offen' : 'Als bezahlt'}
+                      {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
                     </button>
                   </td>
                 </tr>
@@ -2224,10 +2218,10 @@ function AbrechnungView({
                   className="btn btn-sm btn-secondary"
                   onClick={(e) => {
                     e.stopPropagation()
-                    toggleBezahlt(item.spieler.id, item.bezahlt)
+                    toggleAlleBezahlt(item.spieler.id, item.bezahlt)
                   }}
                 >
-                  {item.bezahlt ? 'Als offen' : 'Als bezahlt'}
+                  {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
                 </button>
               </div>
             </div>
@@ -2264,11 +2258,27 @@ function AbrechnungView({
                 <button className="modal-close" onClick={() => setSelectedSpielerDetail(null)}>×</button>
               </div>
               <div className="modal-body">
-                <div style={{ marginBottom: 16 }}>
-                  <strong>Monat:</strong> {selectedMonth} |
-                  <strong> Gesamt:</strong> {detail.summe.toFixed(2)} €
+                <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                  <div>
+                    <strong>Monat:</strong> {selectedMonth}
+                  </div>
+                  <div>
+                    <strong>Gesamt:</strong> {detail.summe.toFixed(2)} €
+                  </div>
                   {detail.barSumme > 0 && (
-                    <span style={{ color: 'var(--warning)' }}> (davon {detail.barSumme.toFixed(2)} € bar)</span>
+                    <div style={{ color: 'var(--warning)' }}>
+                      <strong>Bar:</strong> {detail.barSumme.toFixed(2)} €
+                    </div>
+                  )}
+                  {detail.bezahltSumme > 0 && (
+                    <div style={{ color: 'var(--success)' }}>
+                      <strong>Bezahlt:</strong> {detail.bezahltSumme.toFixed(2)} €
+                    </div>
+                  )}
+                  {detail.offeneSumme > 0 && (
+                    <div style={{ color: 'var(--danger)' }}>
+                      <strong>Offen:</strong> {detail.offeneSumme.toFixed(2)} €
+                    </div>
                   )}
                 </div>
                 <div className="table-container" style={{ maxHeight: 400, overflowY: 'auto' }}>
@@ -2279,26 +2289,48 @@ function AbrechnungView({
                         <th>Uhrzeit</th>
                         <th>Tarif</th>
                         <th style={{ textAlign: 'right' }}>Betrag</th>
+                        <th style={{ textAlign: 'center' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {trainingsDetail.map(({ training, betrag, tarif }) => (
-                        <tr key={training.id} style={training.bar_bezahlt ? { background: 'var(--warning-light)' } : {}}>
-                          <td>{formatDateGerman(training.datum)}</td>
-                          <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
-                          <td>
-                            {tarif?.name || '-'}
-                            {training.bar_bezahlt && (
-                              <span style={{ fontSize: 10, color: 'var(--warning)', marginLeft: 4 }}>(bar)</span>
-                            )}
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: 500 }}>{betrag.toFixed(2)} €</td>
-                        </tr>
-                      ))}
+                      {trainingsDetail.map(({ training, betrag, tarif }) => {
+                        return (
+                          <tr
+                            key={training.id}
+                            style={
+                              training.bar_bezahlt
+                                ? { background: 'var(--warning-light)' }
+                                : training.bezahlt
+                                ? { background: 'var(--success-light)' }
+                                : {}
+                            }
+                          >
+                            <td>{formatDateGerman(training.datum)}</td>
+                            <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
+                            <td>{tarif?.name || '-'}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 500 }}>{betrag.toFixed(2)} €</td>
+                            <td style={{ textAlign: 'center' }}>
+                              {training.bar_bezahlt ? (
+                                <span className="status-badge" style={{ background: 'var(--warning)', color: '#000', fontSize: 11 }}>
+                                  Bar
+                                </span>
+                              ) : (
+                                <button
+                                  className={`btn btn-sm ${training.bezahlt ? 'btn-success' : 'btn-secondary'}`}
+                                  style={{ fontSize: 11, padding: '2px 8px' }}
+                                  onClick={() => toggleTrainingBezahlt(training.id, training.bezahlt)}
+                                >
+                                  {training.bezahlt ? 'Bezahlt' : 'Offen'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                     <tfoot>
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
-                        <td colSpan={3}>Summe</td>
+                        <td colSpan={4}>Summe</td>
                         <td style={{ textAlign: 'right' }}>{detail.summe.toFixed(2)} €</td>
                       </tr>
                     </tfoot>

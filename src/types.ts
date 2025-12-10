@@ -53,6 +53,7 @@ export interface Training {
   custom_preis_pro_stunde?: number
   custom_abrechnung?: 'proTraining' | 'proSpieler'
   bar_bezahlt: boolean
+  bezahlt: boolean
   created_at: string
 }
 
