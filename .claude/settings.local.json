@@ -7,7 +7,11 @@
       "Bash(git commit -m \"$(cat <<''EOF''\nMobile-Design komplett überarbeitet nach Referenz-App\n\n- Volle Bildschirmbreite ohne übermäßiges Padding\n- Neuer Header mit Titel + Untertitel (Admin/Trainername)\n- Cards mit 12px Rundung und Schatten\n- Verbesserte View-Toggle Buttons (44px Touch-Targets)\n- Kalender-Grid mit sticky Zeit-Spalte und Swipe-Hint\n- Sidebar max 280px mit Overlay-Animation\n- Konsistentes 16px Spacing überall\n- Optimierte Typography und Touch-Targets\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git push)",
       "Bash(git commit:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:tennistrainer-app.de)",
+      "Bash(npx vercel --prod)",
+      "Bash(npx vercel:*)",
+      "Bash(curl:*)"
     ]
   },
   "alwaysAllowWrites": true,

@@ -1869,6 +1869,9 @@ function AbrechnungView({
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
+  const [filterType, setFilterType] = useState<'keine' | 'spieler' | 'tag'>('keine')
+  const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
+  const [selectedTag, setSelectedTag] = useState<string>('')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
 
@@ -1956,18 +1959,40 @@ function AbrechnungView({
     return Object.values(summary)
   }, [monthTrainings, spieler, tarife, adjustments, selectedMonth])
 
+  // Alle Tage im Monat mit Trainings
+  const tageImMonat = useMemo(() => {
+    const tage = new Set<string>()
+    monthTrainings.forEach(t => tage.add(t.datum))
+    return Array.from(tage).sort()
+  }, [monthTrainings])
+
   const filteredSummary = useMemo(() => {
+    let result = spielerSummary
+
+    // Status-Filter (bezahlt/offen/bar)
     switch (filter) {
       case 'bezahlt':
-        return spielerSummary.filter((s) => s.bezahlt)
+        result = result.filter((s) => s.bezahlt)
+        break
       case 'offen':
-        return spielerSummary.filter((s) => !s.bezahlt)
+        result = result.filter((s) => !s.bezahlt)
+        break
       case 'bar':
-        return spielerSummary.filter((s) => s.barSumme > 0)
-      default:
-        return spielerSummary
+        result = result.filter((s) => s.barSumme > 0)
+        break
     }
-  }, [spielerSummary, filter])
+
+    // Zusätzlicher Filter nach Spieler oder Tag
+    if (filterType === 'spieler' && selectedSpielerId) {
+      result = result.filter((s) => s.spieler.id === selectedSpielerId)
+    } else if (filterType === 'tag' && selectedTag) {
+      result = result.filter((s) =>
+        s.trainings.some(t => t.datum === selectedTag)
+      )
+    }
+
+    return result
+  }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag])
 
   const stats = useMemo(() => {
     const total = spielerSummary.reduce((sum, s) => sum + s.summe, 0)
@@ -2030,12 +2055,15 @@ function AbrechnungView({
       <div className="card">
         <div className="card-header">
           <div className="card-header-actions">
-            <div className="filter-pills">
+            <div className="filter-pills" style={{ flexWrap: 'wrap', gap: 8 }}>
               <input
                 type="month"
                 className="form-control"
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value)
+                  setSelectedTag('')
+                }}
                 style={{ width: 'auto', minWidth: 140 }}
               />
               <select
@@ -2049,6 +2077,50 @@ function AbrechnungView({
                 <option value="offen">Nur offen</option>
                 <option value="bar">Nur bar</option>
               </select>
+              <select
+                className="form-control"
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value as typeof filterType)
+                  setSelectedSpielerId('')
+                  setSelectedTag('')
+                }}
+                style={{ width: 'auto' }}
+              >
+                <option value="keine">Weitere Filter...</option>
+                <option value="spieler">Nach Spieler</option>
+                <option value="tag">Nach Tag</option>
+              </select>
+              {filterType === 'spieler' && (
+                <select
+                  className="form-control"
+                  value={selectedSpielerId}
+                  onChange={(e) => setSelectedSpielerId(e.target.value)}
+                  style={{ width: 'auto', minWidth: 150 }}
+                >
+                  <option value="">Spieler wählen...</option>
+                  {spielerSummary.map(s => (
+                    <option key={s.spieler.id} value={s.spieler.id}>
+                      {s.spieler.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {filterType === 'tag' && (
+                <select
+                  className="form-control"
+                  value={selectedTag}
+                  onChange={(e) => setSelectedTag(e.target.value)}
+                  style={{ width: 'auto', minWidth: 150 }}
+                >
+                  <option value="">Tag wählen...</option>
+                  {tageImMonat.map(tag => (
+                    <option key={tag} value={tag}>
+                      {formatDateGerman(tag)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <button className="btn btn-primary" onClick={() => setShowInvoiceModal(true)}>
               Rechnung erstellen
