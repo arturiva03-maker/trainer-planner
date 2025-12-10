@@ -3580,7 +3580,8 @@ function BuchhaltungView({
   const isAdmin = userEmail === 'arturiva03@gmail.com'
   const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [zeitraumTyp, setZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
+  const [ustZeitraumTyp, setUstZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
+  const [euerZeitraumTyp, setEuerZeitraumTyp] = useState<'monat' | 'jahr'>('monat')
   const [showAusgabeModal, setShowAusgabeModal] = useState(false)
   const [editingAusgabe, setEditingAusgabe] = useState<Ausgabe | null>(null)
   const [inclBarEinnahmen, setInclBarEinnahmen] = useState(true)
@@ -3697,7 +3698,7 @@ function BuchhaltungView({
       zahllast: number
     }[] = []
 
-    if (zeitraumTyp === 'monat') {
+    if (ustZeitraumTyp === 'monat') {
       for (let m = 1; m <= 12; m++) {
         const monatStr = `${selectedYear}-${m.toString().padStart(2, '0')}`
         const monatEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(monatStr))
@@ -3745,7 +3746,7 @@ function BuchhaltungView({
     }
 
     return perioden
-  }, [einnahmenPositionen, jahresAusgaben, selectedYear, zeitraumTyp, kleinunternehmer])
+  }, [einnahmenPositionen, jahresAusgaben, selectedYear, ustZeitraumTyp, kleinunternehmer])
 
   // EÜR-Berechnung
   const euerZeilen = useMemo(() => {
@@ -3757,7 +3758,7 @@ function BuchhaltungView({
       gewinn: number
     }[] = []
 
-    if (zeitraumTyp === 'monat') {
+    if (euerZeitraumTyp === 'monat') {
       for (let m = 1; m <= 12; m++) {
         const monatStr = `${selectedYear}-${m.toString().padStart(2, '0')}`
         const monatEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(monatStr))
@@ -3778,36 +3779,24 @@ function BuchhaltungView({
         })
       }
     } else {
-      for (let q = 1; q <= 4; q++) {
-        const startMonth = (q - 1) * 3 + 1
-        const endMonth = q * 3
-        const quartalEinnahmen = einnahmenPositionen.filter(e => {
-          const month = parseInt(e.datum.substring(5, 7))
-          return month >= startMonth && month <= endMonth
-        })
-        const quartalAusgaben = jahresAusgaben.filter(a => {
-          const month = parseInt(a.datum.substring(5, 7))
-          return month >= startMonth && month <= endMonth
-        })
+      // Jährliche Ansicht - nur eine Zeile für das ganze Jahr
+      const einnahmenNetto = einnahmenPositionen.reduce((s, e) => s + e.netto, 0)
+      const ausgabenNetto = jahresAusgaben.reduce((s, a) => {
+        if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
+        return s + a.betrag
+      }, 0)
 
-        const einnahmenNetto = quartalEinnahmen.reduce((s, e) => s + e.netto, 0)
-        const ausgabenNetto = quartalAusgaben.reduce((s, a) => {
-          if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
-          return s + a.betrag
-        }, 0)
-
-        zeilen.push({
-          periode: `${selectedYear}-Q${q}`,
-          label: formatQuartal(selectedYear, q),
-          einnahmenNetto,
-          ausgabenNetto,
-          gewinn: einnahmenNetto - ausgabenNetto
-        })
-      }
+      zeilen.push({
+        periode: `${selectedYear}`,
+        label: `Gesamtjahr ${selectedYear}`,
+        einnahmenNetto,
+        ausgabenNetto,
+        gewinn: einnahmenNetto - ausgabenNetto
+      })
     }
 
     return zeilen
-  }, [einnahmenPositionen, jahresAusgaben, selectedYear, zeitraumTyp])
+  }, [einnahmenPositionen, jahresAusgaben, selectedYear, euerZeitraumTyp])
 
   // Gesamtsummen
   const gesamtEinnahmenNetto = einnahmenPositionen.reduce((s, e) => s + e.netto, 0)
@@ -3858,16 +3847,29 @@ function BuchhaltungView({
               ))}
             </select>
           </div>
-          {(activeSubTab === 'ust' || activeSubTab === 'euer') && (
+          {activeSubTab === 'ust' && (
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Zeitraum</label>
               <select
                 className="form-control"
-                value={zeitraumTyp}
-                onChange={e => setZeitraumTyp(e.target.value as 'monat' | 'quartal')}
+                value={ustZeitraumTyp}
+                onChange={e => setUstZeitraumTyp(e.target.value as 'monat' | 'quartal')}
               >
                 <option value="monat">Monatlich</option>
                 <option value="quartal">Quartalsweise</option>
+              </select>
+            </div>
+          )}
+          {activeSubTab === 'euer' && (
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Zeitraum</label>
+              <select
+                className="form-control"
+                value={euerZeitraumTyp}
+                onChange={e => setEuerZeitraumTyp(e.target.value as 'monat' | 'jahr')}
+              >
+                <option value="monat">Monatlich</option>
+                <option value="jahr">Jährlich</option>
               </select>
             </div>
           )}
@@ -4245,24 +4247,17 @@ function BuchhaltungView({
           </div>
 
           {detailPeriode ? (() => {
-            // Detailansicht für gewählten Zeitraum
-            const isQuartal = detailPeriode.includes('Q')
+            // Detailansicht für gewählten Zeitraum (nur Monat oder Jahr)
+            const isJahr = detailPeriode.length === 4 // nur Jahreszahl
             let periodeEinnahmen: typeof einnahmenPositionen = []
             let periodeAusgaben: typeof jahresAusgaben = []
 
-            if (isQuartal) {
-              const q = parseInt(detailPeriode.split('Q')[1])
-              const startMonth = (q - 1) * 3 + 1
-              const endMonth = q * 3
-              periodeEinnahmen = einnahmenPositionen.filter(e => {
-                const m = parseInt(e.datum.substring(5, 7))
-                return m >= startMonth && m <= endMonth
-              })
-              periodeAusgaben = jahresAusgaben.filter(a => {
-                const m = parseInt(a.datum.substring(5, 7))
-                return m >= startMonth && m <= endMonth
-              })
+            if (isJahr) {
+              // Ganzes Jahr
+              periodeEinnahmen = einnahmenPositionen
+              periodeAusgaben = jahresAusgaben
             } else {
+              // Monat
               periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
               periodeAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(detailPeriode))
             }
