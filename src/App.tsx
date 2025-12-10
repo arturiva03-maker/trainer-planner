@@ -3502,6 +3502,8 @@ function BuchhaltungView({
   const [showAusgabeModal, setShowAusgabeModal] = useState(false)
   const [editingAusgabe, setEditingAusgabe] = useState<Ausgabe | null>(null)
   const [inclBarEinnahmen, setInclBarEinnahmen] = useState(true)
+  const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
+  const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
 
   const kleinunternehmer = profile?.kleinunternehmer ?? false
 
@@ -3729,7 +3731,6 @@ function BuchhaltungView({
   const gesamtEinnahmenNetto = einnahmenPositionen.reduce((s, e) => s + e.netto, 0)
   const gesamtEinnahmenBrutto = einnahmenPositionen.reduce((s, e) => s + e.brutto, 0)
   const gesamtEinnahmenUst = einnahmenPositionen.reduce((s, e) => s + e.ust, 0)
-  const gesamtAusgabenBrutto = jahresAusgaben.reduce((s, a) => s + a.betrag, 0)
   const gesamtAusgabenNetto = jahresAusgaben.reduce((s, a) => {
     if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
     return s + a.betrag
@@ -3872,92 +3873,231 @@ function BuchhaltungView({
       )}
 
       {/* Ausgaben Tab */}
-      {activeSubTab === 'ausgaben' && (
-        <div className="card">
-          <div className="card-header">
-            <h3>Ausgaben {selectedYear}</h3>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setEditingAusgabe(null)
-                setShowAusgabeModal(true)
-              }}
-            >
-              + Neue Ausgabe
-            </button>
-          </div>
+      {activeSubTab === 'ausgaben' && (() => {
+        // Verfügbare Monate für Filter berechnen
+        const ausgabenMonate = [...new Set(jahresAusgaben.map(a => a.datum.substring(0, 7)))].sort()
+        // Gefilterte Ausgaben
+        const gefilterteAusgaben = selectedAusgabenMonat === 'alle'
+          ? jahresAusgaben
+          : jahresAusgaben.filter(a => a.datum.startsWith(selectedAusgabenMonat))
+        // Summen für gefilterte Ausgaben
+        const filteredBrutto = gefilterteAusgaben.reduce((s, a) => s + a.betrag, 0)
+        const filteredNetto = gefilterteAusgaben.reduce((s, a) => {
+          if (a.hat_vorsteuer) return s + (a.betrag / (1 + a.vorsteuer_satz / 100))
+          return s + a.betrag
+        }, 0)
+        const filteredVorsteuer = gefilterteAusgaben
+          .filter(a => a.hat_vorsteuer)
+          .reduce((s, a) => s + (a.betrag * a.vorsteuer_satz / (100 + a.vorsteuer_satz)), 0)
 
-          <div style={{ marginBottom: 16, display: 'flex', gap: 16 }}>
-            <div>Gesamt Brutto: <strong>{gesamtAusgabenBrutto.toFixed(2)} €</strong></div>
-            <div>Gesamt Netto: <strong>{gesamtAusgabenNetto.toFixed(2)} €</strong></div>
-            {!kleinunternehmer && <div>Vorsteuer: <strong>{gesamtVorsteuer.toFixed(2)} €</strong></div>}
-          </div>
-
-          {jahresAusgaben.length === 0 ? (
-            <div className="empty-state">Keine Ausgaben in {selectedYear}</div>
-          ) : (
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Datum</th>
-                    <th>Kategorie</th>
-                    <th>Beschreibung</th>
-                    <th style={{ textAlign: 'right' }}>Brutto</th>
-                    {!kleinunternehmer && <th style={{ textAlign: 'right' }}>Vorsteuer</th>}
-                    <th>Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jahresAusgaben.map(a => {
-                    const vorsteuer = a.hat_vorsteuer
-                      ? a.betrag * a.vorsteuer_satz / (100 + a.vorsteuer_satz)
-                      : 0
-                    return (
-                      <tr key={a.id}>
-                        <td>{formatDateGerman(a.datum)}</td>
-                        <td>{AUSGABE_KATEGORIEN.find(k => k.value === a.kategorie)?.label || a.kategorie}</td>
-                        <td>{a.beschreibung || '-'}</td>
-                        <td style={{ textAlign: 'right' }}>{a.betrag.toFixed(2)} €</td>
-                        {!kleinunternehmer && (
-                          <td style={{ textAlign: 'right' }}>
-                            {a.hat_vorsteuer ? `${vorsteuer.toFixed(2)} € (${a.vorsteuer_satz}%)` : '-'}
-                          </td>
-                        )}
-                        <td>
-                          <button
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => {
-                              setEditingAusgabe(a)
-                              setShowAusgabeModal(true)
-                            }}
-                          >
-                            Bearbeiten
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+        return (
+          <div className="card">
+            <div className="card-header">
+              <h3>Ausgaben {selectedAusgabenMonat === 'alle' ? selectedYear : formatMonthGerman(selectedAusgabenMonat)}</h3>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setEditingAusgabe(null)
+                  setShowAusgabeModal(true)
+                }}
+              >
+                + Neue Ausgabe
+              </button>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Monatsfilter */}
+            <div style={{ marginBottom: 16, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Monat</label>
+                <select
+                  className="form-control"
+                  value={selectedAusgabenMonat}
+                  onChange={e => setSelectedAusgabenMonat(e.target.value)}
+                >
+                  <option value="alle">Alle Monate</option>
+                  {ausgabenMonate.map(m => (
+                    <option key={m} value={m}>{formatMonthGerman(m)}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div>Brutto: <strong>{filteredBrutto.toFixed(2)} €</strong></div>
+                <div>Netto: <strong>{filteredNetto.toFixed(2)} €</strong></div>
+                {!kleinunternehmer && <div>Vorsteuer: <strong>{filteredVorsteuer.toFixed(2)} €</strong></div>}
+              </div>
+            </div>
+
+            {gefilterteAusgaben.length === 0 ? (
+              <div className="empty-state">Keine Ausgaben {selectedAusgabenMonat === 'alle' ? `in ${selectedYear}` : `im ${formatMonthGerman(selectedAusgabenMonat)}`}</div>
+            ) : (
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Datum</th>
+                      <th>Kategorie</th>
+                      <th>Beschreibung</th>
+                      <th style={{ textAlign: 'right' }}>Brutto</th>
+                      {!kleinunternehmer && <th style={{ textAlign: 'right' }}>Vorsteuer</th>}
+                      <th>Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gefilterteAusgaben.map(a => {
+                      const vorsteuer = a.hat_vorsteuer
+                        ? a.betrag * a.vorsteuer_satz / (100 + a.vorsteuer_satz)
+                        : 0
+                      return (
+                        <tr key={a.id}>
+                          <td>{formatDateGerman(a.datum)}</td>
+                          <td>{AUSGABE_KATEGORIEN.find(k => k.value === a.kategorie)?.label || a.kategorie}</td>
+                          <td>{a.beschreibung || '-'}</td>
+                          <td style={{ textAlign: 'right' }}>{a.betrag.toFixed(2)} €</td>
+                          {!kleinunternehmer && (
+                            <td style={{ textAlign: 'right' }}>
+                              {a.hat_vorsteuer ? `${vorsteuer.toFixed(2)} € (${a.vorsteuer_satz}%)` : '-'}
+                            </td>
+                          )}
+                          <td>
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => {
+                                setEditingAusgabe(a)
+                                setShowAusgabeModal(true)
+                              }}
+                            >
+                              Bearbeiten
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* USt Tab */}
       {activeSubTab === 'ust' && (
         <div className="card">
           <div className="card-header">
             <h3>Umsatzsteuer {selectedYear}</h3>
+            {detailPeriode && (
+              <button className="btn btn-secondary" onClick={() => setDetailPeriode(null)}>
+                Zurück zur Übersicht
+              </button>
+            )}
           </div>
 
           {kleinunternehmer ? (
             <div className="empty-state" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
               Als Kleinunternehmer bist du von der Umsatzsteuer befreit (§19 UStG).
             </div>
-          ) : (
+          ) : detailPeriode ? (() => {
+            // Detailansicht für gewählten Zeitraum
+            const isQuartal = detailPeriode.includes('Q')
+            let periodeEinnahmen: typeof einnahmenPositionen = []
+            let periodeAusgaben: typeof jahresAusgaben = []
+
+            if (isQuartal) {
+              const q = parseInt(detailPeriode.split('Q')[1])
+              const startMonth = (q - 1) * 3 + 1
+              const endMonth = q * 3
+              periodeEinnahmen = einnahmenPositionen.filter(e => {
+                const m = parseInt(e.datum.substring(5, 7))
+                return m >= startMonth && m <= endMonth
+              })
+              periodeAusgaben = jahresAusgaben.filter(a => {
+                const m = parseInt(a.datum.substring(5, 7))
+                return m >= startMonth && m <= endMonth
+              })
+            } else {
+              periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
+              periodeAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(detailPeriode))
+            }
+
+            const periodeData = ustBerechnung.find(p => p.periode === detailPeriode)
+
+            return (
+              <div>
+                <h4 style={{ margin: '16px 0 8px' }}>{periodeData?.label} - Zusammenfassung</h4>
+                <div style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
+                  <div>USt aus Einnahmen: <strong>{periodeData?.einnahmenUst.toFixed(2)} €</strong></div>
+                  <div>Vorsteuer aus Ausgaben: <strong>{periodeData?.vorsteuer.toFixed(2)} €</strong></div>
+                  <div>Zahllast: <strong style={{ color: (periodeData?.zahllast || 0) < 0 ? 'var(--success)' : 'inherit' }}>
+                    {periodeData?.zahllast.toFixed(2)} €
+                  </strong></div>
+                </div>
+
+                <h4 style={{ margin: '16px 0 8px' }}>Einnahmen mit USt ({periodeEinnahmen.length})</h4>
+                {periodeEinnahmen.length === 0 ? (
+                  <div className="empty-state">Keine Einnahmen in diesem Zeitraum</div>
+                ) : (
+                  <div className="table-container" style={{ marginBottom: 24 }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Datum</th>
+                          <th>Spieler</th>
+                          <th style={{ textAlign: 'right' }}>Netto</th>
+                          <th style={{ textAlign: 'right' }}>USt</th>
+                          <th style={{ textAlign: 'right' }}>Brutto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {periodeEinnahmen.map((e, i) => (
+                          <tr key={i}>
+                            <td>{formatDateGerman(e.datum)}</td>
+                            <td>{e.spielerName}</td>
+                            <td style={{ textAlign: 'right' }}>{e.netto.toFixed(2)} €</td>
+                            <td style={{ textAlign: 'right' }}>{e.ust.toFixed(2)} € ({e.ustSatz}%)</td>
+                            <td style={{ textAlign: 'right' }}>{e.brutto.toFixed(2)} €</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <h4 style={{ margin: '16px 0 8px' }}>Ausgaben mit Vorsteuer ({periodeAusgaben.filter(a => a.hat_vorsteuer).length})</h4>
+                {periodeAusgaben.filter(a => a.hat_vorsteuer).length === 0 ? (
+                  <div className="empty-state">Keine Ausgaben mit Vorsteuer in diesem Zeitraum</div>
+                ) : (
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Datum</th>
+                          <th>Kategorie</th>
+                          <th>Beschreibung</th>
+                          <th style={{ textAlign: 'right' }}>Brutto</th>
+                          <th style={{ textAlign: 'right' }}>Vorsteuer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {periodeAusgaben.filter(a => a.hat_vorsteuer).map(a => (
+                          <tr key={a.id}>
+                            <td>{formatDateGerman(a.datum)}</td>
+                            <td>{AUSGABE_KATEGORIEN.find(k => k.value === a.kategorie)?.label}</td>
+                            <td>{a.beschreibung || '-'}</td>
+                            <td style={{ textAlign: 'right' }}>{a.betrag.toFixed(2)} €</td>
+                            <td style={{ textAlign: 'right' }}>
+                              {(a.betrag * a.vorsteuer_satz / (100 + a.vorsteuer_satz)).toFixed(2)} € ({a.vorsteuer_satz}%)
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })() : (
             <>
+              <p style={{ marginBottom: 16, color: 'var(--gray-600)' }}>Klicke auf einen Zeitraum für Details</p>
               <div className="table-container">
                 <table>
                   <thead>
@@ -3970,8 +4110,13 @@ function BuchhaltungView({
                   </thead>
                   <tbody>
                     {ustBerechnung.map(p => (
-                      <tr key={p.periode}>
-                        <td>{p.label}</td>
+                      <tr
+                        key={p.periode}
+                        onClick={() => setDetailPeriode(p.periode)}
+                        style={{ cursor: 'pointer' }}
+                        className="clickable-row"
+                      >
+                        <td style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{p.label}</td>
                         <td style={{ textAlign: 'right' }}>{p.einnahmenUst.toFixed(2)} €</td>
                         <td style={{ textAlign: 'right' }}>{p.vorsteuer.toFixed(2)} €</td>
                         <td style={{
@@ -4010,50 +4155,181 @@ function BuchhaltungView({
         <div className="card">
           <div className="card-header">
             <h3>Einnahme-Überschuss-Rechnung {selectedYear}</h3>
+            {detailPeriode && (
+              <button className="btn btn-secondary" onClick={() => setDetailPeriode(null)}>
+                Zurück zur Übersicht
+              </button>
+            )}
           </div>
 
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Zeitraum</th>
-                  <th style={{ textAlign: 'right' }}>Einnahmen (netto)</th>
-                  <th style={{ textAlign: 'right' }}>Ausgaben (netto)</th>
-                  <th style={{ textAlign: 'right' }}>Gewinn/Verlust</th>
-                </tr>
-              </thead>
-              <tbody>
-                {euerZeilen.map(z => (
-                  <tr key={z.periode}>
-                    <td>{z.label}</td>
-                    <td style={{ textAlign: 'right' }}>{z.einnahmenNetto.toFixed(2)} €</td>
-                    <td style={{ textAlign: 'right' }}>{z.ausgabenNetto.toFixed(2)} €</td>
-                    <td style={{
-                      textAlign: 'right',
-                      fontWeight: 500,
-                      color: z.gewinn >= 0 ? 'var(--success)' : 'var(--danger)'
-                    }}>
-                      {z.gewinn >= 0 ? '+' : ''}{z.gewinn.toFixed(2)} €
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
-                  <td>Gesamt {selectedYear}</td>
-                  <td style={{ textAlign: 'right' }}>{gesamtEinnahmenNetto.toFixed(2)} €</td>
-                  <td style={{ textAlign: 'right' }}>{gesamtAusgabenNetto.toFixed(2)} €</td>
-                  <td style={{
-                    textAlign: 'right',
-                    color: (gesamtEinnahmenNetto - gesamtAusgabenNetto) >= 0 ? 'var(--success)' : 'var(--danger)'
-                  }}>
-                    {(gesamtEinnahmenNetto - gesamtAusgabenNetto) >= 0 ? '+' : ''}
-                    {(gesamtEinnahmenNetto - gesamtAusgabenNetto).toFixed(2)} €
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          {detailPeriode ? (() => {
+            // Detailansicht für gewählten Zeitraum
+            const isQuartal = detailPeriode.includes('Q')
+            let periodeEinnahmen: typeof einnahmenPositionen = []
+            let periodeAusgaben: typeof jahresAusgaben = []
+
+            if (isQuartal) {
+              const q = parseInt(detailPeriode.split('Q')[1])
+              const startMonth = (q - 1) * 3 + 1
+              const endMonth = q * 3
+              periodeEinnahmen = einnahmenPositionen.filter(e => {
+                const m = parseInt(e.datum.substring(5, 7))
+                return m >= startMonth && m <= endMonth
+              })
+              periodeAusgaben = jahresAusgaben.filter(a => {
+                const m = parseInt(a.datum.substring(5, 7))
+                return m >= startMonth && m <= endMonth
+              })
+            } else {
+              periodeEinnahmen = einnahmenPositionen.filter(e => e.datum.startsWith(detailPeriode))
+              periodeAusgaben = jahresAusgaben.filter(a => a.datum.startsWith(detailPeriode))
+            }
+
+            const periodeData = euerZeilen.find(z => z.periode === detailPeriode)
+
+            return (
+              <div>
+                <h4 style={{ margin: '16px 0 8px' }}>{periodeData?.label} - Zusammenfassung</h4>
+                <div style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
+                  <div>Einnahmen (netto): <strong>{periodeData?.einnahmenNetto.toFixed(2)} €</strong></div>
+                  <div>Ausgaben (netto): <strong>{periodeData?.ausgabenNetto.toFixed(2)} €</strong></div>
+                  <div>Gewinn/Verlust: <strong style={{ color: (periodeData?.gewinn || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {(periodeData?.gewinn || 0) >= 0 ? '+' : ''}{periodeData?.gewinn.toFixed(2)} €
+                  </strong></div>
+                </div>
+
+                <h4 style={{ margin: '16px 0 8px' }}>Einnahmen ({periodeEinnahmen.length})</h4>
+                {periodeEinnahmen.length === 0 ? (
+                  <div className="empty-state">Keine Einnahmen in diesem Zeitraum</div>
+                ) : (
+                  <div className="table-container" style={{ marginBottom: 24 }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Datum</th>
+                          <th>Spieler</th>
+                          <th>Tarif</th>
+                          <th style={{ textAlign: 'right' }}>Netto</th>
+                          <th style={{ textAlign: 'right' }}>Brutto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {periodeEinnahmen.map((e, i) => (
+                          <tr key={i}>
+                            <td>{formatDateGerman(e.datum)}</td>
+                            <td>{e.spielerName}</td>
+                            <td>{e.tarifName}</td>
+                            <td style={{ textAlign: 'right' }}>{e.netto.toFixed(2)} €</td>
+                            <td style={{ textAlign: 'right' }}>{e.brutto.toFixed(2)} €</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
+                          <td colSpan={3}>Summe Einnahmen</td>
+                          <td style={{ textAlign: 'right' }}>{periodeEinnahmen.reduce((s, e) => s + e.netto, 0).toFixed(2)} €</td>
+                          <td style={{ textAlign: 'right' }}>{periodeEinnahmen.reduce((s, e) => s + e.brutto, 0).toFixed(2)} €</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+
+                <h4 style={{ margin: '16px 0 8px' }}>Ausgaben ({periodeAusgaben.length})</h4>
+                {periodeAusgaben.length === 0 ? (
+                  <div className="empty-state">Keine Ausgaben in diesem Zeitraum</div>
+                ) : (
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Datum</th>
+                          <th>Kategorie</th>
+                          <th>Beschreibung</th>
+                          <th style={{ textAlign: 'right' }}>Netto</th>
+                          <th style={{ textAlign: 'right' }}>Brutto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {periodeAusgaben.map(a => {
+                          const netto = a.hat_vorsteuer ? a.betrag / (1 + a.vorsteuer_satz / 100) : a.betrag
+                          return (
+                            <tr key={a.id}>
+                              <td>{formatDateGerman(a.datum)}</td>
+                              <td>{AUSGABE_KATEGORIEN.find(k => k.value === a.kategorie)?.label}</td>
+                              <td>{a.beschreibung || '-'}</td>
+                              <td style={{ textAlign: 'right' }}>{netto.toFixed(2)} €</td>
+                              <td style={{ textAlign: 'right' }}>{a.betrag.toFixed(2)} €</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
+                          <td colSpan={3}>Summe Ausgaben</td>
+                          <td style={{ textAlign: 'right' }}>
+                            {periodeAusgaben.reduce((s, a) => s + (a.hat_vorsteuer ? a.betrag / (1 + a.vorsteuer_satz / 100) : a.betrag), 0).toFixed(2)} €
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{periodeAusgaben.reduce((s, a) => s + a.betrag, 0).toFixed(2)} €</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })() : (
+            <>
+              <p style={{ marginBottom: 16, color: 'var(--gray-600)' }}>Klicke auf einen Zeitraum für Details</p>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Zeitraum</th>
+                      <th style={{ textAlign: 'right' }}>Einnahmen (netto)</th>
+                      <th style={{ textAlign: 'right' }}>Ausgaben (netto)</th>
+                      <th style={{ textAlign: 'right' }}>Gewinn/Verlust</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {euerZeilen.map(z => (
+                      <tr
+                        key={z.periode}
+                        onClick={() => setDetailPeriode(z.periode)}
+                        style={{ cursor: 'pointer' }}
+                        className="clickable-row"
+                      >
+                        <td style={{ color: 'var(--primary)', textDecoration: 'underline' }}>{z.label}</td>
+                        <td style={{ textAlign: 'right' }}>{z.einnahmenNetto.toFixed(2)} €</td>
+                        <td style={{ textAlign: 'right' }}>{z.ausgabenNetto.toFixed(2)} €</td>
+                        <td style={{
+                          textAlign: 'right',
+                          fontWeight: 500,
+                          color: z.gewinn >= 0 ? 'var(--success)' : 'var(--danger)'
+                        }}>
+                          {z.gewinn >= 0 ? '+' : ''}{z.gewinn.toFixed(2)} €
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
+                      <td>Gesamt {selectedYear}</td>
+                      <td style={{ textAlign: 'right' }}>{gesamtEinnahmenNetto.toFixed(2)} €</td>
+                      <td style={{ textAlign: 'right' }}>{gesamtAusgabenNetto.toFixed(2)} €</td>
+                      <td style={{
+                        textAlign: 'right',
+                        color: (gesamtEinnahmenNetto - gesamtAusgabenNetto) >= 0 ? 'var(--success)' : 'var(--danger)'
+                      }}>
+                        {(gesamtEinnahmenNetto - gesamtAusgabenNetto) >= 0 ? '+' : ''}
+                        {(gesamtEinnahmenNetto - gesamtAusgabenNetto).toFixed(2)} €
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
