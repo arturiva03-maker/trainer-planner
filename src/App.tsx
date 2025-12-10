@@ -1395,6 +1395,21 @@ function VerwaltungView({
         </div>
       )}
 
+      {activeSubTab === 'trainer' && (
+        <div className="card">
+          <div className="card-header">
+            <h3>Trainer-Verwaltung</h3>
+          </div>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--gray-500)' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🚧</div>
+            <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>Demnächst verfügbar</div>
+            <p style={{ fontSize: 14 }}>
+              Die Trainer-Verwaltung befindet sich noch in Entwicklung.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Spieler Modal */}
       {showSpielerModal && (
         <SpielerModal
