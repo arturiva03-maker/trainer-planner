@@ -3588,7 +3588,35 @@ function BuchhaltungView({
   const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
   const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
 
+  // State für manuelle Rechnung
+  const [rechnungData, setRechnungData] = useState({
+    empfaengerName: '',
+    empfaengerAdresse: '',
+    rechnungsnummer: '',
+    rechnungsdatum: formatDate(new Date()),
+    leistungszeitraum: '',
+    beschreibung: 'Vermietung Tennisplatz',
+    positionen: [{ beschreibung: '', menge: 1, einzelpreis: 0 }] as { beschreibung: string; menge: number; einzelpreis: number }[],
+    ustSatz: 19,
+    zahlungsziel: 14,
+    freitext: ''
+  })
+
   const kleinunternehmer = profile?.kleinunternehmer ?? false
+
+  // Rechnungsnummer beim ersten Laden generieren
+  useEffect(() => {
+    if (!rechnungData.rechnungsnummer) {
+      setRechnungData(prev => ({ ...prev, rechnungsnummer: generateRechnungsnummer() }))
+    }
+  }, [])
+
+  // USt-Satz anpassen wenn Kleinunternehmer
+  useEffect(() => {
+    if (kleinunternehmer && rechnungData.ustSatz !== 0) {
+      setRechnungData(prev => ({ ...prev, ustSatz: 0 }))
+    }
+  }, [kleinunternehmer])
 
   // Verfügbare Jahre berechnen
   const verfuegbareJahre = useMemo(() => {
@@ -4637,20 +4665,6 @@ function BuchhaltungView({
 
       {/* Manuelle Rechnung Tab */}
       {activeSubTab === 'rechnung' && (() => {
-        // State für manuelle Rechnung (innerhalb der Render-Funktion)
-        const [rechnungData, setRechnungData] = useState({
-          empfaengerName: '',
-          empfaengerAdresse: '',
-          rechnungsnummer: generateRechnungsnummer(),
-          rechnungsdatum: formatDate(new Date()),
-          leistungszeitraum: '',
-          beschreibung: 'Vermietung Tennisplatz',
-          positionen: [{ beschreibung: '', menge: 1, einzelpreis: 0 }] as { beschreibung: string; menge: number; einzelpreis: number }[],
-          ustSatz: kleinunternehmer ? 0 : 19,
-          zahlungsziel: 14,
-          freitext: ''
-        })
-
         const addPosition = () => {
           setRechnungData(prev => ({
             ...prev,

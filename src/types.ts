@@ -131,3 +131,22 @@ export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[
   { value: 'fortbildung', label: 'Fortbildung' },
   { value: 'sonstiges', label: 'Sonstiges' }
 ]
+
+export interface ManuelleRechnung {
+  id: string
+  user_id: string
+  rechnungsnummer: string
+  rechnungsdatum: string
+  empfaenger_name: string
+  empfaenger_adresse?: string
+  leistungszeitraum?: string
+  beschreibung?: string
+  positionen: { beschreibung: string; menge: number; einzelpreis: number }[]
+  ust_satz: number
+  netto_gesamt: number
+  ust_betrag: number
+  brutto_gesamt: number
+  zahlungsziel: number
+  freitext?: string
+  created_at: string
+}

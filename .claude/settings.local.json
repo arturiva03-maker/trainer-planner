@@ -11,7 +11,8 @@
       "WebFetch(domain:tennistrainer-app.de)",
       "Bash(npx vercel --prod)",
       "Bash(npx vercel:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(vercel:*)"
     ]
   },
   "alwaysAllowWrites": true,
