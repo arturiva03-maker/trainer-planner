@@ -255,6 +255,30 @@ function MainApp({ user }: { user: User }) {
     { id: 'weiteres' as Tab, label: 'Mehr', icon: '⚙️' }
   ]
 
+  // Warte-Bildschirm für nicht freigeschaltete User
+  if (!dataLoading && profile && !profile.approved) {
+    return (
+      <div className="auth-container">
+        <div className="auth-card">
+          <h2>Warten auf Freischaltung</h2>
+          <p style={{ marginBottom: 16, color: 'var(--gray-600)' }}>
+            Dein Account wurde erfolgreich erstellt, aber noch nicht freigeschaltet.
+          </p>
+          <p style={{ marginBottom: 24, color: 'var(--gray-600)' }}>
+            Bitte warte, bis der Administrator deinen Zugang aktiviert hat.
+          </p>
+          <div style={{ padding: 16, background: 'var(--gray-100)', borderRadius: 8, marginBottom: 24 }}>
+            <div><strong>Name:</strong> {profile.name}</div>
+            <div><strong>E-Mail:</strong> {user.email}</div>
+          </div>
+          <button className="btn btn-secondary btn-block" onClick={handleLogout}>
+            Abmelden
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app-container">
       {/* Mobile Header */}

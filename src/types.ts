@@ -8,6 +8,7 @@ export interface TrainerProfile {
   iban?: string
   ust_id_nr?: string
   kleinunternehmer: boolean
+  approved: boolean
   notiz?: string
   created_at: string
   updated_at: string
