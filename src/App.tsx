@@ -1399,6 +1399,7 @@ function VerwaltungView({
       {showSpielerModal && (
         <SpielerModal
           spieler={editingSpieler}
+          alleSpieler={spieler}
           userId={userId}
           onClose={() => {
             setShowSpielerModal(false)
@@ -1452,11 +1453,13 @@ function VerwaltungView({
 // ============ SPIELER MODAL ============
 function SpielerModal({
   spieler,
+  alleSpieler,
   userId,
   onClose,
   onSave
 }: {
   spieler: Spieler | null
+  alleSpieler: Spieler[]
   userId: string
   onClose: () => void
   onSave: () => void
@@ -1467,8 +1470,14 @@ function SpielerModal({
   const [adresse, setAdresse] = useState(spieler?.rechnungs_adresse || '')
   const [abweichendeRechnung, setAbweichendeRechnung] = useState(spieler?.abweichende_rechnung || false)
   const [rechnungsEmpfaenger, setRechnungsEmpfaenger] = useState(spieler?.rechnungs_empfaenger || '')
+  const [rechnungsSpielerId, setRechnungsSpielerId] = useState(spieler?.rechnungs_spieler_id || '')
   const [notizen, setNotizen] = useState(spieler?.notizen || '')
   const [saving, setSaving] = useState(false)
+
+  // Spieler die als Rechnungsempfänger verfügbar sind (nicht der aktuelle Spieler selbst)
+  const verfuegbareRechnungsSpieler = alleSpieler.filter(s =>
+    s.id !== spieler?.id && !s.rechnungs_spieler_id // Nur Spieler die selbst keinen anderen Rechnungsempfänger haben
+  )
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -1487,13 +1496,21 @@ function SpielerModal({
         notizen: notizen || null
       }
 
-      // Neue Felder nur hinzufügen wenn sie verwendet werden (für DB-Kompatibilität)
-      if (abweichendeRechnung) {
+      // Rechnungsempfänger-Logik
+      if (rechnungsSpielerId) {
+        // Anderer Spieler ist Rechnungsempfänger
+        data.abweichende_rechnung = false
+        data.rechnungs_empfaenger = null
+        data.rechnungs_spieler_id = rechnungsSpielerId
+      } else if (abweichendeRechnung) {
+        // Manuell eingegebener abweichender Empfänger
         data.abweichende_rechnung = true
         data.rechnungs_empfaenger = rechnungsEmpfaenger || null
+        data.rechnungs_spieler_id = null
       } else {
         data.abweichende_rechnung = false
         data.rechnungs_empfaenger = null
+        data.rechnungs_spieler_id = null
       }
 
       if (spieler) {
@@ -1568,33 +1585,65 @@ function SpielerModal({
               placeholder="Straße, PLZ Ort"
             />
           </div>
-          <div className="form-group">
-            <div className="checkbox-group">
-              <input
-                type="checkbox"
-                id="abweichendeRechnung"
-                checked={abweichendeRechnung}
-                onChange={(e) => setAbweichendeRechnung(e.target.checked)}
-              />
-              <label htmlFor="abweichendeRechnung">
-                Abweichender Rechnungsempfänger (z.B. bei Kindern)
-              </label>
-            </div>
-          </div>
-          {abweichendeRechnung && (
-            <div className="form-group" style={{ background: 'var(--gray-50)', padding: 12, borderRadius: 'var(--radius)', marginTop: -8 }}>
-              <label>Rechnungsempfänger (Name)</label>
-              <input
-                type="text"
+          {/* Rechnungsempfänger-Auswahl */}
+          {verfuegbareRechnungsSpieler.length > 0 && (
+            <div className="form-group">
+              <label>Rechnung über anderen Spieler (z.B. Geschwister)</label>
+              <select
                 className="form-control"
-                value={rechnungsEmpfaenger}
-                onChange={(e) => setRechnungsEmpfaenger(e.target.value)}
-                placeholder="z.B. Eltern des Kindes"
-              />
-              <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-                Die Rechnungsadresse oben wird dann für diesen Empfänger verwendet.
-              </p>
+                value={rechnungsSpielerId}
+                onChange={(e) => {
+                  setRechnungsSpielerId(e.target.value)
+                  if (e.target.value) {
+                    setAbweichendeRechnung(false)
+                  }
+                }}
+              >
+                <option value="">-- Eigene Rechnung --</option>
+                {verfuegbareRechnungsSpieler.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              {rechnungsSpielerId && (
+                <p style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4 }}>
+                  Trainings dieses Spielers werden auf der Rechnung von "{verfuegbareRechnungsSpieler.find(s => s.id === rechnungsSpielerId)?.name}" mit aufgeführt.
+                </p>
+              )}
             </div>
+          )}
+
+          {/* Manueller abweichender Rechnungsempfänger (nur wenn kein Spieler ausgewählt) */}
+          {!rechnungsSpielerId && (
+            <>
+              <div className="form-group">
+                <div className="checkbox-group">
+                  <input
+                    type="checkbox"
+                    id="abweichendeRechnung"
+                    checked={abweichendeRechnung}
+                    onChange={(e) => setAbweichendeRechnung(e.target.checked)}
+                  />
+                  <label htmlFor="abweichendeRechnung">
+                    Abweichender Rechnungsempfänger (z.B. bei Kindern)
+                  </label>
+                </div>
+              </div>
+              {abweichendeRechnung && (
+                <div className="form-group" style={{ background: 'var(--gray-50)', padding: 12, borderRadius: 'var(--radius)', marginTop: -8 }}>
+                  <label>Rechnungsempfänger (Name)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={rechnungsEmpfaenger}
+                    onChange={(e) => setRechnungsEmpfaenger(e.target.value)}
+                    placeholder="z.B. Eltern des Kindes"
+                  />
+                  <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+                    Die Rechnungsadresse oben wird dann für diesen Empfänger verwendet.
+                  </p>
+                </div>
+              )}
+            </>
           )}
           <div className="form-group">
             <label>Notizen</label>
@@ -2380,6 +2429,7 @@ function InvoiceModal({
     summe: number
     offeneSumme: number
     barSumme: number
+    bezahltSumme: number
     bezahlt: boolean
   }[]
   tarife: Tarif[]
@@ -2410,12 +2460,43 @@ function InvoiceModal({
   // Trainingsaufstellung für den ausgewählten Spieler
   const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
 
+  // Finde Spieler die diesen Spieler als Rechnungsempfänger haben (z.B. Geschwister)
+  const verknuepfteSpieler = useMemo(() => {
+    if (!selectedSpielerId) return []
+    return spieler.filter(s => s.rechnungs_spieler_id === selectedSpielerId)
+  }, [selectedSpielerId, spieler])
+
+  // Summaries der verknüpften Spieler
+  const verknuepfteSummaries = useMemo(() => {
+    return verknuepfteSpieler.map(vs => ({
+      spieler: vs,
+      summary: spielerSummary.find(ss => ss.spieler.id === vs.id)
+    })).filter(v => v.summary && v.summary.trainings.length > 0)
+  }, [verknuepfteSpieler, spielerSummary])
+
   // Berechne die Positionen mit USt-Details (ohne bar bezahlte Trainings)
+  // Inkludiert auch Trainings von verknüpften Spielern (Geschwister)
   const rechnungsPositionen = useMemo(() => {
     if (!selectedSummary) return []
 
-    // Bar bezahlte Trainings sind bereits bezahlt und erscheinen nicht in der Rechnung
-    return selectedSummary.trainings.filter(t => !t.bar_bezahlt).map((t) => {
+    // Sammle alle Trainings: eigene + verknüpfte Spieler
+    const alleTrainings: { training: Training; spielerName: string; spielerId: string }[] = []
+
+    // Eigene Trainings (ohne bar bezahlte)
+    selectedSummary.trainings.filter(t => !t.bar_bezahlt).forEach(t => {
+      alleTrainings.push({ training: t, spielerName: selectedSummary.spieler.name, spielerId: selectedSummary.spieler.id })
+    })
+
+    // Trainings von verknüpften Spielern (ohne bar bezahlte)
+    verknuepfteSummaries.forEach(vs => {
+      if (vs.summary) {
+        vs.summary.trainings.filter(t => !t.bar_bezahlt).forEach(t => {
+          alleTrainings.push({ training: t, spielerName: vs.spieler.name, spielerId: vs.spieler.id })
+        })
+      }
+    })
+
+    return alleTrainings.map(({ training: t, spielerName, spielerId }) => {
       const tarif = tarife.find((ta) => ta.id === t.tarif_id)
       const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
       const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
@@ -2455,13 +2536,15 @@ function InvoiceModal({
         zeit: `${t.uhrzeit_von} - ${t.uhrzeit_bis}`,
         dauer: duration,
         tarifName: tarif?.name || 'Unbekannt',
+        spielerName,
+        spielerId,
         ustSatz,
         netto,
         ust,
         brutto
       }
     }).sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [selectedSummary, tarife, kleinunternehmer])
+  }, [selectedSummary, verknuepfteSummaries, tarife, kleinunternehmer])
 
   // Berechne Gesamtsummen inkl. Korrektur
   const summen = useMemo(() => {
@@ -2504,12 +2587,15 @@ function InvoiceModal({
   }, [selectedSpielerId, spieler])
 
   const generatePDF = () => {
+    const hatMehrereSpieler = verknuepfteSummaries.length > 0
+
     // Erstelle Tabellenzeilen für jede Position
     const positionenHtml = rechnungsPositionen.map((p) => `
       <tr>
         <td>${formatDateGerman(p.datum)}</td>
         <td>${p.zeit}</td>
         <td>${p.dauer.toFixed(1)} Std.</td>
+        ${hatMehrereSpieler ? `<td>${p.spielerName}</td>` : ''}
         <td>${p.tarifName}</td>
         <td style="text-align: right">${p.netto.toFixed(2)} €</td>
         ${!kleinunternehmer ? `<td style="text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
@@ -2518,9 +2604,10 @@ function InvoiceModal({
     `).join('')
 
     // Korrekturzeile falls vorhanden
+    const korrekturColSpan = hatMehrereSpieler ? 4 : 3
     const korrekturHtml = summen.korrektur !== 0 ? `
       <tr style="background: ${summen.korrektur < 0 ? '#fee2e2' : '#dcfce7'}">
-        <td colspan="3"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td colspan="${korrekturColSpan}"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
         <td><em>Korrektur</em></td>
         <td style="text-align: right">${summen.korrekturNetto >= 0 ? '' : ''}${summen.korrekturNetto.toFixed(2)} €</td>
         ${!kleinunternehmer ? `<td style="text-align: right">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
@@ -2587,6 +2674,7 @@ function InvoiceModal({
               <th>Datum</th>
               <th>Zeit</th>
               <th>Dauer</th>
+              ${hatMehrereSpieler ? '<th>Spieler</th>' : ''}
               <th>Tarif</th>
               <th style="text-align: right">Netto</th>
               ${!kleinunternehmer ? '<th style="text-align: right">USt</th>' : ''}
@@ -2662,16 +2750,41 @@ function InvoiceModal({
                   onChange={(e) => setSelectedSpielerId(e.target.value)}
                 >
                   <option value="">-- Spieler auswählen --</option>
-                  {spielerSummary.filter(s => s.offeneSumme > 0).map((s) => {
-                    const offeneTrainings = s.trainings.filter(t => !t.bar_bezahlt).length
-                    return (
-                      <option key={s.spieler.id} value={s.spieler.id}>
-                        {s.spieler.name} - {s.offeneSumme.toFixed(2)} € offen ({offeneTrainings} Trainings)
-                      </option>
-                    )
-                  })}
+                  {/* Nur Spieler anzeigen die keinen anderen Rechnungsempfänger haben */}
+                  {spielerSummary
+                    .filter(s => !s.spieler.rechnungs_spieler_id && s.offeneSumme > 0)
+                    .map((s) => {
+                      // Prüfe ob verknüpfte Spieler existieren
+                      const verknuepfte = spieler.filter(sp => sp.rechnungs_spieler_id === s.spieler.id)
+                      const verknuepfteNames = verknuepfte.map(v => v.name).join(', ')
+                      const offeneTrainings = s.trainings.filter(t => !t.bar_bezahlt).length
+                      return (
+                        <option key={s.spieler.id} value={s.spieler.id}>
+                          {s.spieler.name} - {s.offeneSumme.toFixed(2)} € offen ({offeneTrainings} Trainings)
+                          {verknuepfte.length > 0 ? ` [+${verknuepfteNames}]` : ''}
+                        </option>
+                      )
+                    })}
                 </select>
               </div>
+
+              {/* Hinweis auf verknüpfte Spieler (Geschwister) */}
+              {selectedSpielerId && verknuepfteSummaries.length > 0 && (
+                <div style={{ background: 'var(--primary-light)', padding: 12, borderRadius: 'var(--radius)', marginBottom: 16, border: '1px solid var(--primary)' }}>
+                  <div style={{ fontWeight: 500, marginBottom: 8, color: 'var(--primary)' }}>
+                    Verknüpfte Spieler auf dieser Rechnung:
+                  </div>
+                  {verknuepfteSummaries.map(vs => (
+                    <div key={vs.spieler.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0' }}>
+                      <span>{vs.spieler.name}</span>
+                      <span>{vs.summary!.offeneSumme.toFixed(2)} € ({vs.summary!.trainings.filter(t => !t.bar_bezahlt).length} Trainings)</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: '1px solid var(--primary)', marginTop: 8, paddingTop: 8, fontSize: 12, color: 'var(--gray-600)' }}>
+                    Die Trainings dieser Spieler werden automatisch mit auf die Rechnung aufgenommen.
+                  </div>
+                </div>
+              )}
 
               {selectedSpielerId && rechnungsPositionen.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
@@ -2684,6 +2797,7 @@ function InvoiceModal({
                         <tr>
                           <th>Datum</th>
                           <th>Zeit</th>
+                          {verknuepfteSummaries.length > 0 && <th>Spieler</th>}
                           <th>Tarif</th>
                           <th style={{ textAlign: 'right' }}>Brutto</th>
                         </tr>
@@ -2693,6 +2807,7 @@ function InvoiceModal({
                           <tr key={i}>
                             <td>{formatDateGerman(p.datum)}</td>
                             <td>{p.zeit}</td>
+                            {verknuepfteSummaries.length > 0 && <td>{p.spielerName}</td>}
                             <td>{p.tarifName}</td>
                             <td style={{ textAlign: 'right' }}>{p.brutto.toFixed(2)} €</td>
                           </tr>

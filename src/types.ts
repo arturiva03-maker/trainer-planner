@@ -21,6 +21,7 @@ export interface Spieler {
   kontakt_telefon?: string
   rechnungs_adresse?: string
   rechnungs_empfaenger?: string
+  rechnungs_spieler_id?: string
   abweichende_rechnung: boolean
   notizen?: string
   created_at: string
