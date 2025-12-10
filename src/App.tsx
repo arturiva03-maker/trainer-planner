@@ -56,7 +56,8 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
             user_id: data.user.id,
             name: name,
             stundensatz: 25,
-            kleinunternehmer: false
+            kleinunternehmer: false,
+            approved: false
           })
           onLogin(data.user)
         }
