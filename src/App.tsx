@@ -1995,12 +1995,12 @@ function AbrechnungView({
   }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag])
 
   const stats = useMemo(() => {
-    const total = spielerSummary.reduce((sum, s) => sum + s.summe, 0)
-    const bar = spielerSummary.reduce((sum, s) => sum + s.barSumme, 0)
-    const bezahlt = bar + spielerSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
-    const offen = spielerSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
+    const total = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
+    const bar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
+    const bezahlt = bar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
+    const offen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
     return { total, bar, bezahlt, offen }
-  }, [spielerSummary])
+  }, [filteredSummary])
 
   // Alle Trainings eines Spielers im Monat als bezahlt/offen markieren
   const toggleAlleBezahlt = async (spielerId: string, currentStatus: boolean) => {
