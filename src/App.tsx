@@ -3170,6 +3170,8 @@ Vielen Dank für die Zusammenarbeit!
 
 Mit freundlichen Grüßen
 ${rechnungsstellerName}
+
+Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
 ══════════════════════════════════════
 `
 
