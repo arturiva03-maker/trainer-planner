@@ -1,6 +1,6 @@
 {
-  "name": "Trainer Planner",
-  "short_name": "Trainer",
+  "name": "CourtPro",
+  "short_name": "CourtPro",
   "description": "Tennis-Trainer Planungs- und Abrechnungs-App",
   "start_url": "/",
   "display": "standalone",

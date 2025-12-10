@@ -285,7 +285,7 @@ function MainApp({ user }: { user: User }) {
       {/* Mobile Header */}
       <div className="mobile-header">
         <div className="header-content">
-          <h1 className="header-title">Tennistrainer Planung</h1>
+          <h1 className="header-title">CourtPro</h1>
           <p className="header-subtitle">{profile?.name || 'Trainer'}</p>
         </div>
       </div>
@@ -298,7 +298,7 @@ function MainApp({ user }: { user: User }) {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <h2>Trainer Planner</h2>
+          <h2>CourtPro</h2>
         </div>
         <nav className="sidebar-nav">
           {tabs.map((tab) => (
