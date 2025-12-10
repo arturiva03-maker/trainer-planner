@@ -29,6 +29,64 @@ import {
   formatQuartal
 } from './utils'
 
+// ============ FEATURE DETAILS DATA ============
+const featureDetails = {
+  terminplanung: {
+    icon: '📅',
+    title: 'Terminplanung',
+    subtitle: 'Behalte den Überblick über alle Trainingseinheiten',
+    features: [
+      { icon: '📆', title: 'Wochenkalender', desc: 'Übersichtliche Wochenansicht mit allen Terminen auf einen Blick' },
+      { icon: '📋', title: 'Tagesansicht', desc: 'Detaillierte Tagesplanung mit Zeitslots und Spielerinformationen' },
+      { icon: '🔄', title: 'Serientermine', desc: 'Erstelle wiederkehrende Trainings für regelmäßige Gruppen' },
+      { icon: '✅', title: 'Status-Tracking', desc: 'Markiere Trainings als geplant, durchgeführt oder abgesagt' },
+      { icon: '📝', title: 'Notizen', desc: 'Füge Notizen zu einzelnen Trainingseinheiten hinzu' },
+      { icon: '👥', title: 'Gruppentraining', desc: 'Plane Einzel- oder Gruppentrainings mit mehreren Spielern' }
+    ]
+  },
+  spieler: {
+    icon: '👥',
+    title: 'Spieler & Tarife',
+    subtitle: 'Zentrale Verwaltung aller Spieler und Preismodelle',
+    features: [
+      { icon: '📇', title: 'Spielerdatenbank', desc: 'Speichere alle Spieler mit Kontaktdaten und Notizen' },
+      { icon: '📧', title: 'Kontaktdaten', desc: 'E-Mail und Telefonnummer für schnelle Kommunikation' },
+      { icon: '🏠', title: 'Rechnungsadressen', desc: 'Individuelle Rechnungsadressen und -empfänger pro Spieler' },
+      { icon: '💵', title: 'Flexible Tarife', desc: 'Erstelle verschiedene Tarife für unterschiedliche Trainingsarten' },
+      { icon: '📊', title: 'Abrechnungsmodelle', desc: 'Pro Training, pro Spieler oder monatliche Pauschalen' },
+      { icon: '🔗', title: 'Verknüpfungen', desc: 'Verknüpfe Spieler für gemeinsame Rechnungen (z.B. Geschwister)' }
+    ]
+  },
+  abrechnung: {
+    icon: '💰',
+    title: 'Abrechnung',
+    subtitle: 'Professionelle Rechnungen mit wenigen Klicks',
+    features: [
+      { icon: '🧾', title: 'PDF-Rechnungen', desc: 'Professionelle Rechnungen automatisch als PDF erstellen' },
+      { icon: '📬', title: 'E-Mail-Versand', desc: 'Rechnungen direkt per E-Mail an Spieler versenden' },
+      { icon: '⏳', title: 'Offene Posten', desc: 'Überblick über ausstehende Zahlungen pro Monat' },
+      { icon: '✔️', title: 'Zahlungsverfolgung', desc: 'Markiere Rechnungen als bezahlt (Bar oder Überweisung)' },
+      { icon: '📑', title: 'Manuelle Rechnungen', desc: 'Erstelle individuelle Rechnungen für Platzmiete etc.' },
+      { icon: '📈', title: 'Statistiken', desc: 'Monatliche Übersicht über Umsätze und offene Beträge' }
+    ]
+  },
+  buchhaltung: {
+    icon: '📊',
+    title: 'Buchhaltung',
+    subtitle: 'Alles für deine Steuererklärung',
+    features: [
+      { icon: '💹', title: 'Einnahmenübersicht', desc: 'Alle Einnahmen nach Monat und Quartal aufgeschlüsselt' },
+      { icon: '📉', title: 'Ausgabenverwaltung', desc: 'Erfasse Platzmiete, Material, Fahrtkosten und mehr' },
+      { icon: '🧮', title: 'USt-Voranmeldung', desc: 'Automatische Berechnung der Umsatzsteuer für das Finanzamt' },
+      { icon: '📋', title: 'EÜR-Bericht', desc: 'Einnahmen-Überschuss-Rechnung für den Steuerberater' },
+      { icon: '📤', title: 'Export-Funktionen', desc: 'Exportiere Berichte als Text für ELSTER oder Steuerberater' },
+      { icon: '💼', title: 'Kleinunternehmerregelung', desc: 'Unterstützung für §19 UStG ohne Mehrwertsteuer' }
+    ]
+  }
+}
+
+type FeatureKey = keyof typeof featureDetails
+
 // ============ AUTH COMPONENT ============
 function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
   const [isLogin, setIsLogin] = useState(true)
@@ -37,6 +95,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [selectedFeature, setSelectedFeature] = useState<FeatureKey | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,33 +141,37 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
           <p className="auth-tagline">Die All-in-One Verwaltung für Tennistrainer</p>
 
           <div className="auth-features">
-            <div className="auth-feature">
+            <div className="auth-feature" onClick={() => setSelectedFeature('terminplanung')}>
               <span className="auth-feature-icon">📅</span>
               <div>
                 <strong>Terminplanung</strong>
                 <p>Kalender mit Wochen- und Tagesansicht, Serientermine und Status-Tracking</p>
               </div>
+              <span className="auth-feature-arrow">→</span>
             </div>
-            <div className="auth-feature">
+            <div className="auth-feature" onClick={() => setSelectedFeature('spieler')}>
               <span className="auth-feature-icon">👥</span>
               <div>
                 <strong>Spieler & Tarife</strong>
                 <p>Verwalte Spieler, Kontaktdaten und flexible Tarifmodelle</p>
               </div>
+              <span className="auth-feature-arrow">→</span>
             </div>
-            <div className="auth-feature">
+            <div className="auth-feature" onClick={() => setSelectedFeature('abrechnung')}>
               <span className="auth-feature-icon">💰</span>
               <div>
                 <strong>Abrechnung</strong>
                 <p>Automatische Rechnungserstellung, offene Posten und Zahlungsverfolgung</p>
               </div>
+              <span className="auth-feature-arrow">→</span>
             </div>
-            <div className="auth-feature">
+            <div className="auth-feature" onClick={() => setSelectedFeature('buchhaltung')}>
               <span className="auth-feature-icon">📊</span>
               <div>
                 <strong>Buchhaltung</strong>
                 <p>Einnahmen, Ausgaben, USt-Voranmeldung und EÜR auf einen Blick</p>
               </div>
+              <span className="auth-feature-arrow">→</span>
             </div>
           </div>
         </div>
@@ -167,6 +230,33 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
           </div>
         </div>
       </div>
+
+      {/* Feature Detail Modal */}
+      {selectedFeature && (
+        <div className="feature-modal-overlay" onClick={() => setSelectedFeature(null)}>
+          <div className="feature-modal" onClick={e => e.stopPropagation()}>
+            <button className="feature-modal-close" onClick={() => setSelectedFeature(null)}>×</button>
+            <div className="feature-modal-header">
+              <span className="feature-modal-icon">{featureDetails[selectedFeature].icon}</span>
+              <div>
+                <h2>{featureDetails[selectedFeature].title}</h2>
+                <p>{featureDetails[selectedFeature].subtitle}</p>
+              </div>
+            </div>
+            <div className="feature-modal-grid">
+              {featureDetails[selectedFeature].features.map((feature, index) => (
+                <div key={index} className="feature-modal-item">
+                  <span className="feature-modal-item-icon">{feature.icon}</span>
+                  <div>
+                    <strong>{feature.title}</strong>
+                    <p>{feature.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
