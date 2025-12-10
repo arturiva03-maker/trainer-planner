@@ -67,3 +67,18 @@ export function debounce<T extends (...args: Parameters<T>) => void>(
 
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 export const WOCHENTAGE_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+
+const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+
+export function formatMonthGerman(monthStr: string): string {
+  const [year, month] = monthStr.split('-')
+  return `${MONATE[parseInt(month) - 1]} ${year}`
+}
+
+export function formatQuartal(year: number, quartal: number): string {
+  return `Q${quartal} ${year}`
+}
+
+export function getQuartalFromMonth(month: number): number {
+  return Math.ceil(month / 3)
+}

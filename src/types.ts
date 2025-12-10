@@ -106,4 +106,24 @@ export interface PlanungData {
   tage: { [key: string]: { [zeit: string]: string[] } }
 }
 
-export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'weiteres'
+export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'buchhaltung' | 'weiteres'
+
+export interface Ausgabe {
+  id: string
+  user_id: string
+  datum: string
+  betrag: number
+  kategorie: 'platzmiete' | 'material' | 'fahrtkosten' | 'fortbildung' | 'sonstiges'
+  beschreibung?: string
+  hat_vorsteuer: boolean
+  vorsteuer_satz: number
+  created_at: string
+}
+
+export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[] = [
+  { value: 'platzmiete', label: 'Platzmiete' },
+  { value: 'material', label: 'Material' },
+  { value: 'fahrtkosten', label: 'Fahrtkosten' },
+  { value: 'fortbildung', label: 'Fortbildung' },
+  { value: 'sonstiges', label: 'Sonstiges' }
+]
