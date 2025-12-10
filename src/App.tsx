@@ -3159,7 +3159,9 @@ ${positionenText}${korrekturText}
 ──────────────────────────────────────
 ${!kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €
 USt (19%):     ${summen.gesamtUst.toFixed(2)} €
-` : ''}GESAMTBETRAG:  ${summen.gesamtBrutto.toFixed(2)} €
+` : ''}
+  ►►► GESAMTBETRAG:  ${summen.gesamtBrutto.toFixed(2)} € ◄◄◄
+
 ──────────────────────────────────────
 ${kleinunternehmer ? '\nGemäß §19 UStG wird keine Umsatzsteuer berechnet.\n' : ''}
 Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf:
@@ -3171,7 +3173,7 @@ Vielen Dank für die Zusammenarbeit!
 Mit freundlichen Grüßen
 ${rechnungsstellerName}
 
-Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
+⚠️ Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
 ══════════════════════════════════════
 `
 
