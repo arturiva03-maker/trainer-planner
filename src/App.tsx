@@ -152,6 +152,9 @@ function MainApp({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<Tab>('kalender')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Navigation zum Kalender mit Training-Bearbeitung
+  const [navigateToTraining, setNavigateToTraining] = useState<Training | null>(null)
+
   // Data states
   const [profile, setProfile] = useState<TrainerProfile | null>(null)
   const [spieler, setSpieler] = useState<Spieler[]>([])
@@ -210,9 +213,14 @@ function MainApp({ user }: { user: User }) {
     await supabase.auth.signOut()
   }
 
+  // Navigation zum Kalender mit Bearbeitungsmodus für ein Training
+  const handleNavigateToTraining = (training: Training) => {
+    setNavigateToTraining(training)
+    setActiveTab('kalender')
+  }
+
   const baseTabs = [
     { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
-    { id: 'training' as Tab, label: 'Training', icon: '🎾' },
     { id: 'verwaltung' as Tab, label: 'Verwaltung', icon: '👥' },
     { id: 'abrechnung' as Tab, label: 'Abrechnung', icon: '💰' },
   ]
@@ -232,9 +240,9 @@ function MainApp({ user }: { user: User }) {
   // Haupt-Tabs für die mobile Bottom-Navigation (max 5 für bessere UX)
   const mobileNavTabs = [
     { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
-    { id: 'training' as Tab, label: 'Training', icon: '🎾' },
     { id: 'verwaltung' as Tab, label: 'Verwalten', icon: '👥' },
     { id: 'abrechnung' as Tab, label: 'Rechnung', icon: '💰' },
+    { id: 'planung' as Tab, label: 'Planung', icon: '📋' },
     { id: 'weiteres' as Tab, label: 'Mehr', icon: '⚙️' }
   ]
 
@@ -309,15 +317,8 @@ function MainApp({ user }: { user: User }) {
                 tarife={tarife}
                 onUpdate={loadAllData}
                 userId={user.id}
-              />
-            )}
-            {activeTab === 'training' && (
-              <TrainingView
-                trainings={trainings}
-                spieler={spieler}
-                tarife={tarife}
-                onUpdate={loadAllData}
-                userId={user.id}
+                navigateToTraining={navigateToTraining}
+                onNavigateComplete={() => setNavigateToTraining(null)}
               />
             )}
             {activeTab === 'verwaltung' && (
@@ -337,6 +338,7 @@ function MainApp({ user }: { user: User }) {
                 adjustments={adjustments}
                 profile={profile}
                 onUpdate={loadAllData}
+                onNavigateToTraining={handleNavigateToTraining}
               />
             )}
             {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
@@ -377,19 +379,33 @@ function KalenderView({
   spieler,
   tarife,
   onUpdate,
-  userId
+  userId,
+  navigateToTraining,
+  onNavigateComplete
 }: {
   trainings: Training[]
   spieler: Spieler[]
   tarife: Tarif[]
   onUpdate: () => void
   userId: string
+  navigateToTraining?: Training | null
+  onNavigateComplete?: () => void
 }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'week' | 'day'>(() =>
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
   )
   const [editingTraining, setEditingTraining] = useState<Training | null>(null)
+
+  // Navigation von Abrechnung: Zum Training-Datum springen und Bearbeitung öffnen
+  useEffect(() => {
+    if (navigateToTraining) {
+      const trainingDate = new Date(navigateToTraining.datum + 'T12:00:00')
+      setCurrentDate(trainingDate)
+      setEditingTraining(navigateToTraining)
+      onNavigateComplete?.()
+    }
+  }, [navigateToTraining, onNavigateComplete])
 
   // Automatisch zwischen Tag- und Wochenansicht wechseln bei Resize
   useEffect(() => {
@@ -630,153 +646,6 @@ function KalenderView({
           onClose={() => setShowAddTraining(false)}
           onSave={() => {
             setShowAddTraining(false)
-            onUpdate()
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-// ============ TRAINING VIEW ============
-function TrainingView({
-  trainings,
-  spieler,
-  tarife,
-  onUpdate,
-  userId
-}: {
-  trainings: Training[]
-  spieler: Spieler[]
-  tarife: Tarif[]
-  onUpdate: () => void
-  userId: string
-}) {
-  const [showModal, setShowModal] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-
-  const filteredTrainings = useMemo(() => {
-    if (!searchTerm) return trainings.slice(0, 50)
-    const term = searchTerm.toLowerCase()
-    return trainings.filter((t) => {
-      const spielerNames = t.spieler_ids
-        .map((id) => spieler.find((s) => s.id === id)?.name || '')
-        .join(' ')
-        .toLowerCase()
-      return spielerNames.includes(term) || t.datum.includes(term)
-    }).slice(0, 50)
-  }, [trainings, spieler, searchTerm])
-
-  const getSpielerNames = (ids: string[]) => {
-    return ids
-      .map((id) => spieler.find((s) => s.id === id)?.name || 'Unbekannt')
-      .join(', ')
-  }
-
-  const getTarifName = (id?: string) => {
-    if (!id) return '-'
-    return tarife.find((t) => t.id === id)?.name || '-'
-  }
-
-  return (
-    <div>
-      <div className="card">
-        <div className="card-header">
-          <h3>Trainings</h3>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            + Neues Training
-          </button>
-        </div>
-
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Suche nach Spieler oder Datum..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* Desktop Table */}
-        <div className="table-container desktop-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Zeit</th>
-                <th>Spieler</th>
-                <th>Tarif</th>
-                <th>Status</th>
-                <th>Aktionen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTrainings.map((training) => (
-                <tr key={training.id}>
-                  <td>{formatDateGerman(training.datum)}</td>
-                  <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
-                  <td>{getSpielerNames(training.spieler_ids)}</td>
-                  <td>{getTarifName(training.tarif_id)}</td>
-                  <td>
-                    <span className={`status-badge ${training.status}`}>
-                      {training.status === 'geplant' ? 'Geplant' :
-                        training.status === 'durchgefuehrt' ? 'Durchgeführt' : 'Abgesagt'}
-                    </span>
-                  </td>
-                  <td>
-                    <button className="btn btn-sm btn-secondary">Bearbeiten</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Card List */}
-        <div className="mobile-card-list">
-          {filteredTrainings.map((training) => (
-            <div key={training.id} className="mobile-card">
-              <div className="mobile-card-header">
-                <div>
-                  <div className="mobile-card-title">{formatDateGerman(training.datum)}</div>
-                  <div className="mobile-card-subtitle">
-                    {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
-                  </div>
-                </div>
-                <span className={`status-badge ${training.status}`}>
-                  {training.status === 'geplant' ? 'Geplant' :
-                    training.status === 'durchgefuehrt' ? 'Durchgeführt' : 'Abgesagt'}
-                </span>
-              </div>
-              <div className="mobile-card-body">
-                <div className="mobile-card-row">
-                  <span className="mobile-card-label">Spieler</span>
-                  <span className="mobile-card-value">{getSpielerNames(training.spieler_ids)}</span>
-                </div>
-                <div className="mobile-card-row">
-                  <span className="mobile-card-label">Tarif</span>
-                  <span className="mobile-card-value">{getTarifName(training.tarif_id)}</span>
-                </div>
-              </div>
-              <div className="mobile-card-actions">
-                <button className="btn btn-sm btn-secondary">Bearbeiten</button>
-              </div>
-            </div>
-          ))}
-          {filteredTrainings.length === 0 && (
-            <div className="empty-state">Keine Trainings gefunden</div>
-          )}
-        </div>
-      </div>
-
-      {showModal && (
-        <TrainingModal
-          spieler={spieler}
-          tarife={tarife}
-          userId={userId}
-          onClose={() => setShowModal(false)}
-          onSave={() => {
-            setShowModal(false)
             onUpdate()
           }}
         />
@@ -1987,7 +1856,8 @@ function AbrechnungView({
   tarife,
   adjustments,
   profile,
-  onUpdate
+  onUpdate,
+  onNavigateToTraining
 }: {
   trainings: Training[]
   spieler: Spieler[]
@@ -1995,6 +1865,7 @@ function AbrechnungView({
   adjustments: MonthlyAdjustment[]
   profile: TrainerProfile | null
   onUpdate: () => void
+  onNavigateToTraining: (training: Training) => void
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
@@ -2361,15 +2232,21 @@ function AbrechnungView({
                         return (
                           <tr
                             key={training.id}
-                            style={
-                              training.bar_bezahlt
+                            style={{
+                              cursor: 'pointer',
+                              ...(training.bar_bezahlt
                                 ? { background: 'var(--warning-light)' }
                                 : training.bezahlt
                                 ? { background: 'var(--success-light)' }
-                                : {}
-                            }
+                                : {})
+                            }}
+                            onClick={() => {
+                              setSelectedSpielerDetail(null)
+                              onNavigateToTraining(training)
+                            }}
+                            title="Klicken um im Kalender zu bearbeiten"
                           >
-                            <td>{formatDateGerman(training.datum)}</td>
+                            <td style={{ color: 'var(--primary)' }}>{formatDateGerman(training.datum)}</td>
                             <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
                             <td>{tarif?.name || '-'}</td>
                             <td style={{ textAlign: 'right', fontWeight: 500 }}>{betrag.toFixed(2)} €</td>
@@ -2382,7 +2259,10 @@ function AbrechnungView({
                                 <button
                                   className={`btn btn-sm ${training.bezahlt ? 'btn-success' : 'btn-secondary'}`}
                                   style={{ fontSize: 11, padding: '2px 8px' }}
-                                  onClick={() => toggleTrainingBezahlt(training.id, training.bezahlt)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleTrainingBezahlt(training.id, training.bezahlt)
+                                  }}
                                 >
                                   {training.bezahlt ? 'Bezahlt' : 'Offen'}
                                 </button>

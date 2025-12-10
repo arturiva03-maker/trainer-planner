@@ -106,4 +106,4 @@ export interface PlanungData {
   tage: { [key: string]: { [zeit: string]: string[] } }
 }
 
-export type Tab = 'kalender' | 'training' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'weiteres'
+export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'weiteres'
