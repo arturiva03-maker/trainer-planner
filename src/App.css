@@ -942,6 +942,11 @@ tr:hover {
   transform: scale(0.95);
 }
 
+/* Mobile card list - hidden on desktop */
+.mobile-card-list {
+  display: none;
+}
+
 /* MOBILE OPTIMIZATIONS */
 @media (max-width: 768px) {
   /* ===== 1. CONTAINER & BREITE - VOLLE BILDSCHIRMNUTZUNG ===== */
