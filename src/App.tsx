@@ -715,32 +715,32 @@ function KalenderView({
 
   return (
     <div>
-      <div className="card">
+      <div className="calendar-container">
         <div className="calendar-header">
           <div className="calendar-nav">
-            <button className="btn btn-secondary" onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
+            <button onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
             <h3>
               {isDayView
-                ? currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+                ? currentDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' })
                 : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
               }
             </h3>
-            <button className="btn btn-secondary" onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
+            <button onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
           <div className="view-toggle">
             <button
-              className={`btn ${viewMode === 'week' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn ${viewMode === 'week' ? 'btn-primary' : ''}`}
               onClick={() => setViewMode('week')}
             >
               Woche
             </button>
             <button
-              className={`btn ${viewMode === 'day' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn ${viewMode === 'day' ? 'btn-primary' : ''}`}
               onClick={() => setViewMode('day')}
             >
               Tag
             </button>
-            <button className="btn btn-primary" onClick={goToToday}>Heute</button>
+            <button className={`btn ${formatDate(currentDate) === formatDate(new Date()) ? 'btn-primary' : ''}`} onClick={goToToday}>Heute</button>
             <button className="btn btn-success" onClick={() => setShowAddTraining(true)}>
               + Neu
             </button>
