@@ -189,30 +189,54 @@ export interface EmailVorlage {
   name: string
   betreff: string
   inhalt: string
-  pdf_vorlage?: string // HTML-Vorlage für PDF (optional)
   ist_standard: boolean
   created_at: string
 }
 
-// Verfügbare Platzhalter für E-Mail-Vorlagen
+export interface PdfVorlage {
+  id: string
+  user_id: string
+  name: string
+  inhalt: string // HTML-Vorlage
+  ist_standard: boolean
+  created_at: string
+}
+
+// Verfügbare Platzhalter für E-Mail-Vorlagen (nur Text)
 export const EMAIL_PLATZHALTER = [
   { key: '{{spieler_name}}', beschreibung: 'Name des Spielers' },
   { key: '{{rechnungsnummer}}', beschreibung: 'Rechnungsnummer' },
   { key: '{{rechnungsdatum}}', beschreibung: 'Rechnungsdatum' },
   { key: '{{monat}}', beschreibung: 'Abrechnungsmonat (z.B. Dezember 2024)' },
-  { key: '{{positionen}}', beschreibung: 'Auflistung aller Trainings/Positionen (Text)' },
-  { key: '{{positionen_tabelle}}', beschreibung: 'Trainings als HTML-Tabelle (nur PDF)' },
+  { key: '{{positionen}}', beschreibung: 'Auflistung aller Trainings/Positionen' },
   { key: '{{netto}}', beschreibung: 'Nettobetrag' },
   { key: '{{ust}}', beschreibung: 'Umsatzsteuer-Betrag' },
   { key: '{{brutto}}', beschreibung: 'Gesamtbetrag (Brutto)' },
   { key: '{{iban}}', beschreibung: 'IBAN des Trainers' },
   { key: '{{trainer_name}}', beschreibung: 'Name des Trainers' },
   { key: '{{trainer_adresse}}', beschreibung: 'Adresse des Trainers' },
-  { key: '{{trainer_adresse_html}}', beschreibung: 'Adresse des Trainers (HTML mit <br>)' },
   { key: '{{empfaenger_name}}', beschreibung: 'Name des Rechnungsempfängers' },
   { key: '{{empfaenger_adresse}}', beschreibung: 'Adresse des Rechnungsempfängers' },
-  { key: '{{empfaenger_adresse_html}}', beschreibung: 'Adresse des Empfängers (HTML mit <br>)' },
   { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis (falls zutreffend)' },
   { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
-  { key: '{{summen_block}}', beschreibung: 'Summen-Block als HTML (nur PDF)' },
+]
+
+// Verfügbare Platzhalter für PDF-Vorlagen (mit HTML)
+export const PDF_PLATZHALTER = [
+  { key: '{{spieler_name}}', beschreibung: 'Name des Spielers' },
+  { key: '{{rechnungsnummer}}', beschreibung: 'Rechnungsnummer' },
+  { key: '{{rechnungsdatum}}', beschreibung: 'Rechnungsdatum' },
+  { key: '{{monat}}', beschreibung: 'Abrechnungsmonat (z.B. Dezember 2024)' },
+  { key: '{{positionen_tabelle}}', beschreibung: 'Trainings als HTML-Tabelle' },
+  { key: '{{netto}}', beschreibung: 'Nettobetrag' },
+  { key: '{{ust}}', beschreibung: 'Umsatzsteuer-Betrag' },
+  { key: '{{brutto}}', beschreibung: 'Gesamtbetrag (Brutto)' },
+  { key: '{{iban}}', beschreibung: 'IBAN des Trainers' },
+  { key: '{{trainer_name}}', beschreibung: 'Name des Trainers' },
+  { key: '{{trainer_adresse_html}}', beschreibung: 'Adresse des Trainers (HTML)' },
+  { key: '{{empfaenger_name}}', beschreibung: 'Name des Rechnungsempfängers' },
+  { key: '{{empfaenger_adresse_html}}', beschreibung: 'Adresse des Empfängers (HTML)' },
+  { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis' },
+  { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
+  { key: '{{summen_block}}', beschreibung: 'Summen-Block als HTML' },
 ]
