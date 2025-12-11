@@ -157,3 +157,16 @@ export interface ManuelleRechnung {
   bar_bezahlt: boolean
   created_at: string
 }
+
+export interface Vorauszahlung {
+  id: string
+  user_id: string
+  spieler_id: string
+  serie_id: string
+  betrag: number
+  zahlungsdatum: string
+  gueltig_bis: string // Bis zu welchem Datum die Trainings als bezahlt gelten
+  notiz?: string
+  bar_bezahlt: boolean
+  created_at: string
+}
