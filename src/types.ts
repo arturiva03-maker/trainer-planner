@@ -82,6 +82,17 @@ export interface Payment {
   bezahlt: boolean
 }
 
+// Bezahlstatus pro Spieler pro Training (für Gruppentrainings)
+export interface SpielerTrainingPayment {
+  id: string
+  user_id: string
+  training_id: string
+  spieler_id: string
+  bezahlt: boolean
+  bar_bezahlt: boolean
+  created_at: string
+}
+
 export interface MonthlyAdjustment {
   id: string
   user_id: string

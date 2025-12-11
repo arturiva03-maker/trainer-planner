@@ -14,7 +14,8 @@ import type {
   Tab,
   Ausgabe,
   ManuelleRechnung,
-  Vorauszahlung
+  Vorauszahlung,
+  SpielerTrainingPayment
 } from './types'
 import { AUSGABE_KATEGORIEN } from './types'
 import {
@@ -331,6 +332,7 @@ function MainApp({ user }: { user: User }) {
   const [trainer, setTrainer] = useState<Trainer[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
   const [vorauszahlungen, setVorauszahlungen] = useState<Vorauszahlung[]>([])
+  const [spielerPayments, setSpielerPayments] = useState<SpielerTrainingPayment[]>([])
   const [notizen, setNotizen] = useState<Notiz[]>([])
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
   const [ausgaben, setAusgaben] = useState<Ausgabe[]>([])
@@ -356,7 +358,8 @@ function MainApp({ user }: { user: User }) {
         planungRes,
         ausgabenRes,
         manuelleRechnungenRes,
-        vorauszahlungenRes
+        vorauszahlungenRes,
+        spielerPaymentsRes
       ] = await Promise.all([
         supabase.from('trainer_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('spieler').select('*').eq('user_id', user.id).order('name'),
@@ -368,7 +371,8 @@ function MainApp({ user }: { user: User }) {
         supabase.from('planung_sheets').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('manuelle_rechnungen').select('*').eq('user_id', user.id).order('rechnungsdatum', { ascending: false }),
-        supabase.from('vorauszahlungen').select('*').eq('user_id', user.id).order('zahlungsdatum', { ascending: false })
+        supabase.from('vorauszahlungen').select('*').eq('user_id', user.id).order('zahlungsdatum', { ascending: false }),
+        supabase.from('spieler_training_payments').select('*').eq('user_id', user.id)
       ])
 
       if (profileRes.data) setProfile(profileRes.data)
@@ -378,6 +382,7 @@ function MainApp({ user }: { user: User }) {
       if (trainerRes.data) setTrainer(trainerRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
       if (vorauszahlungenRes.data) setVorauszahlungen(vorauszahlungenRes.data)
+      if (spielerPaymentsRes.data) setSpielerPayments(spielerPaymentsRes.data)
       if (notizenRes.data) setNotizen(notizenRes.data)
       if (planungRes.data) setPlanungSheets(planungRes.data)
       if (ausgabenRes.data) setAusgaben(ausgabenRes.data)
@@ -544,6 +549,7 @@ function MainApp({ user }: { user: User }) {
                 tarife={tarife}
                 adjustments={adjustments}
                 vorauszahlungen={vorauszahlungen}
+                spielerPayments={spielerPayments}
                 profile={profile}
                 manuelleRechnungen={manuelleRechnungen}
                 onUpdate={loadAllData}
@@ -577,6 +583,7 @@ function MainApp({ user }: { user: User }) {
                 manuelleRechnungen={manuelleRechnungen}
                 adjustments={adjustments}
                 vorauszahlungen={vorauszahlungen}
+                spielerPayments={spielerPayments}
                 profile={profile}
                 onUpdate={loadAllData}
                 userId={user.id}
@@ -2097,6 +2104,7 @@ function AbrechnungView({
   tarife,
   adjustments,
   vorauszahlungen,
+  spielerPayments,
   profile,
   manuelleRechnungen,
   onUpdate,
@@ -2108,6 +2116,7 @@ function AbrechnungView({
   tarife: Tarif[]
   adjustments: MonthlyAdjustment[]
   vorauszahlungen: Vorauszahlung[]
+  spielerPayments: SpielerTrainingPayment[]
   profile: TrainerProfile | null
   manuelleRechnungen: ManuelleRechnung[]
   onUpdate: () => void
@@ -2151,6 +2160,21 @@ function AbrechnungView({
       v.serie_id === training.serie_id &&
       training.datum <= v.gueltig_bis
     ) || null
+  }
+
+  // Prüft den Bezahlstatus eines Spielers für ein Training
+  // Nutzt spielerPayments wenn vorhanden, sonst Fallback auf training.bezahlt/bar_bezahlt
+  const getSpielerPaymentStatus = (spielerId: string, training: Training): { bezahlt: boolean, barBezahlt: boolean } => {
+    const payment = spielerPayments.find(p => p.training_id === training.id && p.spieler_id === spielerId)
+    if (payment) {
+      return { bezahlt: payment.bezahlt, barBezahlt: payment.bar_bezahlt }
+    }
+    // Fallback: Für Einzeltrainings (nur 1 Spieler) das alte Feld nutzen
+    if (training.spieler_ids.length === 1) {
+      return { bezahlt: training.bezahlt, barBezahlt: training.bar_bezahlt }
+    }
+    // Für Gruppentrainings ohne expliziten Eintrag: als offen betrachten
+    return { bezahlt: false, barBezahlt: false }
   }
 
   const spielerSummary = useMemo(() => {
@@ -2223,11 +2247,13 @@ function AbrechnungView({
         summary[spielerId].summe += spielerPreis
 
         // Kategorisiere nach Bezahlstatus (inkl. Vorauszahlung)
+        // Nutze spieler-spezifischen Bezahlstatus!
+        const paymentStatus = getSpielerPaymentStatus(spielerId, t)
         const vorauszahlung = istVorauszahlungAktiv(spielerId, t)
         if (spielerPreis > 0 || trainingsKorrektur !== 0) {
-          if (t.bar_bezahlt) {
+          if (paymentStatus.barBezahlt) {
             summary[spielerId].barSumme += spielerPreis
-          } else if (t.bezahlt) {
+          } else if (paymentStatus.bezahlt) {
             summary[spielerId].bezahltSumme += spielerPreis
           } else if (vorauszahlung) {
             // Training ist durch Vorauszahlung abgedeckt
@@ -2257,7 +2283,7 @@ function AbrechnungView({
     })
 
     return Object.values(summary)
-  }, [monthTrainings, spieler, tarife, adjustments, vorauszahlungen, selectedMonth])
+  }, [monthTrainings, spieler, tarife, adjustments, vorauszahlungen, spielerPayments, selectedMonth])
 
   // Alle Tage im Monat mit Trainings
   const tageImMonat = useMemo(() => {
@@ -2382,22 +2408,61 @@ function AbrechnungView({
     const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
     if (!spielerData) return
 
-    const trainingIds = spielerData.trainings.map(t => t.id)
+    const newStatus = !currentStatus
 
-    await supabase
-      .from('trainings')
-      .update({ bezahlt: !currentStatus })
-      .in('id', trainingIds)
+    // Für jeden Training des Spielers: Eintrag in spieler_training_payments erstellen/aktualisieren
+    for (const training of spielerData.trainings) {
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === training.id && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
+        // Update existierenden Eintrag
+        await supabase
+          .from('spieler_training_payments')
+          .update({ bezahlt: newStatus, bar_bezahlt: false })
+          .eq('id', existingPayment.id)
+      } else {
+        // Neuen Eintrag erstellen
+        await supabase
+          .from('spieler_training_payments')
+          .insert({
+            user_id: userId,
+            training_id: training.id,
+            spieler_id: spielerId,
+            bezahlt: newStatus,
+            bar_bezahlt: false
+          })
+      }
+    }
 
     onUpdate()
   }
 
-  // Einzelnes Training als bezahlt markieren
-  const toggleTrainingBezahlt = async (trainingId: string, currentStatus: boolean) => {
-    await supabase
-      .from('trainings')
-      .update({ bezahlt: !currentStatus })
-      .eq('id', trainingId)
+  // Einzelnes Training für einen Spieler als bezahlt markieren
+  const toggleTrainingBezahlt = async (trainingId: string, spielerId: string, currentStatus: boolean) => {
+    const existingPayment = spielerPayments.find(
+      p => p.training_id === trainingId && p.spieler_id === spielerId
+    )
+
+    if (existingPayment) {
+      // Update existierenden Eintrag
+      await supabase
+        .from('spieler_training_payments')
+        .update({ bezahlt: !currentStatus, bar_bezahlt: false })
+        .eq('id', existingPayment.id)
+    } else {
+      // Neuen Eintrag erstellen
+      await supabase
+        .from('spieler_training_payments')
+        .insert({
+          user_id: userId,
+          training_id: trainingId,
+          spieler_id: spielerId,
+          bezahlt: !currentStatus,
+          bar_bezahlt: false
+        })
+    }
 
     onUpdate()
   }
@@ -3143,7 +3208,8 @@ function AbrechnungView({
                             <td style={{ textAlign: 'center' }}>
                               {(() => {
                                 const vorauszahlung = istVorauszahlungAktiv(detail.spieler.id, training)
-                                if (training.bar_bezahlt) {
+                                const paymentStatus = getSpielerPaymentStatus(detail.spieler.id, training)
+                                if (paymentStatus.barBezahlt) {
                                   return (
                                     <span className="status-badge" style={{ background: 'var(--warning)', color: '#000', fontSize: 11 }}>
                                       Bar
@@ -3159,14 +3225,14 @@ function AbrechnungView({
                                 } else {
                                   return (
                                     <button
-                                      className={`btn btn-sm ${training.bezahlt ? 'btn-success' : 'btn-secondary'}`}
+                                      className={`btn btn-sm ${paymentStatus.bezahlt ? 'btn-success' : 'btn-secondary'}`}
                                       style={{ fontSize: 11, padding: '2px 8px' }}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        toggleTrainingBezahlt(training.id, training.bezahlt)
+                                        toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatus.bezahlt)
                                       }}
                                     >
-                                      {training.bezahlt ? 'Bezahlt' : 'Offen'}
+                                      {paymentStatus.bezahlt ? 'Bezahlt' : 'Offen'}
                                     </button>
                                   )
                                 }
@@ -5185,6 +5251,7 @@ function BuchhaltungView({
   manuelleRechnungen,
   adjustments,
   vorauszahlungen,
+  spielerPayments,
   profile,
   onUpdate,
   userId,
@@ -5197,6 +5264,7 @@ function BuchhaltungView({
   manuelleRechnungen: ManuelleRechnung[]
   adjustments: MonthlyAdjustment[]
   vorauszahlungen: Vorauszahlung[]
+  spielerPayments: SpielerTrainingPayment[]
   profile: TrainerProfile | null
   onUpdate: () => void
   userId: string
@@ -5224,23 +5292,33 @@ function BuchhaltungView({
     return Array.from(jahre).sort((a, b) => b - a)
   }, [trainings, ausgaben])
 
+  // Hilfsfunktion: Bezahlstatus eines Spielers für ein Training prüfen
+  const getSpielerPaymentStatus = (spielerId: string, training: Training): { bezahlt: boolean, barBezahlt: boolean } => {
+    const payment = spielerPayments.find(p => p.training_id === training.id && p.spieler_id === spielerId)
+    if (payment) {
+      return { bezahlt: payment.bezahlt, barBezahlt: payment.bar_bezahlt }
+    }
+    // Fallback: Für Einzeltrainings (nur 1 Spieler) das alte Feld nutzen
+    if (training.spieler_ids.length === 1) {
+      return { bezahlt: training.bezahlt, barBezahlt: training.bar_bezahlt }
+    }
+    // Für Gruppentrainings ohne expliziten Eintrag: als offen betrachten
+    return { bezahlt: false, barBezahlt: false }
+  }
+
   // Einnahmen aus bezahlten Trainings berechnen
   const einnahmenPositionen = useMemo(() => {
-    const bezahlteTrainings = trainings.filter(t => {
+    // Alle durchgeführten Trainings des Jahres (Bezahlstatus wird pro Spieler geprüft)
+    const jahresTrainings = trainings.filter(t => {
       if (t.status !== 'durchgefuehrt') return false
       if (!t.datum.startsWith(selectedYear.toString())) return false
-      // Prüfe Zahlungsstatus basierend auf Bar-Einnahmen-Filter
-      if (inclBarEinnahmen) {
-        return t.bezahlt || t.bar_bezahlt
-      } else {
-        return t.bezahlt && !t.bar_bezahlt
-      }
+      return true
     }).sort((a, b) => a.datum.localeCompare(b.datum))
 
     // Track monatliche Serien pro Monat pro Spieler: "YYYY-MM|spielerId|serieId"
     const monatlicheSerienTracking = new Set<string>()
 
-    return bezahlteTrainings.flatMap(t => {
+    return jahresTrainings.flatMap(t => {
       const tarif = tarife.find(ta => ta.id === t.tarif_id)
       const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
       const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
@@ -5248,6 +5326,16 @@ function BuchhaltungView({
       const monat = t.datum.substring(0, 7) // YYYY-MM
 
       return t.spieler_ids.map(spielerId => {
+        // Prüfe spieler-spezifischen Bezahlstatus
+        const paymentStatus = getSpielerPaymentStatus(spielerId, t)
+
+        // Filter basierend auf Bar-Einnahmen-Einstellung
+        if (inclBarEinnahmen) {
+          if (!paymentStatus.bezahlt && !paymentStatus.barBezahlt) return null
+        } else {
+          if (!paymentStatus.bezahlt || paymentStatus.barBezahlt) return null
+        }
+
         let einzelPreis = 0
 
         if (abrechnungsart === 'monatlich') {
@@ -5324,7 +5412,7 @@ function BuchhaltungView({
         istMonatlich: boolean
       }[]
     }).sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [trainings, tarife, spieler, selectedYear, kleinunternehmer, inclBarEinnahmen])
+  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen])
 
   // Einnahmen aus bezahlten manuellen Rechnungen
   const manuelleEinnahmen = useMemo(() => {
