@@ -6662,13 +6662,13 @@ function BuchhaltungView({
                   // Detaillierte Einnahmen (inkl. Vorauszahlungen, Korrekturen, manuelle Rechnungen)
                   bericht += `EINNAHMEN (DETAIL)\n`
                   bericht += `=========================================\n`
-                  bericht += `Datum       | Spieler                    | Tarif              | Netto      | Brutto     | USt\n`
-                  bericht += `---------------------------------------------------------------------------------------------------------\n`
+                  bericht += `Datum       | Netto      | Brutto     | USt\n`
+                  bericht += `---------------------------------------------\n`
                   alleEinnahmen.forEach(e => {
-                    bericht += `${formatDateGerman(e.datum)} | ${e.spielerName.substring(0, 26).padEnd(26)} | ${e.tarifName.substring(0, 18).padEnd(18)} | ${e.netto.toFixed(2).padStart(10)} | ${e.brutto.toFixed(2).padStart(10)} | ${e.ust.toFixed(2).padStart(8)}\n`
+                    bericht += `${formatDateGerman(e.datum)} | ${e.netto.toFixed(2).padStart(10)} | ${e.brutto.toFixed(2).padStart(10)} | ${e.ust.toFixed(2).padStart(8)}\n`
                   })
-                  bericht += `---------------------------------------------------------------------------------------------------------\n`
-                  bericht += `SUMME EINNAHMEN:                                                        | ${gesamtEinnahmenNetto.toFixed(2).padStart(10)} | ${gesamtEinnahmenBrutto.toFixed(2).padStart(10)} | ${gesamtEinnahmenUst.toFixed(2).padStart(8)}\n`
+                  bericht += `---------------------------------------------\n`
+                  bericht += `SUMME:      | ${gesamtEinnahmenNetto.toFixed(2).padStart(10)} | ${gesamtEinnahmenBrutto.toFixed(2).padStart(10)} | ${gesamtEinnahmenUst.toFixed(2).padStart(8)}\n`
                   bericht += `\n`
 
                   // Detaillierte Ausgaben
