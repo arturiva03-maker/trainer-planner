@@ -3784,16 +3784,42 @@ function InvoiceModal({
       }
     })
 
+    // Sortiere nach Datum für korrekte monatliche Berechnung
+    alleTrainings.sort((a, b) => a.training.datum.localeCompare(b.training.datum))
+
+    // Track monatliche Serien pro Spieler: "spielerId|serieId"
+    const monatlicheSerienTracking = new Set<string>()
+
     return alleTrainings.map(({ training: t, spielerName, spielerId }) => {
       const tarif = tarife.find((ta) => ta.id === t.tarif_id)
       const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
       const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
       const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
 
-      let einzelPreis = preis * duration
-      if (abrechnungsart === 'proSpieler') {
-        einzelPreis = einzelPreis / t.spieler_ids.length
+      let einzelPreis = 0
+      let istMonatlich = false
+      let istMonatlicheSerieErstesTraining = false
+
+      if (abrechnungsart === 'monatlich') {
+        istMonatlich = true
+        // Monatlicher Tarif: nur einmal pro Serie pro Spieler berechnen
+        const serieKey = t.serie_id || t.id
+        const trackingKey = `${spielerId}|${serieKey}`
+        if (!monatlicheSerienTracking.has(trackingKey)) {
+          monatlicheSerienTracking.add(trackingKey)
+          einzelPreis = preis // Monatsbetrag, nicht pro Stunde
+          istMonatlicheSerieErstesTraining = true
+        }
+        // Sonst: einzelPreis bleibt 0
+      } else {
+        einzelPreis = preis * duration
+        if (abrechnungsart === 'proSpieler') {
+          einzelPreis = einzelPreis / t.spieler_ids.length
+        }
       }
+
+      // Training-Korrektur anwenden
+      einzelPreis += (t.korrektur_betrag || 0)
 
       // USt-Berechnung basierend auf Tarif
       const inklUst = tarif?.inkl_ust ?? true
@@ -3829,9 +3855,11 @@ function InvoiceModal({
         ustSatz,
         netto,
         ust,
-        brutto
+        brutto,
+        istMonatlich,
+        istMonatlicheSerieErstesTraining
       }
-    }).sort((a, b) => a.datum.localeCompare(b.datum))
+    }).filter(p => p.brutto !== 0 || p.netto !== 0) // Entferne 0€-Positionen (außer dem ersten monatlichen Training)
   }, [selectedSummary, verknuepfteSummaries, tarife, kleinunternehmer])
 
   // Berechne Gesamtsummen inkl. Korrektur
@@ -3882,9 +3910,9 @@ function InvoiceModal({
       <tr>
         <td>${formatDateGerman(p.datum)}</td>
         <td>${p.zeit}</td>
-        <td>${p.dauer.toFixed(1)} Std.</td>
+        <td>${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
         ${hatMehrereSpieler ? `<td>${p.spielerName}</td>` : ''}
-        <td>${p.tarifName}</td>
+        <td>${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
         <td style="text-align: right">${p.netto.toFixed(2)} €</td>
         ${!kleinunternehmer ? `<td style="text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
         <td style="text-align: right">${p.brutto.toFixed(2)} €</td>
@@ -4092,11 +4120,11 @@ function InvoiceModal({
                       </thead>
                       <tbody>
                         {rechnungsPositionen.map((p, i) => (
-                          <tr key={i}>
+                          <tr key={i} style={p.istMonatlich ? { background: 'var(--primary-light)' } : {}}>
                             <td>{formatDateGerman(p.datum)}</td>
-                            <td>{p.zeit}</td>
+                            <td>{p.istMonatlich ? 'Monatsbeitrag' : p.zeit}</td>
                             {verknuepfteSummaries.length > 0 && <td>{p.spielerName}</td>}
-                            <td>{p.tarifName}</td>
+                            <td>{p.tarifName}{p.istMonatlich && <span style={{ fontSize: 10, marginLeft: 4, color: 'var(--primary)' }}>(mtl.)</span>}</td>
                             <td style={{ textAlign: 'right' }}>{p.brutto.toFixed(2)} €</td>
                           </tr>
                         ))}
@@ -4349,7 +4377,7 @@ function InvoiceModal({
 
                   // Positionen als Text formatieren
                   const positionenText = rechnungsPositionen.map(p =>
-                    `${formatDateGerman(p.datum)} | ${p.zeit} | ${p.dauer.toFixed(1)} Std. | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+                    `${formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
                   ).join('\n')
 
                   // Korrektur falls vorhanden
