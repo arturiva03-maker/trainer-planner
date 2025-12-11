@@ -59,6 +59,8 @@ export interface Training {
   custom_abrechnung?: 'proTraining' | 'proSpieler'
   bar_bezahlt: boolean
   bezahlt: boolean
+  korrektur_betrag?: number
+  korrektur_grund?: string
   created_at: string
 }
 

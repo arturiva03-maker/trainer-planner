@@ -2101,6 +2101,9 @@ function AbrechnungView({
   const [korrekturBetrag, setKorrekturBetrag] = useState('')
   const [korrekturGrund, setKorrekturGrund] = useState('')
   const [korrekturSaving, setKorrekturSaving] = useState(false)
+  const [showTrainingKorrekturModal, setShowTrainingKorrekturModal] = useState<Training | null>(null)
+  const [trainingKorrekturBetrag, setTrainingKorrekturBetrag] = useState('')
+  const [trainingKorrekturGrund, setTrainingKorrekturGrund] = useState('')
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -2150,8 +2153,12 @@ function AbrechnungView({
         const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
         let spielerPreis = totalPreis
         if (abrechnungsart === 'proSpieler') {
-          spielerPreis = totalPreis / t.spieler_ids.length
+          spielerPreis = spielerPreis / t.spieler_ids.length
         }
+
+        // Training-Korrektur anwenden (z.B. Kartenlesergebühren)
+        const trainingsKorrektur = t.korrektur_betrag || 0
+        spielerPreis += trainingsKorrektur
 
         summary[spielerId].summe += spielerPreis
 
@@ -2216,6 +2223,8 @@ function AbrechnungView({
             if (abrechnungsart === 'proSpieler') {
               betrag = betrag / t.spieler_ids.length
             }
+            // Training-Korrektur anwenden
+            betrag += (t.korrektur_betrag || 0)
 
             summe += betrag
             if (t.bar_bezahlt) {
@@ -2425,6 +2434,52 @@ function AbrechnungView({
       setKorrekturGrund('')
     }
     setShowKorrekturModal(spielerId)
+  }
+
+  // Training-Korrektur Modal öffnen
+  const openTrainingKorrekturModal = (training: Training) => {
+    setTrainingKorrekturBetrag(training.korrektur_betrag?.toString() || '')
+    setTrainingKorrekturGrund(training.korrektur_grund || '')
+    setShowTrainingKorrekturModal(training)
+  }
+
+  // Training-Korrektur speichern
+  const saveTrainingKorrektur = async () => {
+    if (!showTrainingKorrekturModal) return
+
+    const betrag = trainingKorrekturBetrag ? parseFloat(trainingKorrekturBetrag.replace(',', '.')) : null
+
+    await supabase
+      .from('trainings')
+      .update({
+        korrektur_betrag: betrag,
+        korrektur_grund: trainingKorrekturGrund || null
+      })
+      .eq('id', showTrainingKorrekturModal.id)
+
+    setShowTrainingKorrekturModal(null)
+    setTrainingKorrekturBetrag('')
+    setTrainingKorrekturGrund('')
+    onUpdate()
+  }
+
+  // Training-Korrektur löschen
+  const deleteTrainingKorrektur = async () => {
+    if (!showTrainingKorrekturModal) return
+    if (!confirm('Korrektur wirklich entfernen?')) return
+
+    await supabase
+      .from('trainings')
+      .update({
+        korrektur_betrag: null,
+        korrektur_grund: null
+      })
+      .eq('id', showTrainingKorrekturModal.id)
+
+    setShowTrainingKorrekturModal(null)
+    setTrainingKorrekturBetrag('')
+    setTrainingKorrekturGrund('')
+    onUpdate()
   }
 
   // Manuelle Rechnung löschen
@@ -2783,11 +2838,14 @@ function AbrechnungView({
           const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
           const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
           const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-          let betrag = preis * duration
+          let basisBetrag = preis * duration
           if (abrechnungsart === 'proSpieler') {
-            betrag = betrag / t.spieler_ids.length
+            basisBetrag = basisBetrag / t.spieler_ids.length
           }
-          return { training: t, betrag, tarif }
+          // Korrektur anwenden (z.B. Kartenlesergebühren abziehen)
+          const korrektur = t.korrektur_betrag || 0
+          const betrag = basisBetrag + korrektur
+          return { training: t, basisBetrag, korrektur, betrag, tarif }
         }).sort((a, b) => a.training.datum.localeCompare(b.training.datum))
 
         // Berechne gefilterte Summen
@@ -2836,31 +2894,49 @@ function AbrechnungView({
                         <th>Tarif</th>
                         <th style={{ textAlign: 'right' }}>Betrag</th>
                         <th style={{ textAlign: 'center' }}>Status</th>
+                        <th style={{ textAlign: 'center' }}>Korrektur</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {trainingsDetail.map(({ training, betrag, tarif }) => {
+                      {trainingsDetail.map(({ training, basisBetrag, korrektur, betrag, tarif }) => {
                         return (
                           <tr
                             key={training.id}
                             style={{
-                              cursor: 'pointer',
                               ...(training.bar_bezahlt
                                 ? { background: 'var(--warning-light)' }
                                 : training.bezahlt
                                 ? { background: 'var(--success-light)' }
                                 : {})
                             }}
-                            onClick={() => {
-                              setSelectedSpielerDetail(null)
-                              onNavigateToTraining(training)
-                            }}
-                            title="Klicken um im Kalender zu bearbeiten"
                           >
-                            <td style={{ color: 'var(--primary)' }}>{formatDateGerman(training.datum)}</td>
+                            <td
+                              style={{ color: 'var(--primary)', cursor: 'pointer' }}
+                              onClick={() => {
+                                setSelectedSpielerDetail(null)
+                                onNavigateToTraining(training)
+                              }}
+                              title="Klicken um im Kalender zu bearbeiten"
+                            >
+                              {formatDateGerman(training.datum)}
+                            </td>
                             <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
                             <td>{tarif?.name || '-'}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 500 }}>{betrag.toFixed(2)} €</td>
+                            <td style={{ textAlign: 'right', fontWeight: 500 }}>
+                              {korrektur !== 0 ? (
+                                <div>
+                                  <span style={{ textDecoration: 'line-through', color: 'var(--gray-400)', fontSize: 11 }}>
+                                    {basisBetrag.toFixed(2)} €
+                                  </span>
+                                  <br />
+                                  <span style={{ color: korrektur < 0 ? 'var(--success)' : 'var(--warning)' }}>
+                                    {betrag.toFixed(2)} €
+                                  </span>
+                                </div>
+                              ) : (
+                                <span>{betrag.toFixed(2)} €</span>
+                              )}
+                            </td>
                             <td style={{ textAlign: 'center' }}>
                               {training.bar_bezahlt ? (
                                 <span className="status-badge" style={{ background: 'var(--warning)', color: '#000', fontSize: 11 }}>
@@ -2879,6 +2955,19 @@ function AbrechnungView({
                                 </button>
                               )}
                             </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                className={`btn btn-sm ${korrektur !== 0 ? 'btn-warning' : 'btn-secondary'}`}
+                                style={{ fontSize: 10, padding: '2px 6px' }}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openTrainingKorrekturModal(training)
+                                }}
+                                title={training.korrektur_grund || 'Betrag korrigieren'}
+                              >
+                                {korrektur !== 0 ? `${korrektur > 0 ? '+' : ''}${korrektur.toFixed(2)}€` : '±'}
+                              </button>
+                            </td>
                           </tr>
                         )
                       })}
@@ -2887,6 +2976,7 @@ function AbrechnungView({
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
                         <td colSpan={4}>Summe Trainings</td>
                         <td style={{ textAlign: 'right' }}>{gefilterteSumme.toFixed(2)} €</td>
+                        <td></td>
                       </tr>
                       {detail.adjustment !== 0 && (
                         <tr style={{
@@ -2895,7 +2985,7 @@ function AbrechnungView({
                           color: detail.adjustment < 0 ? 'var(--success)' : 'var(--warning)'
                         }}>
                           <td colSpan={4}>
-                            Korrektur
+                            Monatskorrektur
                             {adjustments.find(a => a.spieler_id === detail.spieler.id && a.monat === selectedMonth)?.grund && (
                               <span style={{ fontWeight: 'normal', marginLeft: 8, fontSize: 12 }}>
                                 ({adjustments.find(a => a.spieler_id === detail.spieler.id && a.monat === selectedMonth)?.grund})
@@ -2903,12 +2993,14 @@ function AbrechnungView({
                             )}
                           </td>
                           <td style={{ textAlign: 'right' }}>{detail.adjustment.toFixed(2)} €</td>
+                          <td></td>
                         </tr>
                       )}
                       {detail.adjustment !== 0 && (
                         <tr style={{ fontWeight: 'bold', background: 'var(--gray-200)' }}>
                           <td colSpan={4}>Gesamt</td>
                           <td style={{ textAlign: 'right' }}>{(gefilterteSumme + detail.adjustment).toFixed(2)} €</td>
+                          <td></td>
                         </tr>
                       )}
                     </tfoot>
@@ -3046,6 +3138,98 @@ function AbrechnungView({
                     disabled={korrekturSaving || !korrekturBetrag}
                   >
                     {korrekturSaving ? 'Speichern...' : 'Speichern'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Training-Korrektur Modal */}
+      {showTrainingKorrekturModal && (() => {
+        const training = showTrainingKorrekturModal
+        const tarif = tarife.find(t => t.id === training.tarif_id)
+        const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+        const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+        const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+        let basisBetrag = preis * duration
+        if (abrechnungsart === 'proSpieler') {
+          basisBetrag = basisBetrag / training.spieler_ids.length
+        }
+
+        return (
+          <div className="modal-overlay" onClick={() => setShowTrainingKorrekturModal(null)}>
+            <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Betrag korrigieren</h3>
+                <button className="modal-close" onClick={() => setShowTrainingKorrekturModal(null)}>×</button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: 16, padding: 12, background: 'var(--gray-50)', borderRadius: 8 }}>
+                  <div><strong>Datum:</strong> {formatDateGerman(training.datum)}</div>
+                  <div><strong>Uhrzeit:</strong> {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</div>
+                  <div><strong>Tarif:</strong> {tarif?.name || '-'}</div>
+                  <div><strong>Basis-Betrag:</strong> {basisBetrag.toFixed(2)} €</div>
+                </div>
+
+                <div className="form-group">
+                  <label>Korrektur-Betrag (€)</label>
+                  <input
+                    type="text"
+                    value={trainingKorrekturBetrag}
+                    onChange={e => setTrainingKorrekturBetrag(e.target.value)}
+                    placeholder="-1.50 für Abzug, 5.00 für Zuschlag"
+                    style={{ fontFamily: 'monospace' }}
+                  />
+                  <small style={{ color: 'var(--gray-500)', display: 'block', marginTop: 4 }}>
+                    Negativer Wert = Abzug (z.B. -1.50 € Kartenlesergebühren)<br />
+                    Positiver Wert = Zuschlag
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label>Grund</label>
+                  <input
+                    type="text"
+                    value={trainingKorrekturGrund}
+                    onChange={e => setTrainingKorrekturGrund(e.target.value)}
+                    placeholder="z.B. Kartenlesergebühren, Materialkosten"
+                  />
+                </div>
+
+                {trainingKorrekturBetrag && (
+                  <div style={{
+                    padding: 12,
+                    background: parseFloat(trainingKorrekturBetrag.replace(',', '.')) < 0 ? 'var(--success-light)' : 'var(--warning-light)',
+                    borderRadius: 8,
+                    marginTop: 16
+                  }}>
+                    <strong>Neuer Betrag:</strong>{' '}
+                    {(basisBetrag + (parseFloat(trainingKorrekturBetrag.replace(',', '.')) || 0)).toFixed(2)} €
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+                <div>
+                  {training.korrektur_betrag && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={deleteTrainingKorrektur}
+                    >
+                      Entfernen
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-secondary" onClick={() => setShowTrainingKorrekturModal(null)}>
+                    Abbrechen
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={saveTrainingKorrektur}
+                  >
+                    Speichern
                   </button>
                 </div>
               </div>
@@ -4668,6 +4852,8 @@ function BuchhaltungView({
         if (abrechnungsart === 'proSpieler') {
           einzelPreis = einzelPreis / t.spieler_ids.length
         }
+        // Training-Korrektur anwenden (z.B. Kartenlesergebühren)
+        einzelPreis += (t.korrektur_betrag || 0)
 
         const inklUst = tarif?.inkl_ust ?? true
         const ustSatz = tarif?.ust_satz ?? 19
@@ -4699,7 +4885,9 @@ function BuchhaltungView({
           netto,
           ust,
           ustSatz,
-          barBezahlt: t.bar_bezahlt
+          barBezahlt: t.bar_bezahlt,
+          korrektur: t.korrektur_betrag || 0,
+          korrekturGrund: t.korrektur_grund
         }
       })
     }).sort((a, b) => a.datum.localeCompare(b.datum))
