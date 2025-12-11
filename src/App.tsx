@@ -29,6 +29,30 @@ import {
   formatQuartal
 } from './utils'
 
+// Tennis Logo Icon Component - Pink racket with ball
+const TennisLogo = ({ size = 40 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Racket head */}
+    <ellipse cx="26" cy="22" rx="18" ry="20" stroke="#ec4899" strokeWidth="3" fill="none"/>
+    {/* Racket strings horizontal */}
+    <line x1="10" y1="16" x2="42" y2="16" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="9" y1="22" x2="43" y2="22" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="10" y1="28" x2="42" y2="28" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    {/* Racket strings vertical */}
+    <line x1="18" y1="4" x2="18" y2="40" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="26" y1="2" x2="26" y2="42" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="34" y1="4" x2="34" y2="40" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    {/* Racket handle */}
+    <rect x="22" y="40" width="8" height="20" rx="2" fill="#ec4899"/>
+    <rect x="22" y="44" width="8" height="3" fill="#db2777"/>
+    <rect x="22" y="50" width="8" height="3" fill="#db2777"/>
+    {/* Tennis ball */}
+    <circle cx="50" cy="14" r="10" fill="#a3e635"/>
+    <path d="M43 8 Q50 14 43 20" stroke="white" strokeWidth="2" fill="none"/>
+    <path d="M57 8 Q50 14 57 20" stroke="white" strokeWidth="2" fill="none"/>
+  </svg>
+)
+
 // ============ FEATURE DETAILS DATA ============
 const featureDetails = {
   terminplanung: {
@@ -135,7 +159,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
       <div className="auth-info">
         <div className="auth-info-content">
           <div className="auth-logo">
-            <span className="auth-logo-icon">🎾</span>
+            <span className="auth-logo-icon"><TennisLogo size={48} /></span>
             <h1>Tennis Trainer Planner</h1>
           </div>
           <p className="auth-tagline">Die All-in-One Verwaltung für Tennistrainer</p>
@@ -426,6 +450,7 @@ function MainApp({ user }: { user: User }) {
     <div className="app-container">
       {/* Mobile Header */}
       <div className="mobile-header">
+        <TennisLogo size={36} />
         <div className="header-content">
           <h1 className="header-title">CourtPro</h1>
           <p className="header-subtitle">{profile?.name || 'Trainer'}</p>
@@ -440,6 +465,7 @@ function MainApp({ user }: { user: User }) {
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
+          <TennisLogo size={32} />
           <h2>CourtPro</h2>
         </div>
         <nav className="sidebar-nav">
