@@ -5216,50 +5216,70 @@ function BuchhaltungView({
                       </tr>
                     </thead>
                     <tbody>
-                      {positionen.map((p, i) => (
-                        <tr key={i} style={p.istKorrektur ? {
-                          background: p.brutto < 0 ? 'var(--success-light)' : 'var(--warning-light)'
-                        } : {}}>
-                          <td>{p.istKorrektur ? formatMonthGerman((p as typeof korrekturEinnahmen[0]).monat) : formatDateGerman(p.datum)}</td>
-                          <td>{p.spielerName}</td>
-                          <td>
-                            {p.istKorrektur && (
-                              <span style={{
-                                background: p.brutto < 0 ? 'var(--success)' : 'var(--warning)',
-                                color: p.brutto < 0 ? '#fff' : '#000',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                fontSize: 10,
-                                marginRight: 6
-                              }}>
-                                {p.brutto < 0 ? 'Gutschrift' : 'Zuschlag'}
-                              </span>
-                            )}
-                            {p.tarifName}
-                          </td>
-                          <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
-                            {p.netto.toFixed(2)} €
-                          </td>
-                          {!kleinunternehmer && (
-                            <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
-                              {p.ust.toFixed(2)} € ({p.ustSatz}%)
+                      {positionen.map((p, i) => {
+                        const hatKorrektur = !p.istKorrektur && (p as typeof einnahmenPositionen[0]).korrektur !== 0
+                        return (
+                          <tr key={i} style={
+                            p.istKorrektur
+                              ? { background: p.brutto < 0 ? 'var(--success-light)' : 'var(--warning-light)' }
+                              : hatKorrektur
+                              ? { background: 'var(--warning-light)' }
+                              : {}
+                          }>
+                            <td>{p.istKorrektur ? formatMonthGerman((p as typeof korrekturEinnahmen[0]).monat) : formatDateGerman(p.datum)}</td>
+                            <td>{p.spielerName}</td>
+                            <td>
+                              {p.istKorrektur && (
+                                <span style={{
+                                  background: p.brutto < 0 ? 'var(--success)' : 'var(--warning)',
+                                  color: p.brutto < 0 ? '#fff' : '#000',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 10,
+                                  marginRight: 6
+                                }}>
+                                  {p.brutto < 0 ? 'Gutschrift' : 'Zuschlag'}
+                                </span>
+                              )}
+                              {hatKorrektur && (
+                                <span style={{
+                                  background: 'var(--warning)',
+                                  color: '#000',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 10,
+                                  marginRight: 6
+                                }}
+                                title={(p as typeof einnahmenPositionen[0]).korrekturGrund || 'Korrigiert'}>
+                                  {(p as typeof einnahmenPositionen[0]).korrektur > 0 ? '+' : ''}{(p as typeof einnahmenPositionen[0]).korrektur.toFixed(2)}€
+                                </span>
+                              )}
+                              {p.tarifName}
                             </td>
-                          )}
-                          <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
-                            {p.brutto.toFixed(2)} €
-                          </td>
-                          <td>
-                            {p.istKorrektur ? (
-                              <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Korrektur</span>
-                            ) : (
-                              <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
-                                    style={{ fontSize: 11 }}>
-                                {p.barBezahlt ? 'Bar' : 'Überweisung'}
-                              </span>
+                            <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
+                              {p.netto.toFixed(2)} €
+                            </td>
+                            {!kleinunternehmer && (
+                              <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
+                                {p.ust.toFixed(2)} € ({p.ustSatz}%)
+                              </td>
                             )}
-                          </td>
-                        </tr>
-                      ))}
+                            <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
+                              {p.brutto.toFixed(2)} €
+                            </td>
+                            <td>
+                              {p.istKorrektur ? (
+                                <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Monatskorr.</span>
+                              ) : (
+                                <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
+                                      style={{ fontSize: 11 }}>
+                                  {p.barBezahlt ? 'Bar' : 'Überweisung'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                     <tfoot>
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
