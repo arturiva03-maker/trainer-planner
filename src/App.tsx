@@ -2165,6 +2165,7 @@ function AbrechnungView({
         offeneSumme: number
         bezahlt: boolean
         adjustment: number
+        monatlicheSerien: Set<string> // Track welche Serien bereits berechnet wurden
       }
     } = {}
 
@@ -2172,7 +2173,7 @@ function AbrechnungView({
       const tarif = tarife.find((ta) => ta.id === t.tarif_id)
       const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
       const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-      const totalPreis = preis * duration
+      const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
 
       t.spieler_ids.forEach((spielerId) => {
         if (!summary[spielerId]) {
@@ -2187,16 +2188,32 @@ function AbrechnungView({
             vorauszahlungSumme: 0,
             offeneSumme: 0,
             bezahlt: false,
-            adjustment: 0
+            adjustment: 0,
+            monatlicheSerien: new Set()
           }
         }
 
         summary[spielerId].trainings.push(t)
 
-        const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-        let spielerPreis = totalPreis
-        if (abrechnungsart === 'proSpieler') {
-          spielerPreis = spielerPreis / t.spieler_ids.length
+        // Berechne den Preis basierend auf Abrechnungsart
+        let spielerPreis = 0
+
+        if (abrechnungsart === 'monatlich') {
+          // Monatlicher Tarif: nur einmal pro Serie pro Spieler berechnen
+          const serieKey = t.serie_id || t.id // Fallback auf Training-ID wenn keine Serie
+          if (!summary[spielerId].monatlicheSerien.has(serieKey)) {
+            summary[spielerId].monatlicheSerien.add(serieKey)
+            // Bei monatlich ist der Preis der Monatsbetrag (nicht pro Stunde)
+            spielerPreis = preis
+          }
+          // Sonst: spielerPreis bleibt 0, da Serie bereits berechnet
+        } else {
+          // Pro Training oder Pro Spieler
+          const totalPreis = preis * duration
+          spielerPreis = totalPreis
+          if (abrechnungsart === 'proSpieler') {
+            spielerPreis = spielerPreis / t.spieler_ids.length
+          }
         }
 
         // Training-Korrektur anwenden (z.B. Kartenlesergebühren)
@@ -2207,15 +2224,17 @@ function AbrechnungView({
 
         // Kategorisiere nach Bezahlstatus (inkl. Vorauszahlung)
         const vorauszahlung = istVorauszahlungAktiv(spielerId, t)
-        if (t.bar_bezahlt) {
-          summary[spielerId].barSumme += spielerPreis
-        } else if (t.bezahlt) {
-          summary[spielerId].bezahltSumme += spielerPreis
-        } else if (vorauszahlung) {
-          // Training ist durch Vorauszahlung abgedeckt
-          summary[spielerId].vorauszahlungSumme += spielerPreis
-        } else {
-          summary[spielerId].offeneSumme += spielerPreis
+        if (spielerPreis > 0 || trainingsKorrektur !== 0) {
+          if (t.bar_bezahlt) {
+            summary[spielerId].barSumme += spielerPreis
+          } else if (t.bezahlt) {
+            summary[spielerId].bezahltSumme += spielerPreis
+          } else if (vorauszahlung) {
+            // Training ist durch Vorauszahlung abgedeckt
+            summary[spielerId].vorauszahlungSumme += spielerPreis
+          } else {
+            summary[spielerId].offeneSumme += spielerPreis
+          }
         }
       })
     })
@@ -2980,21 +2999,39 @@ function AbrechnungView({
           ? detail.trainings.filter(t => t.datum === selectedTag)
           : detail.trainings
 
-        // Berechne Betrag pro Training
-        const trainingsDetail = gefilterteTrainings.map(t => {
-          const tarif = tarife.find(ta => ta.id === t.tarif_id)
-          const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-          const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-          const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-          let basisBetrag = preis * duration
-          if (abrechnungsart === 'proSpieler') {
-            basisBetrag = basisBetrag / t.spieler_ids.length
-          }
-          // Korrektur anwenden (z.B. Kartenlesergebühren abziehen)
-          const korrektur = t.korrektur_betrag || 0
-          const betrag = basisBetrag + korrektur
-          return { training: t, basisBetrag, korrektur, betrag, tarif }
-        }).sort((a, b) => a.training.datum.localeCompare(b.training.datum))
+        // Berechne Betrag pro Training (mit Tracking für monatliche Tarife)
+        const monatlicheSerienTracking = new Set<string>()
+        const trainingsDetail = gefilterteTrainings
+          .sort((a, b) => a.datum.localeCompare(b.datum)) // Sortiere zuerst nach Datum
+          .map(t => {
+            const tarif = tarife.find(ta => ta.id === t.tarif_id)
+            const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+            const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+            let basisBetrag = 0
+            let istMonatlicheSerieErstesTraining = false
+
+            if (abrechnungsart === 'monatlich') {
+              // Monatlicher Tarif: nur einmal pro Serie berechnen
+              const serieKey = t.serie_id || t.id
+              if (!monatlicheSerienTracking.has(serieKey)) {
+                monatlicheSerienTracking.add(serieKey)
+                basisBetrag = preis // Monatsbetrag, nicht pro Stunde
+                istMonatlicheSerieErstesTraining = true
+              }
+            } else {
+              basisBetrag = preis * duration
+              if (abrechnungsart === 'proSpieler') {
+                basisBetrag = basisBetrag / t.spieler_ids.length
+              }
+            }
+
+            // Korrektur anwenden (z.B. Kartenlesergebühren abziehen)
+            const korrektur = t.korrektur_betrag || 0
+            const betrag = basisBetrag + korrektur
+            return { training: t, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }
+          })
 
         // Berechne gefilterte Summen
         const gefilterteSumme = trainingsDetail.reduce((sum, t) => sum + t.betrag, 0)
@@ -3046,7 +3083,8 @@ function AbrechnungView({
                       </tr>
                     </thead>
                     <tbody>
-                      {trainingsDetail.map(({ training, basisBetrag, korrektur, betrag, tarif }) => {
+                      {trainingsDetail.map(({ training, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }) => {
+                        const istMonatlich = abrechnungsart === 'monatlich'
                         return (
                           <tr
                             key={training.id}
@@ -3055,7 +3093,8 @@ function AbrechnungView({
                                 ? { background: 'var(--warning-light)' }
                                 : training.bezahlt
                                 ? { background: 'var(--success-light)' }
-                                : {})
+                                : {}),
+                              ...(istMonatlich && !istMonatlicheSerieErstesTraining ? { opacity: 0.6 } : {})
                             }}
                           >
                             <td
@@ -3069,9 +3108,25 @@ function AbrechnungView({
                               {formatDateGerman(training.datum)}
                             </td>
                             <td>{formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}</td>
-                            <td>{tarif?.name || '-'}</td>
+                            <td>
+                              {tarif?.name || '-'}
+                              {istMonatlich && (
+                                <span style={{
+                                  background: istMonatlicheSerieErstesTraining ? 'var(--primary)' : 'var(--gray-300)',
+                                  color: istMonatlicheSerieErstesTraining ? '#fff' : 'var(--gray-600)',
+                                  padding: '1px 4px',
+                                  borderRadius: 3,
+                                  fontSize: 9,
+                                  marginLeft: 4
+                                }}>
+                                  mtl.
+                                </span>
+                              )}
+                            </td>
                             <td style={{ textAlign: 'right', fontWeight: 500 }}>
-                              {korrektur !== 0 ? (
+                              {istMonatlich && !istMonatlicheSerieErstesTraining ? (
+                                <span style={{ color: 'var(--gray-400)', fontSize: 11 }}>inkl.</span>
+                              ) : korrektur !== 0 ? (
                                 <div>
                                   <span style={{ textDecoration: 'line-through', color: 'var(--gray-400)', fontSize: 11 }}>
                                     {basisBetrag.toFixed(2)} €
@@ -5180,21 +5235,44 @@ function BuchhaltungView({
       } else {
         return t.bezahlt && !t.bar_bezahlt
       }
-    })
+    }).sort((a, b) => a.datum.localeCompare(b.datum))
+
+    // Track monatliche Serien pro Monat pro Spieler: "YYYY-MM|spielerId|serieId"
+    const monatlicheSerienTracking = new Set<string>()
 
     return bezahlteTrainings.flatMap(t => {
       const tarif = tarife.find(ta => ta.id === t.tarif_id)
       const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
       const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
       const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+      const monat = t.datum.substring(0, 7) // YYYY-MM
 
       return t.spieler_ids.map(spielerId => {
-        let einzelPreis = preis * duration
-        if (abrechnungsart === 'proSpieler') {
-          einzelPreis = einzelPreis / t.spieler_ids.length
+        let einzelPreis = 0
+
+        if (abrechnungsart === 'monatlich') {
+          // Monatlicher Tarif: nur einmal pro Monat pro Serie pro Spieler
+          const serieKey = t.serie_id || t.id
+          const trackingKey = `${monat}|${spielerId}|${serieKey}`
+          if (!monatlicheSerienTracking.has(trackingKey)) {
+            monatlicheSerienTracking.add(trackingKey)
+            einzelPreis = preis // Monatsbetrag
+          }
+          // Sonst: 0€ da bereits berechnet
+        } else {
+          einzelPreis = preis * duration
+          if (abrechnungsart === 'proSpieler') {
+            einzelPreis = einzelPreis / t.spieler_ids.length
+          }
         }
+
         // Training-Korrektur anwenden (z.B. Kartenlesergebühren)
         einzelPreis += (t.korrektur_betrag || 0)
+
+        // Wenn kein Betrag, überspringen (außer es gibt eine Korrektur)
+        if (einzelPreis === 0 && (t.korrektur_betrag || 0) === 0) {
+          return null
+        }
 
         const inklUst = tarif?.inkl_ust ?? true
         const ustSatz = tarif?.ust_satz ?? 19
@@ -5228,9 +5306,23 @@ function BuchhaltungView({
           ustSatz,
           barBezahlt: t.bar_bezahlt,
           korrektur: t.korrektur_betrag || 0,
-          korrekturGrund: t.korrektur_grund
+          korrekturGrund: t.korrektur_grund,
+          istMonatlich: abrechnungsart === 'monatlich'
         }
-      })
+      }).filter(Boolean) as {
+        trainingId: string
+        datum: string
+        spielerName: string
+        tarifName: string
+        brutto: number
+        netto: number
+        ust: number
+        ustSatz: number
+        barBezahlt: boolean
+        korrektur: number
+        korrekturGrund?: string
+        istMonatlich: boolean
+      }[]
     }).sort((a, b) => a.datum.localeCompare(b.datum))
   }, [trainings, tarife, spieler, selectedYear, kleinunternehmer, inclBarEinnahmen])
 
