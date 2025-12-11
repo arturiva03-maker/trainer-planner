@@ -4331,22 +4331,24 @@ function InvoiceModal({
                 />
               </div>
 
-              {/* E-Mail-Vorlage Auswahl */}
-              <div className="form-group" style={{ marginTop: 16 }}>
-                <label>E-Mail-Vorlage</label>
-                <select
-                  className="form-control"
-                  value={selectedVorlageId}
-                  onChange={(e) => setSelectedVorlageId(e.target.value)}
-                >
-                  <option value="">Standard-Vorlage</option>
-                  {emailVorlagen.map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* E-Mail-Vorlage Auswahl - nur anzeigen wenn eigene Vorlagen existieren */}
+              {emailVorlagen.length > 0 && (
+                <div className="form-group" style={{ marginTop: 16 }}>
+                  <label>E-Mail-Vorlage</label>
+                  <select
+                    className="form-control"
+                    value={selectedVorlageId}
+                    onChange={(e) => setSelectedVorlageId(e.target.value)}
+                  >
+                    <option value="">Standard-Vorlage</option>
+                    {emailVorlagen.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 16 }}>
                 <div style={{ marginBottom: 8, fontWeight: 500 }}>Rechnungsvorschau:</div>
