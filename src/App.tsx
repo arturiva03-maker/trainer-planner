@@ -7142,46 +7142,60 @@ function WeiteresView({
             </div>
           </div>
 
-          {emailVorlagen.length === 0 ? (
-            <div className="card">
-              <div className="empty-state">
-                <p>Noch keine E-Mail-Vorlagen erstellt.</p>
-                <p style={{ fontSize: 13, marginTop: 8, color: 'var(--gray-600)' }}>
-                  Die Standard-Vorlage wird automatisch verwendet, wenn keine eigene Vorlage existiert.
-                </p>
+          {/* Standard-Vorlage (immer sichtbar) */}
+          <div className="card" style={{ marginBottom: 12, border: '2px solid var(--success)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <strong>Standard-Vorlage</strong>
+                <span style={{ fontSize: 10, background: 'var(--success)', color: 'white', padding: '2px 6px', borderRadius: 4 }}>
+                  System
+                </span>
               </div>
             </div>
-          ) : (
-            emailVorlagen.map((v) => (
-              <div key={v.id} className="card" style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <strong>{v.name}</strong>
-                    {v.ist_standard && (
-                      <span style={{ fontSize: 10, background: 'var(--success)', color: 'white', padding: '2px 6px', borderRadius: 4 }}>
-                        Standard
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => {
-                      setEditingVorlage(v)
-                      setShowVorlageModal(true)
-                    }}
-                  >
-                    Bearbeiten
-                  </button>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-                  <strong>Betreff:</strong> {v.betreff}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 100, overflow: 'hidden' }}>
-                  {v.inhalt.substring(0, 200)}{v.inhalt.length > 200 ? '...' : ''}
-                </div>
-              </div>
-            ))
+            <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+              <strong>Betreff:</strong> Rechnung {'{{rechnungsnummer}}'} - Tennisunterricht {'{{monat}}'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+              Die integrierte Rechnungs-E-Mail mit allen Positionen, Beträgen und Zahlungsinformationen.
+              Diese Vorlage wird verwendet, wenn keine eigene Vorlage ausgewählt ist.
+            </div>
+          </div>
+
+          {/* Eigene Vorlagen */}
+          {emailVorlagen.length > 0 && (
+            <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500, color: 'var(--gray-600)' }}>
+              Eigene Vorlagen:
+            </div>
           )}
+          {emailVorlagen.map((v) => (
+            <div key={v.id} className="card" style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <strong>{v.name}</strong>
+                  {v.ist_standard && (
+                    <span style={{ fontSize: 10, background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: 4 }}>
+                      Bevorzugt
+                    </span>
+                  )}
+                </div>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => {
+                    setEditingVorlage(v)
+                    setShowVorlageModal(true)
+                  }}
+                >
+                  Bearbeiten
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                <strong>Betreff:</strong> {v.betreff}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 100, overflow: 'hidden' }}>
+                {v.inhalt.substring(0, 200)}{v.inhalt.length > 200 ? '...' : ''}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
