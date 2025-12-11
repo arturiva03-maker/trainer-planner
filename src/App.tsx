@@ -6293,10 +6293,10 @@ function BuchhaltungView({
                               <span title="Beleg vorhanden" style={{ marginLeft: 6 }}>📎</span>
                             )}
                           </td>
-                          <td style={{ textAlign: 'right' }}>{a.betrag.toFixed(2)} €</td>
+                          <td style={{ textAlign: 'right' }}>{(a.betrag || 0).toFixed(2)} €</td>
                           {!kleinunternehmer && (
                             <td style={{ textAlign: 'right' }}>
-                              {a.hat_vorsteuer ? `${vorsteuer.toFixed(2)} € (${a.vorsteuer_satz}%)` : '-'}
+                              {a.hat_vorsteuer ? `${(vorsteuer || 0).toFixed(2)} € (${a.vorsteuer_satz || 0}%)` : '-'}
                             </td>
                           )}
                           <td>
