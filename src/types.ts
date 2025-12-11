@@ -54,6 +54,7 @@ export interface Training {
   trainer_id?: string
   status: 'geplant' | 'durchgefuehrt' | 'abgesagt'
   notiz?: string
+  name?: string // Optionaler Name wie "Mannschaftstraining"
   serie_id?: string
   custom_preis_pro_stunde?: number
   custom_abrechnung?: 'proTraining' | 'proSpieler'

@@ -827,7 +827,7 @@ function KalenderView({
                             onClick={() => setEditingTraining(training)}
                             onDoubleClick={() => handleDoubleClick(training)}
                           >
-                            <div className="training-title">{getSpielerNames(training.spieler_ids, true)}</div>
+                            <div className="training-title">{training.name || getSpielerNames(training.spieler_ids, true)}</div>
                             <div className="training-time">
                               {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
                             </div>
@@ -904,6 +904,7 @@ function TrainingModal({
   const [tarifId, setTarifId] = useState(training?.tarif_id || '')
   const [status, setStatus] = useState<Training['status']>(training?.status || 'geplant')
   const [notiz, setNotiz] = useState(training?.notiz || '')
+  const [trainingName, setTrainingName] = useState(training?.name || '')
   const [barBezahlt, setBarBezahlt] = useState(training?.bar_bezahlt || false)
   const [customPreis, setCustomPreis] = useState(training?.custom_preis_pro_stunde?.toString() || '')
   const [wiederholen, setWiederholen] = useState(false)
@@ -942,6 +943,7 @@ function TrainingModal({
         tarif_id: tarifId || null,
         status,
         notiz: notiz || null,
+        name: trainingName || null,
         bar_bezahlt: barBezahlt,
         custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : null
       }
@@ -1091,6 +1093,20 @@ function TrainingModal({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="form-group">
+            <label>Trainingsname (optional)</label>
+            <input
+              type="text"
+              className="form-control"
+              value={trainingName}
+              onChange={(e) => setTrainingName(e.target.value)}
+              placeholder="z.B. Mannschaftstraining, Techniktraining..."
+            />
+            <small style={{ color: 'var(--gray-500)', fontSize: 12 }}>
+              Ohne Angabe werden die Spielernamen angezeigt
+            </small>
           </div>
 
           <div className="form-row">
