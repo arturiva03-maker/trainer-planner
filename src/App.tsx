@@ -15,9 +15,10 @@ import type {
   Ausgabe,
   ManuelleRechnung,
   Vorauszahlung,
-  SpielerTrainingPayment
+  SpielerTrainingPayment,
+  EmailVorlage
 } from './types'
-import { AUSGABE_KATEGORIEN } from './types'
+import { AUSGABE_KATEGORIEN, EMAIL_PLATZHALTER } from './types'
 import {
   formatDate,
   formatDateGerman,
@@ -337,6 +338,7 @@ function MainApp({ user }: { user: User }) {
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
   const [ausgaben, setAusgaben] = useState<Ausgabe[]>([])
   const [manuelleRechnungen, setManuelleRechnungen] = useState<ManuelleRechnung[]>([])
+  const [emailVorlagen, setEmailVorlagen] = useState<EmailVorlage[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
   // Load all data
@@ -359,7 +361,8 @@ function MainApp({ user }: { user: User }) {
         ausgabenRes,
         manuelleRechnungenRes,
         vorauszahlungenRes,
-        spielerPaymentsRes
+        spielerPaymentsRes,
+        emailVorlagenRes
       ] = await Promise.all([
         supabase.from('trainer_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('spieler').select('*').eq('user_id', user.id).order('name'),
@@ -372,7 +375,8 @@ function MainApp({ user }: { user: User }) {
         supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('manuelle_rechnungen').select('*').eq('user_id', user.id).order('rechnungsdatum', { ascending: false }),
         supabase.from('vorauszahlungen').select('*').eq('user_id', user.id).order('zahlungsdatum', { ascending: false }),
-        supabase.from('spieler_training_payments').select('*').eq('user_id', user.id)
+        supabase.from('spieler_training_payments').select('*').eq('user_id', user.id),
+        supabase.from('email_vorlagen').select('*').eq('user_id', user.id).order('name')
       ])
 
       if (profileRes.data) setProfile(profileRes.data)
@@ -387,6 +391,7 @@ function MainApp({ user }: { user: User }) {
       if (planungRes.data) setPlanungSheets(planungRes.data)
       if (ausgabenRes.data) setAusgaben(ausgabenRes.data)
       if (manuelleRechnungenRes.data) setManuelleRechnungen(manuelleRechnungenRes.data)
+      if (emailVorlagenRes.data) setEmailVorlagen(emailVorlagenRes.data)
     } catch (err) {
       console.error('Error loading data:', err)
     } finally {
@@ -552,6 +557,7 @@ function MainApp({ user }: { user: User }) {
                 spielerPayments={spielerPayments}
                 profile={profile}
                 manuelleRechnungen={manuelleRechnungen}
+                emailVorlagen={emailVorlagen}
                 onUpdate={loadAllData}
                 onNavigateToTraining={handleNavigateToTraining}
                 userId={user.id}
@@ -594,6 +600,7 @@ function MainApp({ user }: { user: User }) {
               <WeiteresView
                 profile={profile}
                 notizen={notizen}
+                emailVorlagen={emailVorlagen}
                 onUpdate={loadAllData}
                 userId={user.id}
               />
@@ -2107,6 +2114,7 @@ function AbrechnungView({
   spielerPayments,
   profile,
   manuelleRechnungen,
+  emailVorlagen,
   onUpdate,
   onNavigateToTraining,
   userId
@@ -2119,6 +2127,7 @@ function AbrechnungView({
   spielerPayments: SpielerTrainingPayment[]
   profile: TrainerProfile | null
   manuelleRechnungen: ManuelleRechnung[]
+  emailVorlagen: EmailVorlage[]
   onUpdate: () => void
   onNavigateToTraining: (training: Training) => void
   userId: string
@@ -3388,6 +3397,7 @@ function AbrechnungView({
           tarife={tarife}
           profile={profile}
           selectedMonth={selectedMonth}
+          emailVorlagen={emailVorlagen}
           onClose={() => {
             setShowInvoiceModal(false)
           }}
@@ -3708,6 +3718,7 @@ function InvoiceModal({
   tarife,
   profile,
   selectedMonth,
+  emailVorlagen,
   onClose
 }: {
   spieler: Spieler[]
@@ -3723,6 +3734,7 @@ function InvoiceModal({
   tarife: Tarif[]
   profile: TrainerProfile | null
   selectedMonth: string
+  emailVorlagen: EmailVorlage[]
   onClose: () => void
 }) {
   const [step, setStep] = useState(1)
@@ -3740,6 +3752,10 @@ function InvoiceModal({
   const [rechnungsempfaengerAdresse, setRechnungsempfaengerAdresse] = useState('')
   const [rechnungsnummer, setRechnungsnummer] = useState(generateRechnungsnummer())
   const [rechnungsdatum, setRechnungsdatum] = useState(formatDate(new Date()))
+
+  // E-Mail-Vorlage Auswahl
+  const standardVorlage = emailVorlagen.find(v => v.ist_standard) || emailVorlagen[0]
+  const [selectedVorlageId, setSelectedVorlageId] = useState(standardVorlage?.id || '')
 
   // Manuelle Korrektur (z.B. Regenausfall)
   const [korrekturBetrag, setKorrekturBetrag] = useState('')
@@ -4316,6 +4332,24 @@ function InvoiceModal({
                 />
               </div>
 
+              {/* E-Mail-Vorlage Auswahl */}
+              {emailVorlagen.length > 0 && (
+                <div className="form-group" style={{ marginTop: 16 }}>
+                  <label>E-Mail-Vorlage</label>
+                  <select
+                    className="form-control"
+                    value={selectedVorlageId}
+                    onChange={(e) => setSelectedVorlageId(e.target.value)}
+                  >
+                    {emailVorlagen.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} {v.ist_standard ? '(Standard)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 16 }}>
                 <div style={{ marginBottom: 8, fontWeight: 500 }}>Rechnungsvorschau:</div>
                 <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
@@ -4400,9 +4434,48 @@ function InvoiceModal({
                     ? `\nKorrektur: ${korrekturNum > 0 ? '+' : ''}${korrekturNum.toFixed(2)} €`
                     : ''
 
-                  // Komplette Rechnung als Text
-                  const rechnungText = `
-══════════════════════════════════════
+                  // Platzhalter-Werte definieren
+                  const platzhalterWerte: Record<string, string> = {
+                    '{{spieler_name}}': selectedSummary?.spieler.name || '',
+                    '{{rechnungsnummer}}': rechnungsnummer,
+                    '{{rechnungsdatum}}': formatDateGerman(rechnungsdatum),
+                    '{{monat}}': monatFormatiert,
+                    '{{positionen}}': positionenText + korrekturText,
+                    '{{netto}}': `${summen.gesamtNetto.toFixed(2)} €`,
+                    '{{ust}}': `${summen.gesamtUst.toFixed(2)} €`,
+                    '{{brutto}}': `${summen.gesamtBrutto.toFixed(2)} €`,
+                    '{{iban}}': iban,
+                    '{{trainer_name}}': rechnungsstellerName,
+                    '{{trainer_adresse}}': rechnungsstellerAdresse + (ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''),
+                    '{{empfaenger_name}}': rechnungsempfaengerName,
+                    '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
+                    '{{kleinunternehmer_hinweis}}': kleinunternehmer ? 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.' : '',
+                    '{{ust_zeile}}': !kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €\nUSt (19%):     ${summen.gesamtUst.toFixed(2)} €` : '',
+                  }
+
+                  // Funktion zum Ersetzen der Platzhalter
+                  const ersetzePlatzhalter = (text: string): string => {
+                    let result = text
+                    for (const [key, value] of Object.entries(platzhalterWerte)) {
+                      result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+                    }
+                    return result
+                  }
+
+                  // Vorlage verwenden wenn vorhanden
+                  const selectedVorlage = emailVorlagen.find(v => v.id === selectedVorlageId)
+
+                  let subject: string
+                  let body: string
+
+                  if (selectedVorlage) {
+                    // Vorlage mit Platzhaltern verwenden
+                    subject = ersetzePlatzhalter(selectedVorlage.betreff)
+                    body = ersetzePlatzhalter(selectedVorlage.inhalt)
+                  } else {
+                    // Standard-Text (Fallback wenn keine Vorlage)
+                    subject = `Rechnung ${rechnungsnummer} - Tennisunterricht ${monatFormatiert}`
+                    body = `══════════════════════════════════════
            R E C H N U N G
 ══════════════════════════════════════
 
@@ -4441,13 +4514,11 @@ Mit freundlichen Grüßen
 ${rechnungsstellerName}
 
 ⚠️ Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
-══════════════════════════════════════
-`
-
-                  const subject = `Rechnung ${rechnungsnummer} - Tennisunterricht ${monatFormatiert}`
+══════════════════════════════════════`
+                  }
 
                   // mailto-Link öffnen
-                  const mailtoLink = `mailto:${spielerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(rechnungText.trim())}`
+                  const mailtoLink = `mailto:${spielerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.trim())}`
                   window.open(mailtoLink, '_blank')
                 }}
                 disabled={!selectedSummary?.spieler.kontakt_email}
@@ -6802,17 +6873,21 @@ function AusgabeModal({
 function WeiteresView({
   profile,
   notizen,
+  emailVorlagen,
   onUpdate,
   userId
 }: {
   profile: TrainerProfile | null
   notizen: Notiz[]
+  emailVorlagen: EmailVorlage[]
   onUpdate: () => void
   userId: string
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'profil' | 'notizen'>('profil')
+  const [activeSubTab, setActiveSubTab] = useState<'profil' | 'notizen' | 'email-vorlagen'>('profil')
   const [showNotizModal, setShowNotizModal] = useState(false)
   const [editingNotiz, setEditingNotiz] = useState<Notiz | null>(null)
+  const [showVorlageModal, setShowVorlageModal] = useState(false)
+  const [editingVorlage, setEditingVorlage] = useState<EmailVorlage | null>(null)
 
   // Profile form
   const [name, setName] = useState(profile?.name || '')
@@ -6872,6 +6947,12 @@ function WeiteresView({
           onClick={() => setActiveSubTab('notizen')}
         >
           Notizen ({notizen.length})
+        </button>
+        <button
+          className={`tab ${activeSubTab === 'email-vorlagen' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('email-vorlagen')}
+        >
+          E-Mail-Vorlagen ({emailVorlagen.length})
         </button>
       </div>
 
@@ -7043,8 +7124,294 @@ function WeiteresView({
           }}
         />
       )}
+
+      {activeSubTab === 'email-vorlagen' && (
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <button className="btn btn-primary" onClick={() => setShowVorlageModal(true)}>
+              + Neue Vorlage
+            </button>
+          </div>
+
+          <div className="card" style={{ marginBottom: 16, padding: 12, background: 'var(--primary-light)' }}>
+            <strong>Verfügbare Platzhalter:</strong>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {EMAIL_PLATZHALTER.map(p => (
+                <span key={p.key} style={{ fontSize: 11, background: 'white', padding: '2px 6px', borderRadius: 4 }} title={p.beschreibung}>
+                  {p.key}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {emailVorlagen.length === 0 ? (
+            <div className="card">
+              <div className="empty-state">
+                <p>Noch keine E-Mail-Vorlagen erstellt.</p>
+                <p style={{ fontSize: 13, marginTop: 8, color: 'var(--gray-600)' }}>
+                  Die Standard-Vorlage wird automatisch verwendet, wenn keine eigene Vorlage existiert.
+                </p>
+              </div>
+            </div>
+          ) : (
+            emailVorlagen.map((v) => (
+              <div key={v.id} className="card" style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <strong>{v.name}</strong>
+                    {v.ist_standard && (
+                      <span style={{ fontSize: 10, background: 'var(--success)', color: 'white', padding: '2px 6px', borderRadius: 4 }}>
+                        Standard
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      setEditingVorlage(v)
+                      setShowVorlageModal(true)
+                    }}
+                  >
+                    Bearbeiten
+                  </button>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+                  <strong>Betreff:</strong> {v.betreff}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 100, overflow: 'hidden' }}>
+                  {v.inhalt.substring(0, 200)}{v.inhalt.length > 200 ? '...' : ''}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {showVorlageModal && (
+        <EmailVorlageModal
+          vorlage={editingVorlage}
+          vorlagen={emailVorlagen}
+          userId={userId}
+          onClose={() => {
+            setShowVorlageModal(false)
+            setEditingVorlage(null)
+          }}
+          onSave={() => {
+            setShowVorlageModal(false)
+            setEditingVorlage(null)
+            onUpdate()
+          }}
+        />
+      )}
     </div>
   )
+}
+
+// ============ EMAIL VORLAGE MODAL ============
+function EmailVorlageModal({
+  vorlage,
+  vorlagen,
+  userId,
+  onClose,
+  onSave
+}: {
+  vorlage: EmailVorlage | null
+  vorlagen: EmailVorlage[]
+  userId: string
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [name, setName] = useState(vorlage?.name || '')
+  const [betreff, setBetreff] = useState(vorlage?.betreff || 'Rechnung {{rechnungsnummer}} - Tennisunterricht {{monat}}')
+  const [inhalt, setInhalt] = useState(vorlage?.inhalt || getDefaultEmailInhalt())
+  const [istStandard, setIstStandard] = useState(vorlage?.ist_standard || vorlagen.length === 0)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert('Name ist erforderlich')
+      return
+    }
+    if (!betreff.trim()) {
+      alert('Betreff ist erforderlich')
+      return
+    }
+
+    setSaving(true)
+    try {
+      // Wenn diese Vorlage Standard wird, andere auf nicht-Standard setzen
+      if (istStandard) {
+        await supabase.from('email_vorlagen')
+          .update({ ist_standard: false })
+          .eq('user_id', userId)
+      }
+
+      if (vorlage) {
+        await supabase.from('email_vorlagen').update({
+          name: name.trim(),
+          betreff: betreff.trim(),
+          inhalt: inhalt,
+          ist_standard: istStandard
+        }).eq('id', vorlage.id)
+      } else {
+        await supabase.from('email_vorlagen').insert({
+          user_id: userId,
+          name: name.trim(),
+          betreff: betreff.trim(),
+          inhalt: inhalt,
+          ist_standard: istStandard
+        })
+      }
+      onSave()
+    } catch (err) {
+      console.error('Error saving vorlage:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!vorlage) return
+    if (!confirm('Vorlage wirklich löschen?')) return
+
+    await supabase.from('email_vorlagen').delete().eq('id', vorlage.id)
+    onSave()
+  }
+
+  const insertPlatzhalter = (key: string) => {
+    setInhalt(prev => prev + key)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
+        <div className="modal-header">
+          <h3>{vorlage ? 'Vorlage bearbeiten' : 'Neue E-Mail-Vorlage'}</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Name der Vorlage *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="z.B. Standard-Rechnung, Mahnung, etc."
+            />
+          </div>
+
+          <div className="form-group">
+            <label>E-Mail-Betreff *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={betreff}
+              onChange={(e) => setBetreff(e.target.value)}
+              placeholder="Betreff der E-Mail"
+            />
+          </div>
+
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={istStandard}
+                onChange={(e) => setIstStandard(e.target.checked)}
+              />
+              Als Standard-Vorlage verwenden
+            </label>
+          </div>
+
+          <div className="form-group">
+            <label>Platzhalter einfügen:</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {EMAIL_PLATZHALTER.map(p => (
+                <button
+                  key={p.key}
+                  type="button"
+                  className="btn btn-sm"
+                  style={{ fontSize: 10, padding: '2px 6px' }}
+                  onClick={() => insertPlatzhalter(p.key)}
+                  title={p.beschreibung}
+                >
+                  {p.key}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>E-Mail-Inhalt *</label>
+            <textarea
+              className="form-control"
+              value={inhalt}
+              onChange={(e) => setInhalt(e.target.value)}
+              rows={15}
+              style={{ fontFamily: 'monospace', fontSize: 12 }}
+              placeholder="E-Mail-Text mit Platzhaltern..."
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          {vorlage && (
+            <button className="btn btn-danger" onClick={handleDelete}>
+              Löschen
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichere...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Standard E-Mail-Inhalt mit Platzhaltern
+function getDefaultEmailInhalt(): string {
+  return `══════════════════════════════════════
+           R E C H N U N G
+══════════════════════════════════════
+
+Rechnungssteller:
+{{trainer_name}}
+{{trainer_adresse}}
+
+Rechnungsempfänger:
+{{empfaenger_name}}
+{{empfaenger_adresse}}
+
+──────────────────────────────────────
+Rechnungsnummer: {{rechnungsnummer}}
+Rechnungsdatum:  {{rechnungsdatum}}
+Leistungszeitraum: {{monat}}
+──────────────────────────────────────
+
+Positionen:
+{{positionen}}
+
+──────────────────────────────────────
+{{ust_zeile}}
+  ►►► GESAMTBETRAG:  {{brutto}} ◄◄◄
+
+──────────────────────────────────────
+{{kleinunternehmer_hinweis}}
+Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf:
+IBAN: {{iban}}
+Kontoinhaber: {{trainer_name}}
+
+Vielen Dank für die Zusammenarbeit!
+
+Mit freundlichen Grüßen
+{{trainer_name}}
+
+⚠️ Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
+══════════════════════════════════════`
 }
 
 // ============ NOTIZ MODAL ============

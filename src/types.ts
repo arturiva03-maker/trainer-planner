@@ -182,3 +182,32 @@ export interface Vorauszahlung {
   bar_bezahlt: boolean
   created_at: string
 }
+
+export interface EmailVorlage {
+  id: string
+  user_id: string
+  name: string
+  betreff: string
+  inhalt: string
+  ist_standard: boolean
+  created_at: string
+}
+
+// Verfügbare Platzhalter für E-Mail-Vorlagen
+export const EMAIL_PLATZHALTER = [
+  { key: '{{spieler_name}}', beschreibung: 'Name des Spielers' },
+  { key: '{{rechnungsnummer}}', beschreibung: 'Rechnungsnummer' },
+  { key: '{{rechnungsdatum}}', beschreibung: 'Rechnungsdatum' },
+  { key: '{{monat}}', beschreibung: 'Abrechnungsmonat (z.B. Dezember 2024)' },
+  { key: '{{positionen}}', beschreibung: 'Auflistung aller Trainings/Positionen' },
+  { key: '{{netto}}', beschreibung: 'Nettobetrag' },
+  { key: '{{ust}}', beschreibung: 'Umsatzsteuer-Betrag' },
+  { key: '{{brutto}}', beschreibung: 'Gesamtbetrag (Brutto)' },
+  { key: '{{iban}}', beschreibung: 'IBAN des Trainers' },
+  { key: '{{trainer_name}}', beschreibung: 'Name des Trainers' },
+  { key: '{{trainer_adresse}}', beschreibung: 'Adresse des Trainers' },
+  { key: '{{empfaenger_name}}', beschreibung: 'Name des Rechnungsempfängers' },
+  { key: '{{empfaenger_adresse}}', beschreibung: 'Adresse des Rechnungsempfängers' },
+  { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis (falls zutreffend)' },
+  { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
+]
