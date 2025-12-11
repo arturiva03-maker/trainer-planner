@@ -6287,7 +6287,12 @@ function BuchhaltungView({
                         <tr key={a.id}>
                           <td>{formatDateGerman(a.datum)}</td>
                           <td>{AUSGABE_KATEGORIEN.find(k => k.value === a.kategorie)?.label || a.kategorie}</td>
-                          <td>{a.beschreibung || '-'}</td>
+                          <td>
+                            {a.beschreibung || '-'}
+                            {a.beleg_path && (
+                              <span title="Beleg vorhanden" style={{ marginLeft: 6 }}>📎</span>
+                            )}
+                          </td>
                           <td style={{ textAlign: 'right' }}>{a.betrag.toFixed(2)} €</td>
                           {!kleinunternehmer && (
                             <td style={{ textAlign: 'right' }}>
@@ -6925,6 +6930,29 @@ function AusgabeModal({
   const [hatVorsteuer, setHatVorsteuer] = useState(ausgabe?.hat_vorsteuer || false)
   const [vorsteuerSatz, setVorsteuerSatz] = useState(ausgabe?.vorsteuer_satz || 19)
   const [saving, setSaving] = useState(false)
+  const [belegFile, setBelegFile] = useState<File | null>(null)
+  const [belegPreview, setBelegPreview] = useState<string | null>(ausgabe?.beleg_path ? null : null)
+  const [uploading, setUploading] = useState(false)
+  const [existingBelegUrl, setExistingBelegUrl] = useState<string | null>(null)
+
+  // Bestehenden Beleg laden
+  useEffect(() => {
+    if (ausgabe?.beleg_path) {
+      const { data } = supabase.storage.from('belege').getPublicUrl(ausgabe.beleg_path)
+      setExistingBelegUrl(data.publicUrl)
+    }
+  }, [ausgabe?.beleg_path])
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setBelegFile(file)
+      // Preview erstellen
+      const reader = new FileReader()
+      reader.onload = (e) => setBelegPreview(e.target?.result as string)
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSave = async () => {
     if (!betrag || parseFloat(betrag) <= 0) {
@@ -6934,13 +6962,41 @@ function AusgabeModal({
 
     setSaving(true)
     try {
+      let beleg_path = ausgabe?.beleg_path || null
+      let beleg_name = ausgabe?.beleg_name || null
+
+      // Beleg hochladen wenn vorhanden
+      if (belegFile) {
+        setUploading(true)
+        const fileExt = belegFile.name.split('.').pop()
+        const fileName = `${userId}/${Date.now()}.${fileExt}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('belege')
+          .upload(fileName, belegFile)
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          alert('Fehler beim Hochladen des Belegs: ' + uploadError.message)
+          setSaving(false)
+          setUploading(false)
+          return
+        }
+
+        beleg_path = fileName
+        beleg_name = belegFile.name
+        setUploading(false)
+      }
+
       const data = {
         datum,
         betrag: parseFloat(betrag),
         kategorie,
         beschreibung: beschreibung || null,
         hat_vorsteuer: hatVorsteuer,
-        vorsteuer_satz: hatVorsteuer ? vorsteuerSatz : 0
+        vorsteuer_satz: hatVorsteuer ? vorsteuerSatz : 0,
+        beleg_path,
+        beleg_name
       }
 
       if (ausgabe) {
@@ -6955,6 +7011,7 @@ function AusgabeModal({
       alert('Fehler beim Speichern')
     } finally {
       setSaving(false)
+      setUploading(false)
     }
   }
 
@@ -6963,12 +7020,26 @@ function AusgabeModal({
     if (!confirm('Diese Ausgabe wirklich löschen?')) return
 
     try {
+      // Beleg aus Storage löschen wenn vorhanden
+      if (ausgabe.beleg_path) {
+        await supabase.storage.from('belege').remove([ausgabe.beleg_path])
+      }
       await supabase.from('ausgaben').delete().eq('id', ausgabe.id)
       onSave()
     } catch (err) {
       console.error('Error deleting ausgabe:', err)
       alert('Fehler beim Löschen')
     }
+  }
+
+  const handleRemoveBeleg = async () => {
+    if (ausgabe?.beleg_path) {
+      await supabase.storage.from('belege').remove([ausgabe.beleg_path])
+      await supabase.from('ausgaben').update({ beleg_path: null, beleg_name: null }).eq('id', ausgabe.id)
+      setExistingBelegUrl(null)
+    }
+    setBelegFile(null)
+    setBelegPreview(null)
   }
 
   // Vorsteuer berechnen für Anzeige
@@ -7058,6 +7129,103 @@ function AusgabeModal({
             </div>
           )}
 
+          {/* Beleg Upload */}
+          <div className="form-group">
+            <label>Beleg (Bild/PDF)</label>
+            {!belegPreview && !existingBelegUrl ? (
+              <div
+                style={{
+                  border: '2px dashed var(--gray-300)',
+                  borderRadius: 8,
+                  padding: 24,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: 'var(--gray-50)'
+                }}
+                onClick={() => document.getElementById('beleg-input')?.click()}
+              >
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+                <div style={{ color: 'var(--gray-600)' }}>Klicken um Beleg hochzuladen</div>
+                <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>JPG, PNG oder PDF</div>
+                <input
+                  id="beleg-input"
+                  type="file"
+                  accept="image/*,.pdf"
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelect}
+                />
+              </div>
+            ) : (
+              <div style={{
+                border: '1px solid var(--gray-200)',
+                borderRadius: 8,
+                padding: 12,
+                background: 'var(--gray-50)'
+              }}>
+                {belegPreview ? (
+                  // Neue Datei ausgewählt
+                  <div>
+                    {belegFile?.type.startsWith('image/') ? (
+                      <img
+                        src={belegPreview}
+                        alt="Beleg Vorschau"
+                        style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4, marginBottom: 8 }}
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 24 }}>📎</span>
+                        <span>{belegFile?.name}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : existingBelegUrl ? (
+                  // Bestehender Beleg
+                  <div>
+                    {ausgabe?.beleg_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                      <img
+                        src={existingBelegUrl}
+                        alt="Beleg"
+                        style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4, marginBottom: 8 }}
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 24 }}>📎</span>
+                        <a href={existingBelegUrl} target="_blank" rel="noopener noreferrer">
+                          {ausgabe?.beleg_name || 'Beleg anzeigen'}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: 12, padding: '4px 8px' }}
+                    onClick={() => document.getElementById('beleg-input-replace')?.click()}
+                  >
+                    Ersetzen
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    style={{ fontSize: 12, padding: '4px 8px' }}
+                    onClick={handleRemoveBeleg}
+                  >
+                    Entfernen
+                  </button>
+                  <input
+                    id="beleg-input-replace"
+                    type="file"
+                    accept="image/*,.pdf"
+                    style={{ display: 'none' }}
+                    onChange={handleFileSelect}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {betrag && parseFloat(betrag) > 0 && (
             <div style={{ padding: 12, background: 'var(--gray-100)', borderRadius: 8, marginTop: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -7088,8 +7256,8 @@ function AusgabeModal({
           <button className="btn btn-secondary" onClick={onClose}>
             Abbrechen
           </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Speichern...' : 'Speichern'}
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving || uploading}>
+            {uploading ? 'Hochladen...' : saving ? 'Speichern...' : 'Speichern'}
           </button>
         </div>
       </div>

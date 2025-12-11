@@ -12,7 +12,8 @@
       "Bash(npx vercel --prod)",
       "Bash(npx vercel:*)",
       "Bash(curl:*)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(find:*)"
     ]
   },
   "alwaysAllowWrites": true,

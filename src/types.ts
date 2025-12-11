@@ -137,6 +137,8 @@ export interface Ausgabe {
   beschreibung?: string
   hat_vorsteuer: boolean
   vorsteuer_satz: number
+  beleg_path?: string
+  beleg_name?: string
   created_at: string
 }
 
