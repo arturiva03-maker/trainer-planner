@@ -7797,9 +7797,11 @@ function PdfVorlageModal({
   )
 }
 
-// Standard PDF-Vorlage mit schönem Layout
+// Standard PDF-Vorlage mit schönem Layout (identisch zur System-Vorlage)
 function getDefaultPdfVorlage(): string {
-  return `<div class="flex">
+  return `<h1>RECHNUNG</h1>
+
+<div class="flex">
   <div class="section">
     <strong>Rechnungssteller:</strong><br>
     {{trainer_name}}<br>
@@ -7818,7 +7820,9 @@ function getDefaultPdfVorlage(): string {
   <strong>Leistungszeitraum:</strong> {{monat}}
 </div>
 
-<h2 style="margin-top: 30px;">Positionen</h2>
+<p>Sehr geehrte Damen und Herren,</p>
+<p>für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
+
 {{positionen_tabelle}}
 
 {{summen_block}}
@@ -7829,7 +7833,8 @@ function getDefaultPdfVorlage(): string {
   <p>Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
   <p><strong>IBAN:</strong> {{iban}}<br>
   <strong>Kontoinhaber:</strong> {{trainer_name}}</p>
-  <p style="margin-top: 30px;">Vielen Dank für die Zusammenarbeit!</p>
+  <p>Vielen Dank für die Zusammenarbeit.</p>
+  <p>Mit freundlichen Grüßen<br>{{trainer_name}}</p>
 </div>`
 }
 
