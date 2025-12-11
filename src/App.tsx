@@ -4023,7 +4023,7 @@ function InvoiceModal({
 
     // Positionen als Text für E-Mail-Vorlage
     const positionenText = rechnungsPositionen.map(p =>
-      `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+      `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}${hatMehrereSpieler ? ` | ${p.spielerName}` : ''} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
     ).join('\n')
     const korrekturNum = parseFloat(korrekturBetrag) || 0
     const korrekturText = korrekturNum !== 0
@@ -4545,9 +4545,12 @@ function InvoiceModal({
                   const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
                   const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
 
+                  // Prüfen ob mehrere Spieler in der Rechnung sind
+                  const hatMehrereSpieler = verknuepfteSummaries.length > 0
+
                   // Positionen als Text formatieren
                   const positionenText = rechnungsPositionen.map(p =>
-                    `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+                    `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}${hatMehrereSpieler ? ` | ${p.spielerName}` : ''} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
                   ).join('\n')
 
                   // Korrektur falls vorhanden
