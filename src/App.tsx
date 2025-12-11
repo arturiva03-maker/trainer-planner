@@ -6156,21 +6156,21 @@ function BuchhaltungView({
                                   marginRight: 6
                                 }}
                                 title={(p as typeof einnahmenPositionen[0]).korrekturGrund || 'Korrigiert'}>
-                                  {(p as typeof einnahmenPositionen[0]).korrektur > 0 ? '+' : ''}{(p as typeof einnahmenPositionen[0]).korrektur.toFixed(2)}€
+                                  {((p as typeof einnahmenPositionen[0]).korrektur || 0) > 0 ? '+' : ''}{((p as typeof einnahmenPositionen[0]).korrektur || 0).toFixed(2)}€
                                 </span>
                               )}
                               {p.tarifName}
                             </td>
-                            <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
-                              {p.netto.toFixed(2)} €
+                            <td style={{ textAlign: 'right', color: p.istKorrektur && (p.brutto || 0) < 0 ? 'var(--success)' : undefined }}>
+                              {(p.netto || 0).toFixed(2)} €
                             </td>
                             {!kleinunternehmer && (
-                              <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
-                                {p.ust.toFixed(2)} € ({p.ustSatz}%)
+                              <td style={{ textAlign: 'right', color: p.istKorrektur && (p.brutto || 0) < 0 ? 'var(--success)' : undefined }}>
+                                {(p.ust || 0).toFixed(2)} € ({p.ustSatz || 0}%)
                               </td>
                             )}
-                            <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
-                              {p.brutto.toFixed(2)} €
+                            <td style={{ textAlign: 'right', color: p.istKorrektur && (p.brutto || 0) < 0 ? 'var(--success)' : undefined }}>
+                              {(p.brutto || 0).toFixed(2)} €
                             </td>
                             <td>
                               {p.istKorrektur ? (
@@ -6194,9 +6194,9 @@ function BuchhaltungView({
                     <tfoot>
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
                         <td colSpan={3}>Summe {formatMonthGerman(monat)}</td>
-                        <td style={{ textAlign: 'right' }}>{summeNetto.toFixed(2)} €</td>
-                        {!kleinunternehmer && <td style={{ textAlign: 'right' }}>{summeUst.toFixed(2)} €</td>}
-                        <td style={{ textAlign: 'right' }}>{summeBrutto.toFixed(2)} €</td>
+                        <td style={{ textAlign: 'right' }}>{(summeNetto || 0).toFixed(2)} €</td>
+                        {!kleinunternehmer && <td style={{ textAlign: 'right' }}>{(summeUst || 0).toFixed(2)} €</td>}
+                        <td style={{ textAlign: 'right' }}>{(summeBrutto || 0).toFixed(2)} €</td>
                         <td></td>
                       </tr>
                     </tfoot>
