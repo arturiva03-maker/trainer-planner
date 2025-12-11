@@ -6659,12 +6659,12 @@ function BuchhaltungView({
                   })
                   bericht += `\n`
 
-                  // Detaillierte Einnahmen
+                  // Detaillierte Einnahmen (inkl. Vorauszahlungen, Korrekturen, manuelle Rechnungen)
                   bericht += `EINNAHMEN (DETAIL)\n`
                   bericht += `=========================================\n`
                   bericht += `Datum       | Spieler                    | Tarif              | Netto      | Brutto     | USt\n`
                   bericht += `---------------------------------------------------------------------------------------------------------\n`
-                  einnahmenPositionen.forEach(e => {
+                  alleEinnahmen.forEach(e => {
                     bericht += `${formatDateGerman(e.datum)} | ${e.spielerName.substring(0, 26).padEnd(26)} | ${e.tarifName.substring(0, 18).padEnd(18)} | ${e.netto.toFixed(2).padStart(10)} | ${e.brutto.toFixed(2).padStart(10)} | ${e.ust.toFixed(2).padStart(8)}\n`
                   })
                   bericht += `---------------------------------------------------------------------------------------------------------\n`
