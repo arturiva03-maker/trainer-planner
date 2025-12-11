@@ -290,10 +290,103 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
   )
 }
 
+// ============ CONFIRM DIALOG ============
+function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmText = 'Löschen',
+  cancelText = 'Abbrechen',
+  onConfirm,
+  onCancel,
+  variant = 'danger'
+}: {
+  isOpen: boolean
+  title: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  onConfirm: () => void
+  onCancel: () => void
+  variant?: 'danger' | 'warning' | 'primary'
+}) {
+  if (!isOpen) return null
+
+  const buttonClass = variant === 'danger' ? 'btn-danger' : variant === 'warning' ? 'btn-warning' : 'btn-primary'
+
+  return (
+    <div className="modal-overlay" onClick={onCancel} style={{ zIndex: 10000 }}>
+      <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{
+              fontSize: 28,
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: variant === 'danger' ? 'var(--danger-light)' : variant === 'warning' ? 'var(--warning-light)' : 'var(--primary-light)'
+            }}>
+              {variant === 'danger' ? '🗑️' : variant === 'warning' ? '⚠️' : 'ℹ️'}
+            </span>
+            {title}
+          </h3>
+          <button className="modal-close" onClick={onCancel}>×</button>
+        </div>
+        <div className="modal-body" style={{ paddingTop: 8 }}>
+          <p style={{ color: 'var(--gray-600)', margin: 0, fontSize: 15 }}>{message}</p>
+        </div>
+        <div className="modal-footer" style={{ borderTop: 'none', paddingTop: 8, gap: 12 }}>
+          <button className="btn btn-secondary" onClick={onCancel} style={{ flex: 1 }}>
+            {cancelText}
+          </button>
+          <button className={`btn ${buttonClass}`} onClick={onConfirm} style={{ flex: 1 }}>
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Globaler Confirm-State
+let confirmResolve: ((value: boolean) => void) | null = null
+let setConfirmState: React.Dispatch<React.SetStateAction<{
+  isOpen: boolean
+  title: string
+  message: string
+  confirmText: string
+  variant: 'danger' | 'warning' | 'primary'
+}>> | null = null
+
+const showConfirm = (title: string, message: string, confirmText = 'Löschen', variant: 'danger' | 'warning' | 'primary' = 'danger'): Promise<boolean> => {
+  return new Promise((resolve) => {
+    confirmResolve = resolve
+    if (setConfirmState) {
+      setConfirmState({ isOpen: true, title, message, confirmText, variant })
+    }
+  })
+}
+
 // ============ MAIN APP COMPONENT ============
 function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    confirmText: string
+    variant: 'danger' | 'warning' | 'primary'
+  }>({ isOpen: false, title: '', message: '', confirmText: 'Löschen', variant: 'danger' })
+
+  // Registriere setConfirmState global
+  useEffect(() => {
+    setConfirmState = setConfirmDialog
+    return () => { setConfirmState = null }
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -316,7 +409,36 @@ function App() {
     return <AuthScreen onLogin={() => {}} />
   }
 
-  return <MainApp user={session.user} />
+  const handleConfirm = () => {
+    if (confirmResolve) {
+      confirmResolve(true)
+      confirmResolve = null
+    }
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+  }
+
+  const handleCancel = () => {
+    if (confirmResolve) {
+      confirmResolve(false)
+      confirmResolve = null
+    }
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+  }
+
+  return (
+    <>
+      <MainApp user={session.user} />
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        variant={confirmDialog.variant}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    </>
+  )
 }
 
 // ============ MAIN APP WITH TABS ============
@@ -1044,14 +1166,16 @@ function TrainingModal({
     if (!training) return
 
     if (serienAktion === 'nachfolgende' && training.serie_id) {
-      if (!confirm('Dieses und alle nachfolgenden Trainings der Serie wirklich löschen?')) return
+      const confirmed = await showConfirm('Serie löschen', 'Dieses und alle nachfolgenden Trainings der Serie wirklich löschen?')
+      if (!confirmed) return
       await supabase
         .from('trainings')
         .delete()
         .eq('serie_id', training.serie_id)
         .gte('datum', training.datum)
     } else {
-      if (!confirm('Training wirklich löschen?')) return
+      const confirmed = await showConfirm('Training löschen', 'Training wirklich löschen?')
+      if (!confirmed) return
       await supabase.from('trainings').delete().eq('id', training.id)
     }
     onSave()
@@ -1689,7 +1813,8 @@ function SpielerModal({
 
   const handleDelete = async () => {
     if (!spieler) return
-    if (!confirm('Spieler wirklich löschen?')) return
+    const confirmed = await showConfirm('Spieler löschen', 'Spieler wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('spieler').delete().eq('id', spieler.id)
     onSave()
@@ -1892,7 +2017,8 @@ function TarifModal({
 
   const handleDelete = async () => {
     if (!tarif) return
-    if (!confirm('Tarif wirklich löschen?')) return
+    const confirmed = await showConfirm('Tarif löschen', 'Tarif wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('tarife').delete().eq('id', tarif.id)
     onSave()
@@ -2058,7 +2184,8 @@ function TrainerModal({
 
   const handleDelete = async () => {
     if (!trainerData) return
-    if (!confirm('Trainer wirklich löschen?')) return
+    const confirmed = await showConfirm('Trainer löschen', 'Trainer wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('trainer').delete().eq('id', trainerData.id)
     onSave()
@@ -2576,7 +2703,8 @@ function AbrechnungView({
     )
     if (!existingAdjustment) return
 
-    if (!confirm('Korrektur wirklich löschen?')) return
+    const confirmed = await showConfirm('Korrektur löschen', 'Korrektur wirklich löschen?')
+    if (!confirmed) return
 
     await supabase
       .from('monthly_adjustments')
@@ -2634,7 +2762,8 @@ function AbrechnungView({
   // Training-Korrektur löschen
   const deleteTrainingKorrektur = async () => {
     if (!showTrainingKorrekturModal) return
-    if (!confirm('Korrektur wirklich entfernen?')) return
+    const confirmed = await showConfirm('Korrektur entfernen', 'Korrektur wirklich entfernen?')
+    if (!confirmed) return
 
     await supabase
       .from('trainings')
@@ -2652,7 +2781,8 @@ function AbrechnungView({
 
   // Manuelle Rechnung löschen
   const deleteManuelleRechnung = async (rechnungId: string) => {
-    if (!confirm('Rechnung wirklich löschen?')) return
+    const confirmed = await showConfirm('Rechnung löschen', 'Rechnung wirklich löschen?')
+    if (!confirmed) return
     await supabase.from('manuelle_rechnungen').delete().eq('id', rechnungId)
     onUpdate()
   }
@@ -2717,7 +2847,8 @@ function AbrechnungView({
       v.serie_id === showVorauszahlungModal.serieId
     )
     if (!existing) return
-    if (!confirm('Vorauszahlung wirklich löschen?')) return
+    const confirmed = await showConfirm('Vorauszahlung löschen', 'Vorauszahlung wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('vorauszahlungen').delete().eq('id', existing.id)
     setShowVorauszahlungModal(null)
@@ -5447,7 +5578,8 @@ function PlanungView({
       alert('Der letzte Plan kann nicht gelöscht werden')
       return
     }
-    if (!confirm('Plan wirklich löschen?')) return
+    const confirmed = await showConfirm('Plan löschen', 'Plan wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('planung_sheets').delete().eq('id', id)
     onUpdate()
@@ -7028,7 +7160,8 @@ function AusgabeModal({
 
   const handleDelete = async () => {
     if (!ausgabe) return
-    if (!confirm('Diese Ausgabe wirklich löschen?')) return
+    const confirmed = await showConfirm('Ausgabe löschen', 'Diese Ausgabe wirklich löschen?')
+    if (!confirmed) return
 
     try {
       // Beleg aus Storage löschen wenn vorhanden
@@ -7791,7 +7924,8 @@ function EmailVorlageModal({
 
   const handleDelete = async () => {
     if (!vorlage) return
-    if (!confirm('Vorlage wirklich löschen?')) return
+    const confirmed = await showConfirm('Vorlage löschen', 'Vorlage wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('email_vorlagen').delete().eq('id', vorlage.id)
     onSave()
@@ -7991,7 +8125,8 @@ function PdfVorlageModal({
 
   const handleDelete = async () => {
     if (!vorlage) return
-    if (!confirm('PDF-Vorlage wirklich löschen?')) return
+    const confirmed = await showConfirm('PDF-Vorlage löschen', 'PDF-Vorlage wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('pdf_vorlagen').delete().eq('id', vorlage.id)
     onSave()
@@ -8171,7 +8306,8 @@ function NotizModal({
 
   const handleDelete = async () => {
     if (!notiz) return
-    if (!confirm('Notiz wirklich löschen?')) return
+    const confirmed = await showConfirm('Notiz löschen', 'Notiz wirklich löschen?')
+    if (!confirmed) return
 
     await supabase.from('notizen').delete().eq('id', notiz.id)
     onSave()
