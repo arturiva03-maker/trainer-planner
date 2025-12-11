@@ -4023,7 +4023,7 @@ function InvoiceModal({
 
     // Positionen als Text für E-Mail-Vorlage
     const positionenText = rechnungsPositionen.map(p =>
-      `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+      `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
     ).join('\n')
     const korrekturNum = parseFloat(korrekturBetrag) || 0
     const korrekturText = korrekturNum !== 0
@@ -4255,7 +4255,7 @@ function InvoiceModal({
                         {rechnungsPositionen.map((p, i) => (
                           <tr key={i} style={p.istMonatlich ? { background: 'var(--primary-light)' } : {}}>
                             <td>{p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-                            <td>{p.istMonatlich ? 'Monatsbeitrag' : p.zeit}</td>
+                            <td>{p.zeit}</td>
                             {verknuepfteSummaries.length > 0 && <td>{p.spielerName}</td>}
                             <td>{p.tarifName}{p.istMonatlich && <span style={{ fontSize: 10, marginLeft: 4, color: 'var(--primary)' }}>(mtl.)</span>}</td>
                             <td style={{ textAlign: 'right' }}>{p.brutto.toFixed(2)} €</td>
@@ -4547,7 +4547,7 @@ function InvoiceModal({
 
                   // Positionen als Text formatieren
                   const positionenText = rechnungsPositionen.map(p =>
-                    `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+                    `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
                   ).join('\n')
 
                   // Korrektur falls vorhanden
