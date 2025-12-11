@@ -3193,11 +3193,26 @@ function AbrechnungView({
             return { training: t, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }
           })
 
-        // Berechne gefilterte Summen
+        // Berechne gefilterte Summen mit korrektem Bezahlstatus (inkl. Vorauszahlung)
         const gefilterteSumme = trainingsDetail.reduce((sum, t) => sum + t.betrag, 0)
-        const gefilterteBarSumme = trainingsDetail.filter(t => t.training.bar_bezahlt).reduce((sum, t) => sum + t.betrag, 0)
-        const gefilterteBezahltSumme = trainingsDetail.filter(t => t.training.bezahlt && !t.training.bar_bezahlt).reduce((sum, t) => sum + t.betrag, 0)
-        const gefilterteOffeneSumme = trainingsDetail.filter(t => !t.training.bezahlt && !t.training.bar_bezahlt).reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteBarSumme = trainingsDetail.filter(t => {
+          const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
+          return ps.barBezahlt
+        }).reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteVorauszahlungSumme = trainingsDetail.filter(t => {
+          const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
+          const va = istVorauszahlungAktiv(detail.spieler.id, t.training)
+          return !ps.barBezahlt && !ps.bezahlt && va
+        }).reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteBezahltSumme = trainingsDetail.filter(t => {
+          const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
+          return ps.bezahlt && !ps.barBezahlt
+        }).reduce((sum, t) => sum + t.betrag, 0)
+        const gefilterteOffeneSumme = trainingsDetail.filter(t => {
+          const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
+          const va = istVorauszahlungAktiv(detail.spieler.id, t.training)
+          return !ps.bezahlt && !ps.barBezahlt && !va
+        }).reduce((sum, t) => sum + t.betrag, 0)
 
         return (
           <div className="modal-overlay" onClick={() => setSelectedSpielerDetail(null)}>
@@ -3217,6 +3232,11 @@ function AbrechnungView({
                   {gefilterteBarSumme > 0 && (
                     <div style={{ color: 'var(--warning)' }}>
                       <strong>Bar:</strong> {gefilterteBarSumme.toFixed(2)} €
+                    </div>
+                  )}
+                  {gefilterteVorauszahlungSumme > 0 && (
+                    <div style={{ color: 'var(--primary)' }}>
+                      <strong>Vorausbez.:</strong> {gefilterteVorauszahlungSumme.toFixed(2)} €
                     </div>
                   )}
                   {gefilterteBezahltSumme > 0 && (
