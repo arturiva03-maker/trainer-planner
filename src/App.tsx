@@ -4424,7 +4424,7 @@ function InvoiceModal({
               {/* E-Mail-Vorlage Auswahl - nur anzeigen wenn eigene Vorlagen existieren */}
               {emailVorlagen.length > 0 && (
                 <div className="form-group" style={{ marginTop: 16 }}>
-                  <label>E-Mail-Vorlage</label>
+                  <label>Vorlage (E-Mail & PDF)</label>
                   <select
                     className="form-control"
                     value={selectedVorlageId}
@@ -4433,10 +4433,15 @@ function InvoiceModal({
                     <option value="">Standard-Vorlage</option>
                     {emailVorlagen.map(v => (
                       <option key={v.id} value={v.id}>
-                        {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
+                        {v.name} {v.ist_standard ? '(bevorzugt)' : ''} {v.pdf_vorlage ? '📄' : ''}
                       </option>
                     ))}
                   </select>
+                  {selectedVorlageId && !emailVorlagen.find(v => v.id === selectedVorlageId)?.pdf_vorlage && (
+                    <small style={{ color: '#f59e0b', marginTop: 4, display: 'block' }}>
+                      Diese Vorlage hat keine eigene PDF-Vorlage - es wird das Standard-PDF verwendet.
+                    </small>
+                  )}
                 </div>
               )}
 
