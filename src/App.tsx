@@ -29,6 +29,7 @@ import {
   calculateDuration,
   generateRechnungsnummer,
   WOCHENTAGE,
+  WOCHENTAGE_LANG,
   formatMonthGerman,
   formatQuartal
 } from './utils'
@@ -2156,6 +2157,7 @@ function AbrechnungView({
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
   const [filterType, setFilterType] = useState<'keine' | 'spieler' | 'tag'>('keine')
   const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
+  const [spielerSuche, setSpielerSuche] = useState('')
   const [selectedTag, setSelectedTag] = useState<string>('')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showManuelleRechnungModal, setShowManuelleRechnungModal] = useState(false)
@@ -2819,19 +2821,79 @@ function AbrechnungView({
                 <option value="tag">Nach Tag</option>
               </select>
               {filterType === 'spieler' && (
-                <select
-                  className="form-control"
-                  value={selectedSpielerId}
-                  onChange={(e) => setSelectedSpielerId(e.target.value)}
-                  style={{ width: 'auto', minWidth: 150 }}
-                >
-                  <option value="">Spieler wählen...</option>
-                  {spielerSummary.map(s => (
-                    <option key={s.spieler.id} value={s.spieler.id}>
-                      {s.spieler.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Spieler suchen..."
+                    value={spielerSuche}
+                    onChange={(e) => {
+                      setSpielerSuche(e.target.value)
+                      if (!e.target.value) setSelectedSpielerId('')
+                    }}
+                    style={{ width: 'auto', minWidth: 180 }}
+                  />
+                  {spielerSuche && !selectedSpielerId && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'white',
+                      border: '1px solid var(--gray-200)',
+                      borderRadius: 8,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 1000,
+                      maxHeight: 200,
+                      overflowY: 'auto'
+                    }}>
+                      {spielerSummary
+                        .filter(s => s.spieler.name.toLowerCase().includes(spielerSuche.toLowerCase()))
+                        .map(s => (
+                          <div
+                            key={s.spieler.id}
+                            onClick={() => {
+                              setSelectedSpielerId(s.spieler.id)
+                              setSpielerSuche(s.spieler.name)
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid var(--gray-100)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-50)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                          >
+                            {s.spieler.name}
+                          </div>
+                        ))}
+                      {spielerSummary.filter(s => s.spieler.name.toLowerCase().includes(spielerSuche.toLowerCase())).length === 0 && (
+                        <div style={{ padding: '8px 12px', color: 'var(--gray-500)' }}>Kein Spieler gefunden</div>
+                      )}
+                    </div>
+                  )}
+                  {selectedSpielerId && (
+                    <button
+                      onClick={() => {
+                        setSelectedSpielerId('')
+                        setSpielerSuche('')
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--gray-500)',
+                        fontSize: 16
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               )}
               {filterType === 'tag' && (
                 <select
@@ -3365,6 +3427,10 @@ function AbrechnungView({
                     const erstes = allSerienTrainings.sort((a, b) => a.datum.localeCompare(b.datum))[0]
                     const letztes = allSerienTrainings.sort((a, b) => b.datum.localeCompare(a.datum))[0]
 
+                    // Wochentag und Uhrzeit aus dem ersten Training der Serie
+                    const wochentag = erstes ? WOCHENTAGE_LANG[(new Date(erstes.datum).getDay() + 6) % 7] : ''
+                    const uhrzeit = erstes ? `${erstes.uhrzeit_von} - ${erstes.uhrzeit_bis}` : ''
+
                     return (
                       <div key={serieId} style={{
                         marginTop: 12,
@@ -3376,7 +3442,7 @@ function AbrechnungView({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <strong style={{ color: vorauszahlung ? 'var(--primary)' : undefined }}>
-                              Saisonvorauszahlung
+                              Saisonvorauszahlung {wochentag && uhrzeit ? `(${wochentag} ${uhrzeit})` : ''}
                             </strong>
                             <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
                               Serie: {erstes && letztes ? `${formatDateGerman(erstes.datum)} - ${formatDateGerman(letztes.datum)}` : 'Wiederkehrend'}
