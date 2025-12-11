@@ -3934,6 +3934,11 @@ function InvoiceModal({
   const generatePDF = () => {
     const hatMehrereSpieler = verknuepfteSummaries.length > 0
 
+    // Monat formatieren
+    const [year, month] = selectedMonth.split('-')
+    const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+    const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
+
     // Erstelle Tabellenzeilen für jede Position
     const positionenHtml = rechnungsPositionen.map((p) => `
       <tr>
@@ -3960,109 +3965,194 @@ function InvoiceModal({
       </tr>
     ` : ''
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Rechnung ${rechnungsnummer}</title>
-        <style>
-          body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
-          h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
-          .section { margin-bottom: 20px; }
-          .flex { display: flex; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background: #f5f5f5; font-size: 11px; }
-          .total { text-align: right; margin-top: 20px; }
-          .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
-          .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
-          .footer { margin-top: 40px; }
-          @media print {
-            body { padding: 20px; margin: 0; }
-            @page {
-              size: A4;
-              margin: 15mm;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>RECHNUNG</h1>
-
-        <div class="flex">
-          <div class="section">
-            <strong>Rechnungssteller:</strong><br>
-            ${rechnungsstellerName}<br>
-            ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
-            ${ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''}
-          </div>
-          <div class="section" style="text-align: right;">
-            <strong>Rechnungsempfänger:</strong><br>
-            ${rechnungsempfaengerName}<br>
-            ${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}
-          </div>
-        </div>
-
-        <div class="section">
-          <strong>Rechnungsnummer:</strong> ${rechnungsnummer}<br>
-          <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungsdatum)}<br>
-          <strong>Leistungszeitraum:</strong> ${selectedMonth}
-        </div>
-
-        <p>Sehr geehrte Damen und Herren,</p>
-        <p>für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Datum</th>
-              <th>Zeit</th>
-              <th>Dauer</th>
-              ${hatMehrereSpieler ? '<th>Spieler</th>' : ''}
-              <th>Tarif</th>
-              <th style="text-align: right">Netto</th>
-              ${!kleinunternehmer ? '<th style="text-align: right">USt</th>' : ''}
-              <th style="text-align: right">Brutto</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${positionenHtml}
-            ${korrekturHtml}
-          </tbody>
-        </table>
-
-        <div class="total">
-          <div class="total-row">
-            <span>Nettobetrag:</span>
-            <span>${summen.gesamtNetto.toFixed(2)} €</span>
-          </div>
-          ${!kleinunternehmer ? `
-          <div class="total-row">
-            <span>USt (19%):</span>
-            <span>${summen.gesamtUst.toFixed(2)} €</span>
-          </div>
-          ` : ''}
-          <div class="total-row highlight">
-            <span>Gesamtbetrag:</span>
-            <span>${summen.gesamtBrutto.toFixed(2)} €</span>
-          </div>
-        </div>
-
-        ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
-
-        <div class="footer">
-          <p>Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
-          <p>
-            <strong>IBAN:</strong> ${iban}<br>
-            <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
-          </p>
-          <p>Vielen Dank für die Zusammenarbeit.</p>
-          <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
-        </div>
-      </body>
-      </html>
+    // Positionen-Tabelle als HTML
+    const positionenTabelle = `
+      <table>
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Zeit</th>
+            <th>Dauer</th>
+            ${hatMehrereSpieler ? '<th>Spieler</th>' : ''}
+            <th>Tarif</th>
+            <th style="text-align: right">Netto</th>
+            ${!kleinunternehmer ? '<th style="text-align: right">USt</th>' : ''}
+            <th style="text-align: right">Brutto</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${positionenHtml}
+          ${korrekturHtml}
+        </tbody>
+      </table>
     `
+
+    // Summen-Block als HTML
+    const summenBlock = `
+      <div class="total">
+        <div class="total-row">
+          <span>Nettobetrag:</span>
+          <span>${summen.gesamtNetto.toFixed(2)} €</span>
+        </div>
+        ${!kleinunternehmer ? `
+        <div class="total-row">
+          <span>USt (19%):</span>
+          <span>${summen.gesamtUst.toFixed(2)} €</span>
+        </div>
+        ` : ''}
+        <div class="total-row highlight">
+          <span>Gesamtbetrag:</span>
+          <span>${summen.gesamtBrutto.toFixed(2)} €</span>
+        </div>
+      </div>
+    `
+
+    // Positionen als Text für E-Mail-Vorlage
+    const positionenText = rechnungsPositionen.map(p =>
+      `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+    ).join('\n')
+    const korrekturNum = parseFloat(korrekturBetrag) || 0
+    const korrekturText = korrekturNum !== 0
+      ? `\nKorrektur: ${korrekturNum > 0 ? '+' : ''}${korrekturNum.toFixed(2)} €`
+      : ''
+
+    // Platzhalter-Werte für PDF
+    const platzhalterWerte: Record<string, string> = {
+      '{{spieler_name}}': selectedSummary?.spieler.name || '',
+      '{{rechnungsnummer}}': rechnungsnummer,
+      '{{rechnungsdatum}}': formatDateGerman(rechnungsdatum),
+      '{{monat}}': monatFormatiert,
+      '{{positionen}}': positionenText + korrekturText,
+      '{{positionen_tabelle}}': positionenTabelle,
+      '{{netto}}': `${summen.gesamtNetto.toFixed(2)} €`,
+      '{{ust}}': `${summen.gesamtUst.toFixed(2)} €`,
+      '{{brutto}}': `${summen.gesamtBrutto.toFixed(2)} €`,
+      '{{iban}}': iban,
+      '{{trainer_name}}': rechnungsstellerName,
+      '{{trainer_adresse}}': rechnungsstellerAdresse,
+      '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+      '{{empfaenger_name}}': rechnungsempfaengerName,
+      '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
+      '{{empfaenger_adresse_html}}': rechnungsempfaengerAdresse.replace(/\n/g, '<br>'),
+      '{{kleinunternehmer_hinweis}}': kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : '',
+      '{{ust_zeile}}': !kleinunternehmer ? `Nettobetrag: ${summen.gesamtNetto.toFixed(2)} €<br>USt (19%): ${summen.gesamtUst.toFixed(2)} €` : '',
+      '{{summen_block}}': summenBlock,
+    }
+
+    // Funktion zum Ersetzen der Platzhalter
+    const ersetzePlatzhalter = (text: string): string => {
+      let result = text
+      for (const [key, value] of Object.entries(platzhalterWerte)) {
+        result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+      }
+      return result
+    }
+
+    // Vorlage verwenden wenn vorhanden und PDF-Vorlage definiert
+    const selectedVorlage = emailVorlagen.find(v => v.id === selectedVorlageId)
+
+    let html: string
+
+    if (selectedVorlage?.pdf_vorlage) {
+      // Eigene PDF-Vorlage mit Platzhaltern verwenden
+      const pdfBody = ersetzePlatzhalter(selectedVorlage.pdf_vorlage)
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Rechnung ${rechnungsnummer}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+            h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+            .section { margin-bottom: 20px; }
+            .flex { display: flex; justify-content: space-between; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; font-size: 11px; }
+            .total { text-align: right; margin-top: 20px; }
+            .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+            .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
+            .footer { margin-top: 40px; }
+            @media print {
+              body { padding: 20px; margin: 0; }
+              @page { size: A4; margin: 15mm; }
+            }
+          </style>
+        </head>
+        <body>${pdfBody}</body>
+        </html>
+      `
+    } else {
+      // Standard PDF-Layout
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Rechnung ${rechnungsnummer}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+            h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+            .section { margin-bottom: 20px; }
+            .flex { display: flex; justify-content: space-between; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; font-size: 11px; }
+            .total { text-align: right; margin-top: 20px; }
+            .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+            .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
+            .footer { margin-top: 40px; }
+            @media print {
+              body { padding: 20px; margin: 0; }
+              @page { size: A4; margin: 15mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>RECHNUNG</h1>
+
+          <div class="flex">
+            <div class="section">
+              <strong>Rechnungssteller:</strong><br>
+              ${rechnungsstellerName}<br>
+              ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+              ${ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''}
+            </div>
+            <div class="section" style="text-align: right;">
+              <strong>Rechnungsempfänger:</strong><br>
+              ${rechnungsempfaengerName}<br>
+              ${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}
+            </div>
+          </div>
+
+          <div class="section">
+            <strong>Rechnungsnummer:</strong> ${rechnungsnummer}<br>
+            <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungsdatum)}<br>
+            <strong>Leistungszeitraum:</strong> ${monatFormatiert}
+          </div>
+
+          <p>Sehr geehrte Damen und Herren,</p>
+          <p>für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
+
+          ${positionenTabelle}
+          ${summenBlock}
+
+          ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+
+          <div class="footer">
+            <p>Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
+            <p>
+              <strong>IBAN:</strong> ${iban}<br>
+              <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
+            </p>
+            <p>Vielen Dank für die Zusammenarbeit.</p>
+            <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
+          </div>
+        </body>
+        </html>
+      `
+    }
 
     // Blob erstellen für saubere URL (ohne "about:blank")
     const blob = new Blob([html], { type: 'text/html' })
@@ -7238,8 +7328,10 @@ function EmailVorlageModal({
   const [name, setName] = useState(vorlage?.name || '')
   const [betreff, setBetreff] = useState(vorlage?.betreff || 'Rechnung {{rechnungsnummer}} - Tennisunterricht {{monat}}')
   const [inhalt, setInhalt] = useState(vorlage?.inhalt || getDefaultEmailInhalt())
+  const [pdfVorlage, setPdfVorlage] = useState(vorlage?.pdf_vorlage || '')
   const [istStandard, setIstStandard] = useState(vorlage?.ist_standard || vorlagen.length === 0)
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState<'email' | 'pdf'>('email')
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -7265,6 +7357,7 @@ function EmailVorlageModal({
           name: name.trim(),
           betreff: betreff.trim(),
           inhalt: inhalt,
+          pdf_vorlage: pdfVorlage || null,
           ist_standard: istStandard
         }).eq('id', vorlage.id)
       } else {
@@ -7273,6 +7366,7 @@ function EmailVorlageModal({
           name: name.trim(),
           betreff: betreff.trim(),
           inhalt: inhalt,
+          pdf_vorlage: pdfVorlage || null,
           ist_standard: istStandard
         })
       }
@@ -7294,8 +7388,20 @@ function EmailVorlageModal({
   }
 
   const insertPlatzhalter = (key: string) => {
-    setInhalt(prev => prev + key)
+    if (activeTab === 'email') {
+      setInhalt(prev => prev + key)
+    } else {
+      setPdfVorlage(prev => prev + key)
+    }
   }
+
+  // Nur E-Mail-relevante Platzhalter für E-Mail-Tab
+  const emailPlatzhalter = EMAIL_PLATZHALTER.filter(p =>
+    !p.key.includes('_tabelle') && !p.key.includes('_html') && !p.key.includes('_block')
+  )
+
+  // Alle Platzhalter für PDF (inkl. HTML-spezifische)
+  const pdfPlatzhalter = EMAIL_PLATZHALTER
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -7317,17 +7423,6 @@ function EmailVorlageModal({
           </div>
 
           <div className="form-group">
-            <label>E-Mail-Betreff *</label>
-            <input
-              type="text"
-              className="form-control"
-              value={betreff}
-              onChange={(e) => setBetreff(e.target.value)}
-              placeholder="Betreff der E-Mail"
-            />
-          </div>
-
-          <div className="form-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="checkbox"
@@ -7338,35 +7433,153 @@ function EmailVorlageModal({
             </label>
           </div>
 
-          <div className="form-group">
-            <label>Platzhalter einfügen:</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-              {EMAIL_PLATZHALTER.map(p => (
-                <button
-                  key={p.key}
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ fontSize: 10, padding: '2px 6px' }}
-                  onClick={() => insertPlatzhalter(p.key)}
-                  title={p.beschreibung}
-                >
-                  {p.key}
-                </button>
-              ))}
-            </div>
+          {/* Tab-Buttons */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '2px solid #e5e7eb' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('email')}
+              style={{
+                padding: '10px 20px',
+                border: 'none',
+                background: activeTab === 'email' ? '#ec4899' : 'transparent',
+                color: activeTab === 'email' ? 'white' : '#6b7280',
+                fontWeight: activeTab === 'email' ? 600 : 400,
+                cursor: 'pointer',
+                borderRadius: '8px 8px 0 0',
+                marginBottom: -2
+              }}
+            >
+              E-Mail-Vorlage
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('pdf')}
+              style={{
+                padding: '10px 20px',
+                border: 'none',
+                background: activeTab === 'pdf' ? '#ec4899' : 'transparent',
+                color: activeTab === 'pdf' ? 'white' : '#6b7280',
+                fontWeight: activeTab === 'pdf' ? 600 : 400,
+                cursor: 'pointer',
+                borderRadius: '8px 8px 0 0',
+                marginBottom: -2
+              }}
+            >
+              PDF-Vorlage
+            </button>
           </div>
 
-          <div className="form-group">
-            <label>E-Mail-Inhalt *</label>
-            <textarea
-              className="form-control"
-              value={inhalt}
-              onChange={(e) => setInhalt(e.target.value)}
-              rows={15}
-              style={{ fontFamily: 'monospace', fontSize: 12 }}
-              placeholder="E-Mail-Text mit Platzhaltern..."
-            />
-          </div>
+          {/* E-Mail Tab */}
+          {activeTab === 'email' && (
+            <>
+              <div className="form-group">
+                <label>E-Mail-Betreff *</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={betreff}
+                  onChange={(e) => setBetreff(e.target.value)}
+                  placeholder="Betreff der E-Mail"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Platzhalter einfügen:</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                  {emailPlatzhalter.map(p => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ fontSize: 10, padding: '2px 6px' }}
+                      onClick={() => insertPlatzhalter(p.key)}
+                      title={p.beschreibung}
+                    >
+                      {p.key}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>E-Mail-Inhalt *</label>
+                <textarea
+                  className="form-control"
+                  value={inhalt}
+                  onChange={(e) => setInhalt(e.target.value)}
+                  rows={12}
+                  style={{ fontFamily: 'monospace', fontSize: 12 }}
+                  placeholder="E-Mail-Text mit Platzhaltern..."
+                />
+              </div>
+            </>
+          )}
+
+          {/* PDF Tab */}
+          {activeTab === 'pdf' && (
+            <>
+              <div className="form-group">
+                <div style={{
+                  background: '#fef3c7',
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 12,
+                  fontSize: 13
+                }}>
+                  <strong>Hinweis:</strong> Die PDF-Vorlage ist optional. Wenn leer, wird das Standard-PDF-Layout verwendet.
+                  Hier kannst du ein eigenes HTML-Layout für das PDF definieren. Nutze die HTML-spezifischen Platzhalter wie
+                  <code style={{ background: '#e5e7eb', padding: '2px 4px', borderRadius: 4, margin: '0 4px' }}>{'{{positionen_tabelle}}'}</code>
+                  und
+                  <code style={{ background: '#e5e7eb', padding: '2px 4px', borderRadius: 4, margin: '0 4px' }}>{'{{summen_block}}'}</code>
+                  für formatierte Tabellen.
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Platzhalter einfügen:</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                  {pdfPlatzhalter.map(p => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      className="btn btn-sm"
+                      style={{
+                        fontSize: 10,
+                        padding: '2px 6px',
+                        background: p.key.includes('_tabelle') || p.key.includes('_html') || p.key.includes('_block')
+                          ? '#dbeafe' : undefined
+                      }}
+                      onClick={() => insertPlatzhalter(p.key)}
+                      title={p.beschreibung}
+                    >
+                      {p.key}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>PDF HTML-Vorlage (optional)</label>
+                <textarea
+                  className="form-control"
+                  value={pdfVorlage}
+                  onChange={(e) => setPdfVorlage(e.target.value)}
+                  rows={12}
+                  style={{ fontFamily: 'monospace', fontSize: 11 }}
+                  placeholder={`<div style="font-family: Arial; padding: 20px;">
+  <h1>RECHNUNG</h1>
+  <p>Rechnungsnummer: {{rechnungsnummer}}</p>
+
+  {{positionen_tabelle}}
+
+  {{summen_block}}
+
+  <p>{{kleinunternehmer_hinweis}}</p>
+</div>`}
+                />
+              </div>
+            </>
+          )}
         </div>
         <div className="modal-footer">
           {vorlage && (
