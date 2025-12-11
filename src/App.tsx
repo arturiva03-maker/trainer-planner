@@ -3885,7 +3885,7 @@ function InvoiceModal({
         const letzterTag = new Date(year, month, 0) // Letzter Tag des Monats
         const formatTag = (d: Date) => `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`
         anzeigedatum = `${formatTag(ersterTag)} - ${formatTag(letzterTag)}`
-        anzeigezeit = '–'
+        // Zeit beibehalten (Trainingszeit anzeigen)
       }
 
       return {
