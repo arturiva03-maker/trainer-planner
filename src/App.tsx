@@ -3845,9 +3845,23 @@ function InvoiceModal({
         brutto = netto + ust
       }
 
+      // Bei monatlichem Tarif: Zeitraum statt einzelnes Datum
+      let anzeigedatum = t.datum
+      let anzeigezeit = `${t.uhrzeit_von} - ${t.uhrzeit_bis}`
+
+      if (istMonatlich && istMonatlicheSerieErstesTraining) {
+        // Ermittle den Monatszeitraum aus selectedMonth (Format: YYYY-MM)
+        const [year, month] = selectedMonth.split('-').map(Number)
+        const ersterTag = new Date(year, month - 1, 1)
+        const letzterTag = new Date(year, month, 0) // Letzter Tag des Monats
+        const formatTag = (d: Date) => `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`
+        anzeigedatum = `${formatTag(ersterTag)} - ${formatTag(letzterTag)}`
+        anzeigezeit = '–'
+      }
+
       return {
-        datum: t.datum,
-        zeit: `${t.uhrzeit_von} - ${t.uhrzeit_bis}`,
+        datum: anzeigedatum,
+        zeit: anzeigezeit,
         dauer: duration,
         tarifName: tarif?.name || 'Unbekannt',
         spielerName,
@@ -3860,7 +3874,7 @@ function InvoiceModal({
         istMonatlicheSerieErstesTraining
       }
     }).filter(p => p.brutto !== 0 || p.netto !== 0) // Entferne 0€-Positionen (außer dem ersten monatlichen Training)
-  }, [selectedSummary, verknuepfteSummaries, tarife, kleinunternehmer])
+  }, [selectedSummary, verknuepfteSummaries, tarife, kleinunternehmer, selectedMonth])
 
   // Berechne Gesamtsummen inkl. Korrektur
   const summen = useMemo(() => {
@@ -3908,7 +3922,7 @@ function InvoiceModal({
     // Erstelle Tabellenzeilen für jede Position
     const positionenHtml = rechnungsPositionen.map((p) => `
       <tr>
-        <td>${formatDateGerman(p.datum)}</td>
+        <td>${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
         <td>${p.zeit}</td>
         <td>${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
         ${hatMehrereSpieler ? `<td>${p.spielerName}</td>` : ''}
@@ -4121,7 +4135,7 @@ function InvoiceModal({
                       <tbody>
                         {rechnungsPositionen.map((p, i) => (
                           <tr key={i} style={p.istMonatlich ? { background: 'var(--primary-light)' } : {}}>
-                            <td>{formatDateGerman(p.datum)}</td>
+                            <td>{p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
                             <td>{p.istMonatlich ? 'Monatsbeitrag' : p.zeit}</td>
                             {verknuepfteSummaries.length > 0 && <td>{p.spielerName}</td>}
                             <td>{p.tarifName}{p.istMonatlich && <span style={{ fontSize: 10, marginLeft: 4, color: 'var(--primary)' }}>(mtl.)</span>}</td>
@@ -4377,7 +4391,7 @@ function InvoiceModal({
 
                   // Positionen als Text formatieren
                   const positionenText = rechnungsPositionen.map(p =>
-                    `${formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
+                    `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
                   ).join('\n')
 
                   // Korrektur falls vorhanden
