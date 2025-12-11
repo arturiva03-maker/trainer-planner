@@ -3245,13 +3245,17 @@ function AbrechnungView({
                     <tbody>
                       {trainingsDetail.map(({ training, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }) => {
                         const istMonatlich = abrechnungsart === 'monatlich'
+                        const vorauszahlungRow = istVorauszahlungAktiv(detail.spieler.id, training)
+                        const paymentStatusRow = getSpielerPaymentStatus(detail.spieler.id, training)
                         return (
                           <tr
                             key={training.id}
                             style={{
-                              ...(training.bar_bezahlt
+                              ...(paymentStatusRow.barBezahlt
                                 ? { background: 'var(--warning-light)' }
-                                : training.bezahlt
+                                : vorauszahlungRow
+                                ? { background: 'var(--primary-light)' }
+                                : paymentStatusRow.bezahlt
                                 ? { background: 'var(--success-light)' }
                                 : {}),
                               ...(istMonatlich && !istMonatlicheSerieErstesTraining ? { opacity: 0.6 } : {})
@@ -3302,32 +3306,30 @@ function AbrechnungView({
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               {(() => {
-                                const vorauszahlung = istVorauszahlungAktiv(detail.spieler.id, training)
-                                const paymentStatus = getSpielerPaymentStatus(detail.spieler.id, training)
-                                if (paymentStatus.barBezahlt) {
+                                if (paymentStatusRow.barBezahlt) {
                                   return (
                                     <span className="status-badge" style={{ background: 'var(--warning)', color: '#000', fontSize: 11 }}>
                                       Bar
                                     </span>
                                   )
-                                } else if (vorauszahlung) {
+                                } else if (vorauszahlungRow) {
                                   return (
                                     <span className="status-badge" style={{ background: 'var(--primary)', color: '#fff', fontSize: 11 }}
-                                          title={`Vorauszahlung vom ${formatDateGerman(vorauszahlung.zahlungsdatum)}`}>
+                                          title={`Vorauszahlung vom ${formatDateGerman(vorauszahlungRow.zahlungsdatum)}`}>
                                       Vorausbez.
                                     </span>
                                   )
                                 } else {
                                   return (
                                     <button
-                                      className={`btn btn-sm ${paymentStatus.bezahlt ? 'btn-success' : 'btn-secondary'}`}
+                                      className={`btn btn-sm ${paymentStatusRow.bezahlt ? 'btn-success' : 'btn-secondary'}`}
                                       style={{ fontSize: 11, padding: '2px 8px' }}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatus.bezahlt)
+                                        toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatusRow.bezahlt)
                                       }}
                                     >
-                                      {paymentStatus.bezahlt ? 'Bezahlt' : 'Offen'}
+                                      {paymentStatusRow.bezahlt ? 'Bezahlt' : 'Offen'}
                                     </button>
                                   )
                                 }
