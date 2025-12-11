@@ -5630,7 +5630,7 @@ function BuchhaltungView({
           netto,
           ust,
           ustSatz,
-          barBezahlt: t.bar_bezahlt,
+          barBezahlt: paymentStatus.barBezahlt,
           korrektur: t.korrektur_betrag || 0,
           korrekturGrund: t.korrektur_grund,
           istMonatlich: abrechnungsart === 'monatlich'
