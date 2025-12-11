@@ -3932,108 +3932,33 @@ function InvoiceModal({
   }, [selectedSpielerId, spieler])
 
   const generatePDF = () => {
-    // Monat formatieren
-    const [year, month] = selectedMonth.split('-')
-    const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
-    const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
+    const hatMehrereSpieler = verknuepfteSummaries.length > 0
 
-    // Positionen als Text formatieren
-    const positionenText = rechnungsPositionen.map(p =>
-      `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.istMonatlich ? 'Monatsbeitrag' : p.zeit} | ${p.istMonatlich ? 'mtl.' : `${p.dauer.toFixed(1)} Std.`} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
-    ).join('\n')
+    // Erstelle Tabellenzeilen für jede Position
+    const positionenHtml = rechnungsPositionen.map((p) => `
+      <tr>
+        <td>${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td>${p.zeit}</td>
+        <td>${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td>${p.spielerName}</td>` : ''}
+        <td>${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="text-align: right">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="text-align: right">${p.brutto.toFixed(2)} €</td>
+      </tr>
+    `).join('')
 
-    // Korrektur falls vorhanden
-    const korrekturNum = parseFloat(korrekturBetrag) || 0
-    const korrekturText = korrekturNum !== 0
-      ? `\nKorrektur: ${korrekturNum > 0 ? '+' : ''}${korrekturNum.toFixed(2)} €`
-      : ''
-
-    // Platzhalter-Werte definieren (gleich wie bei E-Mail)
-    const platzhalterWerte: Record<string, string> = {
-      '{{spieler_name}}': selectedSummary?.spieler.name || '',
-      '{{rechnungsnummer}}': rechnungsnummer,
-      '{{rechnungsdatum}}': formatDateGerman(rechnungsdatum),
-      '{{monat}}': monatFormatiert,
-      '{{positionen}}': positionenText + korrekturText,
-      '{{netto}}': `${summen.gesamtNetto.toFixed(2)} €`,
-      '{{ust}}': `${summen.gesamtUst.toFixed(2)} €`,
-      '{{brutto}}': `${summen.gesamtBrutto.toFixed(2)} €`,
-      '{{iban}}': iban,
-      '{{trainer_name}}': rechnungsstellerName,
-      '{{trainer_adresse}}': rechnungsstellerAdresse + (ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''),
-      '{{empfaenger_name}}': rechnungsempfaengerName,
-      '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
-      '{{kleinunternehmer_hinweis}}': kleinunternehmer ? 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.' : '',
-      '{{ust_zeile}}': !kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €\nUSt (19%):     ${summen.gesamtUst.toFixed(2)} €` : '',
-    }
-
-    // Funktion zum Ersetzen der Platzhalter
-    const ersetzePlatzhalter = (text: string): string => {
-      let result = text
-      for (const [key, value] of Object.entries(platzhalterWerte)) {
-        result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
-      }
-      return result
-    }
-
-    // Vorlage verwenden wenn vorhanden
-    const selectedVorlage = emailVorlagen.find(v => v.id === selectedVorlageId)
-
-    let pdfContent: string
-
-    if (selectedVorlage) {
-      // Vorlage mit Platzhaltern verwenden
-      pdfContent = ersetzePlatzhalter(selectedVorlage.inhalt)
-    } else {
-      // Standard-Text (Fallback wenn keine Vorlage)
-      pdfContent = `══════════════════════════════════════
-           R E C H N U N G
-══════════════════════════════════════
-
-Rechnungssteller:
-${rechnungsstellerName}
-${rechnungsstellerAdresse}${ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''}
-
-Rechnungsempfänger:
-${rechnungsempfaengerName}
-${rechnungsempfaengerAdresse}
-
-──────────────────────────────────────
-Rechnungsnummer: ${rechnungsnummer}
-Rechnungsdatum:  ${formatDateGerman(rechnungsdatum)}
-Leistungszeitraum: ${monatFormatiert}
-──────────────────────────────────────
-
-Positionen:
-${positionenText}${korrekturText}
-
-──────────────────────────────────────
-${!kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €
-USt (19%):     ${summen.gesamtUst.toFixed(2)} €
-` : ''}
-  ►►► GESAMTBETRAG:  ${summen.gesamtBrutto.toFixed(2)} € ◄◄◄
-
-──────────────────────────────────────
-${kleinunternehmer ? '\nGemäß §19 UStG wird keine Umsatzsteuer berechnet.\n' : ''}
-Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf:
-IBAN: ${iban}
-Kontoinhaber: ${rechnungsstellerName}
-
-Vielen Dank für die Zusammenarbeit!
-
-Mit freundlichen Grüßen
-${rechnungsstellerName}
-
-⚠️ Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
-══════════════════════════════════════`
-    }
-
-    // Text in HTML umwandeln (Zeilenumbrüche, Sonderzeichen)
-    const htmlContent = pdfContent
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n/g, '<br>')
+    // Korrekturzeile falls vorhanden
+    const korrekturColSpan = hatMehrereSpieler ? 4 : 3
+    const korrekturHtml = summen.korrektur !== 0 ? `
+      <tr style="background: ${summen.korrektur < 0 ? '#fee2e2' : '#dcfce7'}">
+        <td colspan="${korrekturColSpan}"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td><em>Korrektur</em></td>
+        <td style="text-align: right">${summen.korrekturNetto >= 0 ? '' : ''}${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="text-align: right">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="text-align: right">${summen.korrektur >= 0 ? '' : ''}${summen.korrektur.toFixed(2)} €</td>
+      </tr>
+    ` : ''
 
     const html = `
       <!DOCTYPE html>
@@ -4042,13 +3967,17 @@ ${rechnungsstellerName}
         <meta charset="utf-8">
         <title>Rechnung ${rechnungsnummer}</title>
         <style>
-          body {
-            font-family: 'Courier New', Consolas, monospace;
-            padding: 40px;
-            line-height: 1.4;
-            font-size: 12px;
-            white-space: pre-wrap;
-          }
+          body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+          h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+          .section { margin-bottom: 20px; }
+          .flex { display: flex; justify-content: space-between; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background: #f5f5f5; font-size: 11px; }
+          .total { text-align: right; margin-top: 20px; }
+          .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+          .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
+          .footer { margin-top: 40px; }
           @media print {
             body { padding: 20px; margin: 0; }
             @page {
@@ -4058,7 +3987,80 @@ ${rechnungsstellerName}
           }
         </style>
       </head>
-      <body>${htmlContent}</body>
+      <body>
+        <h1>RECHNUNG</h1>
+
+        <div class="flex">
+          <div class="section">
+            <strong>Rechnungssteller:</strong><br>
+            ${rechnungsstellerName}<br>
+            ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+            ${ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''}
+          </div>
+          <div class="section" style="text-align: right;">
+            <strong>Rechnungsempfänger:</strong><br>
+            ${rechnungsempfaengerName}<br>
+            ${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}
+          </div>
+        </div>
+
+        <div class="section">
+          <strong>Rechnungsnummer:</strong> ${rechnungsnummer}<br>
+          <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungsdatum)}<br>
+          <strong>Leistungszeitraum:</strong> ${selectedMonth}
+        </div>
+
+        <p>Sehr geehrte Damen und Herren,</p>
+        <p>für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Zeit</th>
+              <th>Dauer</th>
+              ${hatMehrereSpieler ? '<th>Spieler</th>' : ''}
+              <th>Tarif</th>
+              <th style="text-align: right">Netto</th>
+              ${!kleinunternehmer ? '<th style="text-align: right">USt</th>' : ''}
+              <th style="text-align: right">Brutto</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${positionenHtml}
+            ${korrekturHtml}
+          </tbody>
+        </table>
+
+        <div class="total">
+          <div class="total-row">
+            <span>Nettobetrag:</span>
+            <span>${summen.gesamtNetto.toFixed(2)} €</span>
+          </div>
+          ${!kleinunternehmer ? `
+          <div class="total-row">
+            <span>USt (19%):</span>
+            <span>${summen.gesamtUst.toFixed(2)} €</span>
+          </div>
+          ` : ''}
+          <div class="total-row highlight">
+            <span>Gesamtbetrag:</span>
+            <span>${summen.gesamtBrutto.toFixed(2)} €</span>
+          </div>
+        </div>
+
+        ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+
+        <div class="footer">
+          <p>Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
+          <p>
+            <strong>IBAN:</strong> ${iban}<br>
+            <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
+          </p>
+          <p>Vielen Dank für die Zusammenarbeit.</p>
+          <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
+        </div>
+      </body>
       </html>
     `
 
