@@ -6937,10 +6937,21 @@ function AusgabeModal({
 
   // Bestehenden Beleg laden
   useEffect(() => {
-    if (ausgabe?.beleg_path) {
-      const { data } = supabase.storage.from('belege').getPublicUrl(ausgabe.beleg_path)
-      setExistingBelegUrl(data.publicUrl)
+    const loadBelegUrl = async () => {
+      if (ausgabe?.beleg_path) {
+        try {
+          const { data, error } = await supabase.storage
+            .from('belege')
+            .createSignedUrl(ausgabe.beleg_path, 3600) // 1 Stunde gültig
+          if (data && !error) {
+            setExistingBelegUrl(data.signedUrl)
+          }
+        } catch (err) {
+          console.error('Error loading beleg URL:', err)
+        }
+      }
     }
+    loadBelegUrl()
   }, [ausgabe?.beleg_path])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
