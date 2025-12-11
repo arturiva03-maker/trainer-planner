@@ -569,6 +569,7 @@ function MainApp({ user }: { user: User }) {
                 spieler={spieler}
                 ausgaben={ausgaben}
                 manuelleRechnungen={manuelleRechnungen}
+                adjustments={adjustments}
                 profile={profile}
                 onUpdate={loadAllData}
                 userId={user.id}
@@ -2096,6 +2097,10 @@ function AbrechnungView({
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showManuelleRechnungModal, setShowManuelleRechnungModal] = useState(false)
   const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
+  const [showKorrekturModal, setShowKorrekturModal] = useState<string | null>(null)
+  const [korrekturBetrag, setKorrekturBetrag] = useState('')
+  const [korrekturGrund, setKorrekturGrund] = useState('')
+  const [korrekturSaving, setKorrekturSaving] = useState(false)
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -2336,6 +2341,90 @@ function AbrechnungView({
         .eq('id', rechnungId)
     }
     onUpdate()
+  }
+
+  // Korrektur speichern oder aktualisieren
+  const saveKorrektur = async (spielerId: string) => {
+    setKorrekturSaving(true)
+    try {
+      const betrag = parseFloat(korrekturBetrag.replace(',', '.'))
+      if (isNaN(betrag)) {
+        alert('Bitte gültigen Betrag eingeben')
+        return
+      }
+
+      // Prüfen ob bereits eine Korrektur existiert
+      const existingAdjustment = adjustments.find(
+        a => a.spieler_id === spielerId && a.monat === selectedMonth
+      )
+
+      if (existingAdjustment) {
+        // Update
+        await supabase
+          .from('monthly_adjustments')
+          .update({
+            betrag,
+            grund: korrekturGrund || null
+          })
+          .eq('id', existingAdjustment.id)
+      } else {
+        // Insert
+        await supabase
+          .from('monthly_adjustments')
+          .insert({
+            user_id: userId,
+            spieler_id: spielerId,
+            monat: selectedMonth,
+            betrag,
+            grund: korrekturGrund || null
+          })
+      }
+
+      setShowKorrekturModal(null)
+      setKorrekturBetrag('')
+      setKorrekturGrund('')
+      onUpdate()
+    } catch (error) {
+      console.error('Fehler beim Speichern der Korrektur:', error)
+      alert('Fehler beim Speichern')
+    } finally {
+      setKorrekturSaving(false)
+    }
+  }
+
+  // Korrektur löschen
+  const deleteKorrektur = async (spielerId: string) => {
+    const existingAdjustment = adjustments.find(
+      a => a.spieler_id === spielerId && a.monat === selectedMonth
+    )
+    if (!existingAdjustment) return
+
+    if (!confirm('Korrektur wirklich löschen?')) return
+
+    await supabase
+      .from('monthly_adjustments')
+      .delete()
+      .eq('id', existingAdjustment.id)
+
+    setShowKorrekturModal(null)
+    setKorrekturBetrag('')
+    setKorrekturGrund('')
+    onUpdate()
+  }
+
+  // Modal für Korrektur öffnen
+  const openKorrekturModal = (spielerId: string) => {
+    const existingAdjustment = adjustments.find(
+      a => a.spieler_id === spielerId && a.monat === selectedMonth
+    )
+    if (existingAdjustment) {
+      setKorrekturBetrag(existingAdjustment.betrag.toString())
+      setKorrekturGrund(existingAdjustment.grund || '')
+    } else {
+      setKorrekturBetrag('')
+      setKorrekturGrund('')
+    }
+    setShowKorrekturModal(spielerId)
   }
 
   // Manuelle Rechnung löschen
@@ -2796,12 +2885,62 @@ function AbrechnungView({
                     </tbody>
                     <tfoot>
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
-                        <td colSpan={4}>Summe</td>
+                        <td colSpan={4}>Summe Trainings</td>
                         <td style={{ textAlign: 'right' }}>{gefilterteSumme.toFixed(2)} €</td>
                       </tr>
+                      {detail.adjustment !== 0 && (
+                        <tr style={{
+                          fontWeight: 'bold',
+                          background: detail.adjustment < 0 ? 'var(--success-light)' : 'var(--warning-light)',
+                          color: detail.adjustment < 0 ? 'var(--success)' : 'var(--warning)'
+                        }}>
+                          <td colSpan={4}>
+                            Korrektur
+                            {adjustments.find(a => a.spieler_id === detail.spieler.id && a.monat === selectedMonth)?.grund && (
+                              <span style={{ fontWeight: 'normal', marginLeft: 8, fontSize: 12 }}>
+                                ({adjustments.find(a => a.spieler_id === detail.spieler.id && a.monat === selectedMonth)?.grund})
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{detail.adjustment.toFixed(2)} €</td>
+                        </tr>
+                      )}
+                      {detail.adjustment !== 0 && (
+                        <tr style={{ fontWeight: 'bold', background: 'var(--gray-200)' }}>
+                          <td colSpan={4}>Gesamt</td>
+                          <td style={{ textAlign: 'right' }}>{(gefilterteSumme + detail.adjustment).toFixed(2)} €</td>
+                        </tr>
+                      )}
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Korrektur Sektion - nur im Monats-View (nicht Tag-Filter) */}
+                {!(filterType === 'tag' && selectedTag) && (
+                  <div style={{
+                    marginTop: 16,
+                    padding: 12,
+                    background: 'var(--gray-50)',
+                    borderRadius: 8,
+                    border: '1px solid var(--gray-200)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>Monatskorrektur</strong>
+                        <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
+                          z.B. Gutschrift bei Regenausfall, Sonderzuschläge
+                        </p>
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 13 }}
+                        onClick={() => openKorrekturModal(detail.spieler.id)}
+                      >
+                        {detail.adjustment !== 0 ? 'Korrektur bearbeiten' : 'Korrektur hinzufügen'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
@@ -2840,6 +2979,80 @@ function AbrechnungView({
           }}
         />
       )}
+
+      {/* Korrektur Modal */}
+      {showKorrekturModal && (() => {
+        const korrekturSpieler = spieler.find(s => s.id === showKorrekturModal)
+        const existingAdjustment = adjustments.find(
+          a => a.spieler_id === showKorrekturModal && a.monat === selectedMonth
+        )
+        return (
+          <div className="modal-overlay" onClick={() => setShowKorrekturModal(null)}>
+            <div className="modal" style={{ maxWidth: 450 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Monatskorrektur</h3>
+                <button className="modal-close" onClick={() => setShowKorrekturModal(null)}>×</button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: 16 }}>
+                  <strong>Spieler:</strong> {korrekturSpieler?.name}<br />
+                  <strong>Monat:</strong> {selectedMonth}
+                </div>
+
+                <div className="form-group">
+                  <label>Betrag (€)</label>
+                  <input
+                    type="text"
+                    value={korrekturBetrag}
+                    onChange={e => setKorrekturBetrag(e.target.value)}
+                    placeholder="-15.00 für Gutschrift, 10.00 für Zuschlag"
+                    style={{ fontFamily: 'monospace' }}
+                  />
+                  <small style={{ color: 'var(--gray-500)', display: 'block', marginTop: 4 }}>
+                    Negativer Wert = Gutschrift (z.B. Regenausfall)<br />
+                    Positiver Wert = Zuschlag
+                  </small>
+                </div>
+
+                <div className="form-group">
+                  <label>Grund (optional)</label>
+                  <input
+                    type="text"
+                    value={korrekturGrund}
+                    onChange={e => setKorrekturGrund(e.target.value)}
+                    placeholder="z.B. Regenausfall 05.12., Materialkosten"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+                <div>
+                  {existingAdjustment && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => deleteKorrektur(showKorrekturModal)}
+                      disabled={korrekturSaving}
+                    >
+                      Löschen
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-secondary" onClick={() => setShowKorrekturModal(null)}>
+                    Abbrechen
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => saveKorrektur(showKorrekturModal)}
+                    disabled={korrekturSaving || !korrekturBetrag}
+                  >
+                    {korrekturSaving ? 'Speichern...' : 'Speichern'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -4392,6 +4605,7 @@ function BuchhaltungView({
   spieler,
   ausgaben,
   manuelleRechnungen,
+  adjustments,
   profile,
   onUpdate,
   userId,
@@ -4402,6 +4616,7 @@ function BuchhaltungView({
   spieler: Spieler[]
   ausgaben: Ausgabe[]
   manuelleRechnungen: ManuelleRechnung[]
+  adjustments: MonthlyAdjustment[]
   profile: TrainerProfile | null
   onUpdate: () => void
   userId: string
@@ -4517,11 +4732,41 @@ function BuchhaltungView({
       .sort((a, b) => a.datum.localeCompare(b.datum))
   }, [manuelleRechnungen, selectedYear, inclBarEinnahmen])
 
-  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen)
+  // Korrekturen als Einnahmen-Positionen (Gutschriften = negative Einnahmen)
+  const korrekturEinnahmen = useMemo(() => {
+    return adjustments
+      .filter(a => a.monat.startsWith(selectedYear.toString()))
+      .map(a => {
+        const sp = spieler.find(s => s.id === a.spieler_id)
+        // Für Korrekturen: Betrag ist bereits der finale Wert (negativ = Gutschrift)
+        const betrag = a.betrag
+        // Bei Kleinunternehmer keine USt
+        const brutto = betrag
+        const netto = kleinunternehmer ? betrag : betrag / 1.19
+        const ust = kleinunternehmer ? 0 : betrag - netto
+
+        return {
+          korrekturId: a.id,
+          datum: `${a.monat}-01`, // Erster Tag des Monats als Referenz
+          monat: a.monat,
+          spielerName: sp?.name || 'Unbekannt',
+          tarifName: a.grund || 'Korrektur',
+          brutto,
+          netto,
+          ust,
+          ustSatz: kleinunternehmer ? 0 : 19,
+          barBezahlt: false,
+          istKorrektur: true
+        }
+      })
+  }, [adjustments, selectedYear, spieler, kleinunternehmer])
+
+  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen)
   const alleEinnahmen = useMemo(() => {
-    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false }))
-    return [...trainingsEinnahmen, ...manuelleEinnahmen].sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [einnahmenPositionen, manuelleEinnahmen])
+    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false }))
+    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istKorrektur: false }))
+    return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturEinnahmen].sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen])
 
   // Einnahmen nach Monat gruppiert
   const einnahmenNachMonat = useMemo(() => {
@@ -4784,20 +5029,46 @@ function BuchhaltungView({
                     </thead>
                     <tbody>
                       {positionen.map((p, i) => (
-                        <tr key={i}>
-                          <td>{formatDateGerman(p.datum)}</td>
+                        <tr key={i} style={p.istKorrektur ? {
+                          background: p.brutto < 0 ? 'var(--success-light)' : 'var(--warning-light)'
+                        } : {}}>
+                          <td>{p.istKorrektur ? formatMonthGerman((p as typeof korrekturEinnahmen[0]).monat) : formatDateGerman(p.datum)}</td>
                           <td>{p.spielerName}</td>
-                          <td>{p.tarifName}</td>
-                          <td style={{ textAlign: 'right' }}>{p.netto.toFixed(2)} €</td>
-                          {!kleinunternehmer && (
-                            <td style={{ textAlign: 'right' }}>{p.ust.toFixed(2)} € ({p.ustSatz}%)</td>
-                          )}
-                          <td style={{ textAlign: 'right' }}>{p.brutto.toFixed(2)} €</td>
                           <td>
-                            <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
-                                  style={{ fontSize: 11 }}>
-                              {p.barBezahlt ? 'Bar' : 'Überweisung'}
-                            </span>
+                            {p.istKorrektur && (
+                              <span style={{
+                                background: p.brutto < 0 ? 'var(--success)' : 'var(--warning)',
+                                color: p.brutto < 0 ? '#fff' : '#000',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                fontSize: 10,
+                                marginRight: 6
+                              }}>
+                                {p.brutto < 0 ? 'Gutschrift' : 'Zuschlag'}
+                              </span>
+                            )}
+                            {p.tarifName}
+                          </td>
+                          <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
+                            {p.netto.toFixed(2)} €
+                          </td>
+                          {!kleinunternehmer && (
+                            <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
+                              {p.ust.toFixed(2)} € ({p.ustSatz}%)
+                            </td>
+                          )}
+                          <td style={{ textAlign: 'right', color: p.istKorrektur && p.brutto < 0 ? 'var(--success)' : undefined }}>
+                            {p.brutto.toFixed(2)} €
+                          </td>
+                          <td>
+                            {p.istKorrektur ? (
+                              <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Korrektur</span>
+                            ) : (
+                              <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
+                                    style={{ fontSize: 11 }}>
+                                {p.barBezahlt ? 'Bar' : 'Überweisung'}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}

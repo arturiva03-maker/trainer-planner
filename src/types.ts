@@ -85,6 +85,8 @@ export interface MonthlyAdjustment {
   monat: string
   spieler_id: string
   betrag: number
+  grund?: string
+  created_at?: string
 }
 
 export interface Notiz {
