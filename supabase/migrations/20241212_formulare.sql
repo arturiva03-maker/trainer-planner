@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS formulare (
   ist_aktiv BOOLEAN DEFAULT true,
   felder JSONB NOT NULL DEFAULT '[]',
   event_datum DATE,
+  event_uhrzeit TEXT,
   event_ort TEXT,
   max_anmeldungen INTEGER,
   anmeldeschluss TIMESTAMP WITH TIME ZONE,

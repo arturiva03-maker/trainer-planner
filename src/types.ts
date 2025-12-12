@@ -146,6 +146,7 @@ export interface Formular {
   ist_aktiv: boolean
   felder: FormularFeld[]
   event_datum?: string
+  event_uhrzeit?: string
   event_ort?: string
   max_anmeldungen?: number
   anmeldeschluss?: string
