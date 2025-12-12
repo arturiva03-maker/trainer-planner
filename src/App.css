@@ -1581,12 +1581,18 @@ tbody tr:last-child td {
   transform: translateY(-1px);
 }
 
-/* Quick Links Grid für Mobile Navigation */
+/* Quick Links Grid für Mobile Navigation - nur auf Mobile sichtbar */
 .quick-links-grid {
-  display: grid;
+  display: none;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .quick-links-grid {
+    display: grid;
+  }
 }
 
 .quick-link-card {
