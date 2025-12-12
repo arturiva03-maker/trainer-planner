@@ -785,6 +785,7 @@ function MainApp({ user }: { user: User }) {
                 pdfVorlagen={pdfVorlagen}
                 onUpdate={loadAllData}
                 userId={user.id}
+                onNavigate={setActiveTab}
               />
             )}
           </>
@@ -7637,7 +7638,8 @@ function WeiteresView({
   emailVorlagen,
   pdfVorlagen,
   onUpdate,
-  userId
+  userId,
+  onNavigate
 }: {
   profile: TrainerProfile | null
   notizen: Notiz[]
@@ -7645,6 +7647,7 @@ function WeiteresView({
   pdfVorlagen: PdfVorlage[]
   onUpdate: () => void
   userId: string
+  onNavigate: (tab: Tab) => void
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'profil' | 'notizen' | 'email-vorlagen' | 'pdf-vorlagen'>('profil')
   const [showNotizModal, setShowNotizModal] = useState(false)
@@ -7700,6 +7703,22 @@ function WeiteresView({
 
   return (
     <div>
+      {/* Quick Links für Mobile */}
+      <div className="quick-links-grid">
+        <button className="quick-link-card" onClick={() => onNavigate('formulare')}>
+          <span className="quick-link-icon">📝</span>
+          <span className="quick-link-label">Formulare</span>
+        </button>
+        <button className="quick-link-card" onClick={() => onNavigate('planung')}>
+          <span className="quick-link-icon">📋</span>
+          <span className="quick-link-label">Planung</span>
+        </button>
+        <button className="quick-link-card" onClick={() => onNavigate('abrechnung-trainer')}>
+          <span className="quick-link-icon">👨‍🏫</span>
+          <span className="quick-link-label">Trainer-Abr.</span>
+        </button>
+      </div>
+
       <div className="tabs">
         <button
           className={`tab ${activeSubTab === 'profil' ? 'active' : ''}`}
