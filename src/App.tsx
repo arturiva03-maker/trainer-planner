@@ -8922,7 +8922,7 @@ function PublicFormularView({ formularId }: { formularId: string }) {
           {(formular?.event_datum || formular?.event_ort || formular?.preis || formular?.absagefrist) && (
             <div className="event-details">
               {formular.event_datum && (
-                <span className="event-date">📅 {formatDateGerman(formular.event_datum)}{formular.event_uhrzeit && ` um ${formular.event_uhrzeit} Uhr`}</span>
+                <span className="event-date">📅 {formatDateGerman(formular.event_datum)}{formular.event_uhrzeit_von && ` ${formular.event_uhrzeit_von}${formular.event_uhrzeit_bis ? ` - ${formular.event_uhrzeit_bis}` : ''} Uhr`}</span>
               )}
               {formular.event_ort && (
                 <span className="event-location">📍 {formular.event_ort}</span>
@@ -9111,7 +9111,7 @@ function FormulareView({
 
                   <div className="formular-meta">
                     {formular.event_datum && (
-                      <span>📅 {formatDateGerman(formular.event_datum)}{formular.event_uhrzeit && `, ${formular.event_uhrzeit} Uhr`}</span>
+                      <span>📅 {formatDateGerman(formular.event_datum)}{formular.event_uhrzeit_von && `, ${formular.event_uhrzeit_von}${formular.event_uhrzeit_bis ? ` - ${formular.event_uhrzeit_bis}` : ''} Uhr`}</span>
                     )}
                     {formular.event_ort && (
                       <span>📍 {formular.event_ort}</span>
@@ -9299,7 +9299,8 @@ function FormularModal({
   const [felder, setFelder] = useState<FormularFeld[]>(formular?.felder || [])
   const [istAktiv, setIstAktiv] = useState(formular?.ist_aktiv ?? true)
   const [eventDatum, setEventDatum] = useState(formular?.event_datum || '')
-  const [eventUhrzeit, setEventUhrzeit] = useState(formular?.event_uhrzeit || '')
+  const [eventUhrzeitVon, setEventUhrzeitVon] = useState(formular?.event_uhrzeit_von || '')
+  const [eventUhrzeitBis, setEventUhrzeitBis] = useState(formular?.event_uhrzeit_bis || '')
   const [eventOrt, setEventOrt] = useState(formular?.event_ort || '')
   const [maxAnmeldungen, setMaxAnmeldungen] = useState(formular?.max_anmeldungen?.toString() || '')
   const [anmeldeschluss, setAnmeldeschluss] = useState(formular?.anmeldeschluss?.split('T')[0] || '')
@@ -9387,7 +9388,8 @@ function FormularModal({
       felder,
       ist_aktiv: istAktiv,
       event_datum: eventDatum || null,
-      event_uhrzeit: eventUhrzeit || null,
+      event_uhrzeit_von: eventUhrzeitVon || null,
+      event_uhrzeit_bis: eventUhrzeitBis || null,
       event_ort: eventOrt.trim() || null,
       max_anmeldungen: maxAnmeldungen ? parseInt(maxAnmeldungen) : null,
       anmeldeschluss: anmeldeschluss ? new Date(anmeldeschluss).toISOString() : null,
@@ -9459,11 +9461,19 @@ function FormularModal({
                 />
               </div>
               <div className="form-group">
-                <label>Uhrzeit</label>
+                <label>Uhrzeit von</label>
                 <input
                   type="time"
-                  value={eventUhrzeit}
-                  onChange={e => setEventUhrzeit(e.target.value)}
+                  value={eventUhrzeitVon}
+                  onChange={e => setEventUhrzeitVon(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Uhrzeit bis</label>
+                <input
+                  type="time"
+                  value={eventUhrzeitBis}
+                  onChange={e => setEventUhrzeitBis(e.target.value)}
                 />
               </div>
             </div>
