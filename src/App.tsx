@@ -4850,13 +4850,14 @@ function InvoiceModal({
                   } else {
                     // Standard-Text (Fallback wenn keine Vorlage)
                     subject = `Rechnung ${rechnungsnummer} - Tennisunterricht ${monatFormatiert}`
+                    const steuernummerText = profile?.steuernummer ? `\nSteuernummer: ${profile.steuernummer}` : ''
                     body = `══════════════════════════════════════
            R E C H N U N G
 ══════════════════════════════════════
 
 Rechnungssteller:
 ${rechnungsstellerName}
-${rechnungsstellerAdresse}${ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''}
+${rechnungsstellerAdresse}${steuernummerText}${ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''}
 
 Rechnungsempfänger:
 ${rechnungsempfaengerName}
