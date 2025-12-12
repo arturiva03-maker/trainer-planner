@@ -17,7 +17,10 @@ import type {
   Vorauszahlung,
   SpielerTrainingPayment,
   EmailVorlage,
-  PdfVorlage
+  PdfVorlage,
+  Formular,
+  FormularFeld,
+  FormularAnmeldung
 } from './types'
 import { AUSGABE_KATEGORIEN, EMAIL_PLATZHALTER, PDF_PLATZHALTER } from './types'
 import {
@@ -374,6 +377,7 @@ const showConfirm = (title: string, message: string, confirmText = 'Löschen', v
 function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [publicFormId, setPublicFormId] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
     title: string
@@ -381,6 +385,15 @@ function App() {
     confirmText: string
     variant: 'danger' | 'warning' | 'primary'
   }>({ isOpen: false, title: '', message: '', confirmText: 'Löschen', variant: 'danger' })
+
+  // URL-Detection für öffentliche Formulare
+  useEffect(() => {
+    const path = window.location.pathname
+    const match = path.match(/^\/anmeldung\/([a-f0-9-]+)$/i)
+    if (match) {
+      setPublicFormId(match[1])
+    }
+  }, [])
 
   // Registriere setConfirmState global
   useEffect(() => {
@@ -400,6 +413,11 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Öffentliches Formular anzeigen (ohne Login)
+  if (publicFormId) {
+    return <PublicFormularView formularId={publicFormId} />
+  }
 
   if (loading) {
     return <div className="loading">Laden...</div>
@@ -464,6 +482,8 @@ function MainApp({ user }: { user: User }) {
   const [manuelleRechnungen, setManuelleRechnungen] = useState<ManuelleRechnung[]>([])
   const [emailVorlagen, setEmailVorlagen] = useState<EmailVorlage[]>([])
   const [pdfVorlagen, setPdfVorlagen] = useState<PdfVorlage[]>([])
+  const [formulare, setFormulare] = useState<Formular[]>([])
+  const [formularAnmeldungen, setFormularAnmeldungen] = useState<FormularAnmeldung[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
   // Persistenter Navigation-State (wird nicht bei Daten-Refresh zurückgesetzt)
@@ -493,7 +513,9 @@ function MainApp({ user }: { user: User }) {
         vorauszahlungenRes,
         spielerPaymentsRes,
         emailVorlagenRes,
-        pdfVorlagenRes
+        pdfVorlagenRes,
+        formulareRes,
+        formularAnmeldungenRes
       ] = await Promise.all([
         supabase.from('trainer_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('spieler').select('*').eq('user_id', user.id).order('name'),
@@ -508,7 +530,9 @@ function MainApp({ user }: { user: User }) {
         supabase.from('vorauszahlungen').select('*').eq('user_id', user.id).order('zahlungsdatum', { ascending: false }),
         supabase.from('spieler_training_payments').select('*').eq('user_id', user.id),
         supabase.from('email_vorlagen').select('*').eq('user_id', user.id).order('name'),
-        supabase.from('pdf_vorlagen').select('*').eq('user_id', user.id).order('name')
+        supabase.from('pdf_vorlagen').select('*').eq('user_id', user.id).order('name'),
+        supabase.from('formulare').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('formular_anmeldungen').select('*')
       ])
 
       if (profileRes.data) setProfile(profileRes.data)
@@ -525,6 +549,8 @@ function MainApp({ user }: { user: User }) {
       if (manuelleRechnungenRes.data) setManuelleRechnungen(manuelleRechnungenRes.data)
       if (emailVorlagenRes.data) setEmailVorlagen(emailVorlagenRes.data)
       if (pdfVorlagenRes.data) setPdfVorlagen(pdfVorlagenRes.data)
+      if (formulareRes.data) setFormulare(formulareRes.data)
+      if (formularAnmeldungenRes.data) setFormularAnmeldungen(formularAnmeldungenRes.data)
     } catch (err) {
       console.error('Error loading data:', err)
     } finally {
@@ -542,11 +568,18 @@ function MainApp({ user }: { user: User }) {
     setActiveTab('kalender')
   }
 
+  // Anzahl ungelesener Anmeldungen für Badge
+  const ungeleseneAnmeldungen = useMemo(() => {
+    const formularIds = formulare.map(f => f.id)
+    return formularAnmeldungen.filter(a => formularIds.includes(a.formular_id) && !a.gelesen).length
+  }, [formulare, formularAnmeldungen])
+
   const baseTabs = [
     { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
     { id: 'verwaltung' as Tab, label: 'Verwaltung', icon: '👥' },
     { id: 'abrechnung' as Tab, label: 'Abrechnung', icon: '💰' },
     { id: 'buchhaltung' as Tab, label: 'Buchhaltung', icon: '📊' },
+    { id: 'formulare' as Tab, label: 'Formulare', icon: '📝', badge: ungeleseneAnmeldungen > 0 ? ungeleseneAnmeldungen : undefined },
   ]
 
   // Dynamisch Abrechnung Trainer Tab hinzufügen wenn Trainer vorhanden
@@ -734,6 +767,14 @@ function MainApp({ user }: { user: User }) {
                 onYearChange={setBuchhaltungYear}
                 activeSubTab={buchhaltungSubTab}
                 onSubTabChange={setBuchhaltungSubTab}
+              />
+            )}
+            {activeTab === 'formulare' && (
+              <FormulareView
+                formulare={formulare}
+                anmeldungen={formularAnmeldungen}
+                onUpdate={loadAllData}
+                userId={user.id}
               />
             )}
             {activeTab === 'weiteres' && (
@@ -8628,6 +8669,943 @@ function NotizModal({
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Speichere...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ PUBLIC FORMULAR VIEW (öffentlich ohne Login) ============
+function PublicFormularView({ formularId }: { formularId: string }) {
+  const [formular, setFormular] = useState<Formular | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [formData, setFormData] = useState<Record<string, string | boolean | number>>({})
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    loadFormular()
+  }, [formularId])
+
+  const loadFormular = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('formulare')
+        .select('*')
+        .eq('id', formularId)
+        .eq('ist_aktiv', true)
+        .single()
+
+      if (error || !data) {
+        setError('Formular nicht gefunden oder nicht mehr aktiv.')
+        setLoading(false)
+        return
+      }
+
+      // Prüfe Anmeldeschluss
+      if (data.anmeldeschluss && new Date(data.anmeldeschluss) < new Date()) {
+        setError('Der Anmeldeschluss für dieses Event ist bereits vorbei.')
+        setLoading(false)
+        return
+      }
+
+      // Prüfe max Anmeldungen
+      if (data.max_anmeldungen) {
+        const { count } = await supabase
+          .from('formular_anmeldungen')
+          .select('*', { count: 'exact', head: true })
+          .eq('formular_id', formularId)
+
+        if (count && count >= data.max_anmeldungen) {
+          setError('Die maximale Teilnehmerzahl ist bereits erreicht.')
+          setLoading(false)
+          return
+        }
+      }
+
+      setFormular(data)
+
+      // Initialisiere formData mit leeren Werten
+      const initial: Record<string, string | boolean | number> = {}
+      data.felder.forEach((f: FormularFeld) => {
+        initial[f.id] = f.typ === 'checkbox' ? false : ''
+      })
+      setFormData(initial)
+    } catch (err) {
+      setError('Ein Fehler ist aufgetreten.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const validate = (): boolean => {
+    if (!formular) return false
+    const errors: Record<string, string> = {}
+
+    formular.felder.forEach((feld) => {
+      if (feld.pflichtfeld) {
+        const value = formData[feld.id]
+        if (value === '' || value === undefined || value === null) {
+          errors[feld.id] = 'Dieses Feld ist erforderlich'
+        }
+      }
+
+      // Email-Validierung
+      if (feld.typ === 'email' && formData[feld.id]) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(formData[feld.id] as string)) {
+          errors[feld.id] = 'Bitte geben Sie eine gültige E-Mail-Adresse ein'
+        }
+      }
+    })
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validate()) return
+
+    setSubmitting(true)
+    try {
+      const { error } = await supabase
+        .from('formular_anmeldungen')
+        .insert({
+          formular_id: formularId,
+          daten: formData,
+          gelesen: false,
+          email_versendet: false
+        })
+
+      if (error) throw error
+
+      setSubmitted(true)
+    } catch (err) {
+      setError('Ein Fehler ist beim Absenden aufgetreten. Bitte versuchen Sie es erneut.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const renderField = (feld: FormularFeld) => {
+    const error = validationErrors[feld.id]
+
+    switch (feld.typ) {
+      case 'text':
+      case 'email':
+      case 'telefon':
+        return (
+          <input
+            type={feld.typ === 'email' ? 'email' : feld.typ === 'telefon' ? 'tel' : 'text'}
+            value={formData[feld.id] as string || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, [feld.id]: e.target.value }))}
+            placeholder={feld.placeholder || ''}
+            className={error ? 'input-error' : ''}
+          />
+        )
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={formData[feld.id] as number || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, [feld.id]: e.target.value }))}
+            placeholder={feld.placeholder || ''}
+            className={error ? 'input-error' : ''}
+          />
+        )
+      case 'textarea':
+        return (
+          <textarea
+            value={formData[feld.id] as string || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, [feld.id]: e.target.value }))}
+            placeholder={feld.placeholder || ''}
+            rows={4}
+            className={error ? 'input-error' : ''}
+          />
+        )
+      case 'dropdown':
+        return (
+          <select
+            value={formData[feld.id] as string || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, [feld.id]: e.target.value }))}
+            className={error ? 'input-error' : ''}
+          >
+            <option value="">Bitte wählen...</option>
+            {feld.optionen?.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        )
+      case 'checkbox':
+        return (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={formData[feld.id] as boolean || false}
+              onChange={(e) => setFormData(prev => ({ ...prev, [feld.id]: e.target.checked }))}
+            />
+            <span>{feld.label}</span>
+          </label>
+        )
+      case 'datum':
+        return (
+          <input
+            type="date"
+            value={formData[feld.id] as string || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, [feld.id]: e.target.value }))}
+            className={error ? 'input-error' : ''}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="public-form-container">
+        <div className="public-form-card">
+          <div className="loading-spinner">Laden...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="public-form-container">
+        <div className="public-form-card">
+          <div className="public-form-error">
+            <span className="error-icon">⚠️</span>
+            <h2>Fehler</h2>
+            <p>{error}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (submitted) {
+    return (
+      <div className="public-form-container">
+        <div className="public-form-card">
+          <div className="public-form-success">
+            <span className="success-icon">✓</span>
+            <h2>Vielen Dank!</h2>
+            <p>Ihre Anmeldung wurde erfolgreich übermittelt.</p>
+            {formular?.event_datum && (
+              <p className="event-info">
+                Wir freuen uns auf Sie am {formatDateGerman(formular.event_datum)}
+                {formular.event_ort && ` in ${formular.event_ort}`}!
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="public-form-container">
+      <div className="public-form-card">
+        <div className="public-form-header">
+          <div className="public-form-logo">
+            <TennisLogo size={48} />
+          </div>
+          <h1>{formular?.titel}</h1>
+          {formular?.beschreibung && <p className="form-description">{formular.beschreibung}</p>}
+          {(formular?.event_datum || formular?.event_ort) && (
+            <div className="event-details">
+              {formular.event_datum && (
+                <span className="event-date">📅 {formatDateGerman(formular.event_datum)}</span>
+              )}
+              {formular.event_ort && (
+                <span className="event-location">📍 {formular.event_ort}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit} className="public-form">
+          {formular?.felder.map((feld) => (
+            <div key={feld.id} className="form-group">
+              {feld.typ !== 'checkbox' && (
+                <label>
+                  {feld.label}
+                  {feld.pflichtfeld && <span className="required">*</span>}
+                </label>
+              )}
+              {renderField(feld)}
+              {validationErrors[feld.id] && (
+                <span className="field-error">{validationErrors[feld.id]}</span>
+              )}
+            </div>
+          ))}
+
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? 'Wird gesendet...' : 'Anmeldung absenden'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ============ FORMULARE VIEW (Admin-Bereich) ============
+function FormulareView({
+  formulare,
+  anmeldungen,
+  onUpdate,
+  userId
+}: {
+  formulare: Formular[]
+  anmeldungen: FormularAnmeldung[]
+  onUpdate: () => void
+  userId: string
+}) {
+  const [activeSubTab, setActiveSubTab] = useState<'liste' | 'anmeldungen'>('liste')
+  const [showFormularModal, setShowFormularModal] = useState(false)
+  const [editingFormular, setEditingFormular] = useState<Formular | null>(null)
+  const [selectedFormular, setSelectedFormular] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  // Anmeldungen pro Formular zählen
+  const getAnmeldungenCount = (formularId: string) => {
+    return anmeldungen.filter(a => a.formular_id === formularId).length
+  }
+
+  const getUngeleseneCount = (formularId: string) => {
+    return anmeldungen.filter(a => a.formular_id === formularId && !a.gelesen).length
+  }
+
+  const copyLink = async (formularId: string) => {
+    const url = `${window.location.origin}/anmeldung/${formularId}`
+    await navigator.clipboard.writeText(url)
+    setCopiedId(formularId)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handleDelete = async (formular: Formular) => {
+    const confirmed = await showConfirm(
+      'Formular löschen',
+      `Möchten Sie das Formular "${formular.titel}" wirklich löschen? Alle zugehörigen Anmeldungen werden ebenfalls gelöscht.`
+    )
+    if (!confirmed) return
+
+    await supabase.from('formulare').delete().eq('id', formular.id)
+    onUpdate()
+  }
+
+  const toggleAktiv = async (formular: Formular) => {
+    await supabase
+      .from('formulare')
+      .update({ ist_aktiv: !formular.ist_aktiv })
+      .eq('id', formular.id)
+    onUpdate()
+  }
+
+  const markAsRead = async (anmeldungId: string) => {
+    await supabase
+      .from('formular_anmeldungen')
+      .update({ gelesen: true })
+      .eq('id', anmeldungId)
+    onUpdate()
+  }
+
+  const markAllAsRead = async (formularId: string) => {
+    await supabase
+      .from('formular_anmeldungen')
+      .update({ gelesen: true })
+      .eq('formular_id', formularId)
+    onUpdate()
+  }
+
+  const deleteAnmeldung = async (anmeldung: FormularAnmeldung) => {
+    const confirmed = await showConfirm(
+      'Anmeldung löschen',
+      'Möchten Sie diese Anmeldung wirklich löschen?'
+    )
+    if (!confirmed) return
+
+    await supabase.from('formular_anmeldungen').delete().eq('id', anmeldung.id)
+    onUpdate()
+  }
+
+  const selectedAnmeldungen = selectedFormular
+    ? anmeldungen.filter(a => a.formular_id === selectedFormular).sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+    : []
+
+  return (
+    <div className="formulare-view">
+      <div className="view-header">
+        <h2>📝 Anmeldeformulare</h2>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            setEditingFormular(null)
+            setShowFormularModal(true)
+          }}
+        >
+          + Neues Formular
+        </button>
+      </div>
+
+      <div className="sub-tabs">
+        <button
+          className={`sub-tab ${activeSubTab === 'liste' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('liste')}
+        >
+          Formulare
+        </button>
+        <button
+          className={`sub-tab ${activeSubTab === 'anmeldungen' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('anmeldungen')}
+        >
+          Anmeldungen
+          {anmeldungen.filter(a => !a.gelesen && formulare.some(f => f.id === a.formular_id)).length > 0 && (
+            <span className="badge">{anmeldungen.filter(a => !a.gelesen && formulare.some(f => f.id === a.formular_id)).length}</span>
+          )}
+        </button>
+      </div>
+
+      {activeSubTab === 'liste' && (
+        <div className="formulare-liste">
+          {formulare.length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-icon">📝</span>
+              <h3>Noch keine Formulare</h3>
+              <p>Erstellen Sie Ihr erstes Anmeldeformular für Events.</p>
+            </div>
+          ) : (
+            <div className="formular-cards">
+              {formulare.map(formular => (
+                <div key={formular.id} className={`formular-card ${!formular.ist_aktiv ? 'inactive' : ''}`}>
+                  <div className="formular-card-header">
+                    <h3>{formular.titel}</h3>
+                    <div className="formular-status">
+                      <span className={`status-badge ${formular.ist_aktiv ? 'active' : 'inactive'}`}>
+                        {formular.ist_aktiv ? 'Aktiv' : 'Inaktiv'}
+                      </span>
+                      {getUngeleseneCount(formular.id) > 0 && (
+                        <span className="unread-badge">{getUngeleseneCount(formular.id)} neu</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {formular.beschreibung && (
+                    <p className="formular-description">{formular.beschreibung}</p>
+                  )}
+
+                  <div className="formular-meta">
+                    {formular.event_datum && (
+                      <span>📅 {formatDateGerman(formular.event_datum)}</span>
+                    )}
+                    {formular.event_ort && (
+                      <span>📍 {formular.event_ort}</span>
+                    )}
+                    <span>📋 {getAnmeldungenCount(formular.id)} Anmeldungen</span>
+                    {formular.max_anmeldungen && (
+                      <span>👥 Max. {formular.max_anmeldungen}</span>
+                    )}
+                  </div>
+
+                  <div className="formular-actions">
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => copyLink(formular.id)}
+                      title="Link kopieren"
+                    >
+                      {copiedId === formular.id ? '✓ Kopiert!' : '🔗 Link kopieren'}
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        setSelectedFormular(formular.id)
+                        setActiveSubTab('anmeldungen')
+                      }}
+                    >
+                      📋 Anmeldungen
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => toggleAktiv(formular)}
+                    >
+                      {formular.ist_aktiv ? '⏸️ Deaktivieren' : '▶️ Aktivieren'}
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        setEditingFormular(formular)
+                        setShowFormularModal(true)
+                      }}
+                    >
+                      ✏️ Bearbeiten
+                    </button>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleDelete(formular)}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeSubTab === 'anmeldungen' && (
+        <div className="anmeldungen-view">
+          <div className="formular-select">
+            <label>Formular auswählen:</label>
+            <select
+              value={selectedFormular || ''}
+              onChange={(e) => setSelectedFormular(e.target.value || null)}
+            >
+              <option value="">Alle Formulare</option>
+              {formulare.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.titel} ({getAnmeldungenCount(f.id)} Anmeldungen)
+                </option>
+              ))}
+            </select>
+            {selectedFormular && selectedAnmeldungen.some(a => !a.gelesen) && (
+              <button
+                className="btn btn-sm"
+                onClick={() => markAllAsRead(selectedFormular)}
+              >
+                Alle als gelesen markieren
+              </button>
+            )}
+          </div>
+
+          {(selectedFormular ? selectedAnmeldungen : anmeldungen).length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-icon">📭</span>
+              <h3>Keine Anmeldungen</h3>
+              <p>Für dieses Formular liegen noch keine Anmeldungen vor.</p>
+            </div>
+          ) : (
+            <div className="anmeldungen-liste">
+              {(selectedFormular ? selectedAnmeldungen : anmeldungen
+                .filter(a => formulare.some(f => f.id === a.formular_id))
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              ).map(anmeldung => {
+                const formular = formulare.find(f => f.id === anmeldung.formular_id)
+                return (
+                  <div key={anmeldung.id} className={`anmeldung-card ${!anmeldung.gelesen ? 'unread' : ''}`}>
+                    <div className="anmeldung-header">
+                      <div className="anmeldung-info">
+                        {!selectedFormular && formular && (
+                          <span className="formular-name">{formular.titel}</span>
+                        )}
+                        <span className="anmeldung-date">
+                          {new Date(anmeldung.created_at).toLocaleString('de-DE')}
+                        </span>
+                        {!anmeldung.gelesen && <span className="new-badge">Neu</span>}
+                      </div>
+                      <div className="anmeldung-actions">
+                        {!anmeldung.gelesen && (
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => markAsRead(anmeldung.id)}
+                          >
+                            ✓ Gelesen
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => deleteAnmeldung(anmeldung)}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                    <div className="anmeldung-daten">
+                      {formular?.felder.map(feld => {
+                        const value = anmeldung.daten[feld.id]
+                        if (value === undefined || value === '' || value === false) return null
+                        return (
+                          <div key={feld.id} className="datum-row">
+                            <span className="datum-label">{feld.label}:</span>
+                            <span className="datum-value">
+                              {feld.typ === 'checkbox' ? (value ? 'Ja' : 'Nein') : String(value)}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showFormularModal && (
+        <FormularModal
+          formular={editingFormular}
+          userId={userId}
+          onClose={() => {
+            setShowFormularModal(false)
+            setEditingFormular(null)
+          }}
+          onSave={() => {
+            setShowFormularModal(false)
+            setEditingFormular(null)
+            onUpdate()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============ FORMULAR MODAL (Erstellen/Bearbeiten) ============
+function FormularModal({
+  formular,
+  userId,
+  onClose,
+  onSave
+}: {
+  formular: Formular | null
+  userId: string
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [titel, setTitel] = useState(formular?.titel || '')
+  const [beschreibung, setBeschreibung] = useState(formular?.beschreibung || '')
+  const [felder, setFelder] = useState<FormularFeld[]>(formular?.felder || [])
+  const [istAktiv, setIstAktiv] = useState(formular?.ist_aktiv ?? true)
+  const [eventDatum, setEventDatum] = useState(formular?.event_datum || '')
+  const [eventOrt, setEventOrt] = useState(formular?.event_ort || '')
+  const [maxAnmeldungen, setMaxAnmeldungen] = useState(formular?.max_anmeldungen?.toString() || '')
+  const [anmeldeschluss, setAnmeldeschluss] = useState(formular?.anmeldeschluss?.split('T')[0] || '')
+  const [saving, setSaving] = useState(false)
+
+  const addFeld = (typ: FormularFeld['typ']) => {
+    const newFeld: FormularFeld = {
+      id: crypto.randomUUID(),
+      typ,
+      label: '',
+      pflichtfeld: false,
+      optionen: typ === 'dropdown' ? ['Option 1'] : undefined
+    }
+    setFelder([...felder, newFeld])
+  }
+
+  const updateFeld = (id: string, updates: Partial<FormularFeld>) => {
+    setFelder(felder.map(f => f.id === id ? { ...f, ...updates } : f))
+  }
+
+  const moveFeld = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= felder.length) return
+    const newFelder = [...felder]
+    const temp = newFelder[index]
+    newFelder[index] = newFelder[newIndex]
+    newFelder[newIndex] = temp
+    setFelder(newFelder)
+  }
+
+  const removeFeld = (id: string) => {
+    setFelder(felder.filter(f => f.id !== id))
+  }
+
+  const addOption = (feldId: string) => {
+    setFelder(felder.map(f => {
+      if (f.id === feldId && f.optionen) {
+        return { ...f, optionen: [...f.optionen, `Option ${f.optionen.length + 1}`] }
+      }
+      return f
+    }))
+  }
+
+  const updateOption = (feldId: string, optIndex: number, value: string) => {
+    setFelder(felder.map(f => {
+      if (f.id === feldId && f.optionen) {
+        const newOptionen = [...f.optionen]
+        newOptionen[optIndex] = value
+        return { ...f, optionen: newOptionen }
+      }
+      return f
+    }))
+  }
+
+  const removeOption = (feldId: string, optIndex: number) => {
+    setFelder(felder.map(f => {
+      if (f.id === feldId && f.optionen && f.optionen.length > 1) {
+        return { ...f, optionen: f.optionen.filter((_, i) => i !== optIndex) }
+      }
+      return f
+    }))
+  }
+
+  const handleSave = async () => {
+    if (!titel.trim()) {
+      alert('Bitte geben Sie einen Titel ein.')
+      return
+    }
+    if (felder.length === 0) {
+      alert('Bitte fügen Sie mindestens ein Feld hinzu.')
+      return
+    }
+    if (felder.some(f => !f.label.trim())) {
+      alert('Bitte füllen Sie alle Feld-Labels aus.')
+      return
+    }
+
+    setSaving(true)
+    const data = {
+      user_id: userId,
+      titel: titel.trim(),
+      beschreibung: beschreibung.trim() || null,
+      felder,
+      ist_aktiv: istAktiv,
+      event_datum: eventDatum || null,
+      event_ort: eventOrt.trim() || null,
+      max_anmeldungen: maxAnmeldungen ? parseInt(maxAnmeldungen) : null,
+      anmeldeschluss: anmeldeschluss ? new Date(anmeldeschluss).toISOString() : null
+    }
+
+    try {
+      if (formular) {
+        await supabase.from('formulare').update(data).eq('id', formular.id)
+      } else {
+        await supabase.from('formulare').insert(data)
+      }
+      onSave()
+    } catch (err) {
+      console.error('Error saving formular:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const feldTypen: { typ: FormularFeld['typ']; label: string; icon: string }[] = [
+    { typ: 'text', label: 'Text', icon: '📝' },
+    { typ: 'email', label: 'E-Mail', icon: '📧' },
+    { typ: 'telefon', label: 'Telefon', icon: '📞' },
+    { typ: 'number', label: 'Zahl', icon: '🔢' },
+    { typ: 'datum', label: 'Datum', icon: '📅' },
+    { typ: 'dropdown', label: 'Auswahl', icon: '📋' },
+    { typ: 'textarea', label: 'Textbereich', icon: '📄' },
+    { typ: 'checkbox', label: 'Checkbox', icon: '☑️' }
+  ]
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{formular ? 'Formular bearbeiten' : 'Neues Formular erstellen'}</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-section">
+            <h4>Grundeinstellungen</h4>
+            <div className="form-group">
+              <label>Titel *</label>
+              <input
+                type="text"
+                value={titel}
+                onChange={e => setTitel(e.target.value)}
+                placeholder="z.B. Anmeldung Sommercamp 2025"
+              />
+            </div>
+            <div className="form-group">
+              <label>Beschreibung</label>
+              <textarea
+                value={beschreibung}
+                onChange={e => setBeschreibung(e.target.value)}
+                placeholder="Optionale Beschreibung des Events..."
+                rows={3}
+              />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Event-Datum</label>
+                <input
+                  type="date"
+                  value={eventDatum}
+                  onChange={e => setEventDatum(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Event-Ort</label>
+                <input
+                  type="text"
+                  value={eventOrt}
+                  onChange={e => setEventOrt(e.target.value)}
+                  placeholder="z.B. Tennisclub Musterstadt"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Max. Anmeldungen</label>
+                <input
+                  type="number"
+                  value={maxAnmeldungen}
+                  onChange={e => setMaxAnmeldungen(e.target.value)}
+                  placeholder="Unbegrenzt"
+                  min="1"
+                />
+              </div>
+              <div className="form-group">
+                <label>Anmeldeschluss</label>
+                <input
+                  type="date"
+                  value={anmeldeschluss}
+                  onChange={e => setAnmeldeschluss(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={istAktiv}
+                  onChange={e => setIstAktiv(e.target.checked)}
+                />
+                <span>Formular ist aktiv (kann ausgefüllt werden)</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h4>Formularfelder</h4>
+            <div className="feld-typen">
+              {feldTypen.map(ft => (
+                <button
+                  key={ft.typ}
+                  className="btn btn-sm"
+                  onClick={() => addFeld(ft.typ)}
+                  type="button"
+                >
+                  {ft.icon} {ft.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="felder-liste">
+              {felder.length === 0 ? (
+                <div className="empty-felder">
+                  Klicken Sie oben auf einen Feldtyp, um Felder hinzuzufügen.
+                </div>
+              ) : (
+                felder.map((feld, index) => (
+                  <div key={feld.id} className="feld-editor">
+                    <div className="feld-header">
+                      <span className="feld-typ">
+                        {feldTypen.find(ft => ft.typ === feld.typ)?.icon} {feldTypen.find(ft => ft.typ === feld.typ)?.label}
+                      </span>
+                      <div className="feld-controls">
+                        <button
+                          className="btn-icon"
+                          onClick={() => moveFeld(index, 'up')}
+                          disabled={index === 0}
+                          title="Nach oben"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className="btn-icon"
+                          onClick={() => moveFeld(index, 'down')}
+                          disabled={index === felder.length - 1}
+                          title="Nach unten"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          className="btn-icon btn-danger"
+                          onClick={() => removeFeld(feld.id)}
+                          title="Entfernen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    <div className="feld-body">
+                      <div className="form-group">
+                        <label>Bezeichnung *</label>
+                        <input
+                          type="text"
+                          value={feld.label}
+                          onChange={e => updateFeld(feld.id, { label: e.target.value })}
+                          placeholder={`z.B. ${feld.typ === 'email' ? 'E-Mail-Adresse' : feld.typ === 'telefon' ? 'Telefonnummer' : 'Vorname'}`}
+                        />
+                      </div>
+                      {feld.typ !== 'checkbox' && (
+                        <div className="form-group">
+                          <label>Platzhalter</label>
+                          <input
+                            type="text"
+                            value={feld.placeholder || ''}
+                            onChange={e => updateFeld(feld.id, { placeholder: e.target.value })}
+                            placeholder="Optionaler Platzhaltertext"
+                          />
+                        </div>
+                      )}
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={feld.pflichtfeld}
+                          onChange={e => updateFeld(feld.id, { pflichtfeld: e.target.checked })}
+                        />
+                        <span>Pflichtfeld</span>
+                      </label>
+
+                      {feld.typ === 'dropdown' && (
+                        <div className="dropdown-optionen">
+                          <label>Auswahloptionen:</label>
+                          {feld.optionen?.map((opt, optIndex) => (
+                            <div key={optIndex} className="option-row">
+                              <input
+                                type="text"
+                                value={opt}
+                                onChange={e => updateOption(feld.id, optIndex, e.target.value)}
+                              />
+                              <button
+                                className="btn-icon btn-danger"
+                                onClick={() => removeOption(feld.id, optIndex)}
+                                disabled={feld.optionen!.length <= 1}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => addOption(feld.id)}
+                            type="button"
+                          >
+                            + Option hinzufügen
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichere...' : formular ? 'Speichern' : 'Formular erstellen'}
           </button>
         </div>
       </div>

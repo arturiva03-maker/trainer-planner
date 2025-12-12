@@ -126,7 +126,41 @@ export interface PlanungData {
   tage: { [key: string]: { [zeit: string]: string[] } }
 }
 
-export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'buchhaltung' | 'weiteres'
+export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'planung' | 'buchhaltung' | 'weiteres' | 'formulare'
+
+// Event-Anmeldeformular System
+export interface FormularFeld {
+  id: string
+  typ: 'text' | 'email' | 'telefon' | 'dropdown' | 'textarea' | 'checkbox' | 'datum' | 'number'
+  label: string
+  pflichtfeld: boolean
+  optionen?: string[]  // Für Dropdown
+  placeholder?: string
+}
+
+export interface Formular {
+  id: string
+  user_id: string
+  titel: string
+  beschreibung?: string
+  ist_aktiv: boolean
+  felder: FormularFeld[]
+  event_datum?: string
+  event_ort?: string
+  max_anmeldungen?: number
+  anmeldeschluss?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface FormularAnmeldung {
+  id: string
+  formular_id: string
+  daten: Record<string, string | boolean | number>
+  gelesen: boolean
+  email_versendet: boolean
+  created_at: string
+}
 
 export interface Ausgabe {
   id: string

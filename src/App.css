@@ -25,6 +25,19 @@
   --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Spinner Animation */
+.spinner {
+  display: inline-block;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -2812,5 +2825,592 @@ tbody tr:last-child td {
 
   .tabs {
     margin: 0 12px 12px 12px;
+  }
+}
+
+/* ============ PUBLIC FORMULAR STYLES ============ */
+.public-form-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #3b7ab8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.public-form-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.public-form-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.public-form-logo {
+  margin-bottom: 16px;
+}
+
+.public-form-header h1 {
+  font-size: 28px;
+  color: var(--gray-800);
+  margin-bottom: 12px;
+}
+
+.public-form-header .form-description {
+  color: var(--gray-600);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.event-details {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.event-details span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray-600);
+  font-size: 14px;
+  background: var(--gray-100);
+  padding: 8px 12px;
+  border-radius: 20px;
+}
+
+.public-form .form-group {
+  margin-bottom: 20px;
+}
+
+.public-form .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.public-form .form-group .required {
+  color: var(--danger);
+  margin-left: 4px;
+}
+
+.public-form input,
+.public-form select,
+.public-form textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.public-form input:focus,
+.public-form select:focus,
+.public-form textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.public-form .input-error {
+  border-color: var(--danger);
+}
+
+.public-form .field-error {
+  display: block;
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.public-form .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.public-form .checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+.public-form-success,
+.public-form-error {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.public-form-success .success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: var(--success-light);
+  color: var(--success);
+  font-size: 40px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+}
+
+.public-form-success h2 {
+  color: var(--success);
+  margin-bottom: 12px;
+}
+
+.public-form-success p {
+  color: var(--gray-600);
+}
+
+.public-form-success .event-info {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--gray-100);
+  border-radius: 10px;
+}
+
+.public-form-error .error-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.public-form-error h2 {
+  color: var(--danger);
+  margin-bottom: 12px;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 60px;
+  color: var(--gray-500);
+}
+
+/* ============ FORMULARE VIEW (Admin) ============ */
+.formulare-view {
+  padding: 0;
+}
+
+.formulare-view .view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.formulare-view .view-header h2 {
+  font-size: 24px;
+}
+
+.formular-cards {
+  display: grid;
+  gap: 16px;
+}
+
+.formular-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s;
+}
+
+.formular-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.formular-card.inactive {
+  opacity: 0.7;
+  background: var(--gray-50);
+}
+
+.formular-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.formular-card-header h3 {
+  font-size: 18px;
+  color: var(--gray-800);
+}
+
+.formular-status {
+  display: flex;
+  gap: 8px;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.status-badge.inactive {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
+.unread-badge {
+  background: var(--danger);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.formular-description {
+  color: var(--gray-600);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.formular-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.formular-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ============ ANMELDUNGEN VIEW ============ */
+.anmeldungen-view .formular-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.anmeldungen-view .formular-select label {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.anmeldungen-view .formular-select select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius);
+  min-width: 250px;
+}
+
+.anmeldungen-liste {
+  display: grid;
+  gap: 12px;
+}
+
+.anmeldung-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+}
+
+.anmeldung-card.unread {
+  border-left: 4px solid var(--primary);
+  background: var(--primary-light);
+}
+
+.anmeldung-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.anmeldung-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.anmeldung-info .formular-name {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.anmeldung-info .anmeldung-date {
+  color: var(--gray-500);
+  font-size: 13px;
+}
+
+.new-badge {
+  background: var(--primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.anmeldung-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.anmeldung-daten {
+  display: grid;
+  gap: 8px;
+}
+
+.datum-row {
+  display: flex;
+  gap: 8px;
+}
+
+.datum-label {
+  font-weight: 500;
+  color: var(--gray-600);
+  min-width: 120px;
+}
+
+.datum-value {
+  color: var(--gray-800);
+}
+
+/* ============ FORMULAR MODAL ============ */
+.modal-large {
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.form-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.form-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.form-section h4 {
+  font-size: 16px;
+  color: var(--gray-800);
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.feld-typen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.felder-liste {
+  display: grid;
+  gap: 12px;
+}
+
+.empty-felder {
+  padding: 24px;
+  text-align: center;
+  color: var(--gray-500);
+  background: var(--gray-100);
+  border-radius: var(--radius);
+  border: 2px dashed var(--gray-300);
+}
+
+.feld-editor {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  background: var(--gray-50);
+}
+
+.feld-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.feld-typ {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.feld-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gray-300);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--gray-100);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-icon.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger-light);
+}
+
+.btn-icon.btn-danger:hover:not(:disabled) {
+  background: var(--danger-light);
+}
+
+.feld-body {
+  padding: 16px;
+}
+
+.dropdown-optionen {
+  margin-top: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: var(--radius);
+}
+
+.dropdown-optionen label {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.option-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.option-row input {
+  flex: 1;
+}
+
+/* ============ EMPTY STATES ============ */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-500);
+}
+
+.empty-state .empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+
+/* ============ BADGE IN TABS ============ */
+.sub-tab .badge,
+.nav-item .badge {
+  background: var(--danger);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+/* Mobile adjustments for public form */
+@media (max-width: 600px) {
+  .public-form-card {
+    padding: 24px 20px;
+    border-radius: 16px;
+  }
+
+  .public-form-header h1 {
+    font-size: 22px;
+  }
+
+  .event-details {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .formular-card-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .formular-actions {
+    flex-direction: column;
+  }
+
+  .formular-actions .btn {
+    width: 100%;
+  }
+
+  .anmeldung-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .datum-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .datum-label {
+    min-width: auto;
+    font-size: 12px;
   }
 }
