@@ -149,6 +149,8 @@ export interface Formular {
   event_ort?: string
   max_anmeldungen?: number
   anmeldeschluss?: string
+  preis?: string
+  absagefrist?: string
   created_at: string
   updated_at?: string
 }

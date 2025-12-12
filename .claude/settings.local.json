@@ -14,7 +14,17 @@
       "Bash(curl:*)",
       "Bash(vercel:*)",
       "Bash(find:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run build:check:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(npx supabase:*)",
+      "Bash(set SUPABASE_ACCESS_TOKEN=sbp_6c9d1f64ea8d316acc61330acffd76915a4f5ee6)",
+      "Bash($env:SUPABASE_ACCESS_TOKEN=\"sbp_6c9d1f64ea8d316acc61330acffd76915a4f5ee6\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_6c9d1f64ea8d316acc61330acffd76915a4f5ee6 npx supabase:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_bd0f84e962f20e4082be54ead9efd19c548e39db npx supabase functions deploy:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_5d1c31513f47d9f9411ee61e0f9d9447a32f7ff6 npx supabase functions deploy:*)"
     ]
   },
   "alwaysAllowWrites": true,

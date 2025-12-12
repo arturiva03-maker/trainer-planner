@@ -8919,13 +8919,19 @@ function PublicFormularView({ formularId }: { formularId: string }) {
           </div>
           <h1>{formular?.titel}</h1>
           {formular?.beschreibung && <p className="form-description">{formular.beschreibung}</p>}
-          {(formular?.event_datum || formular?.event_ort) && (
+          {(formular?.event_datum || formular?.event_ort || formular?.preis || formular?.absagefrist) && (
             <div className="event-details">
               {formular.event_datum && (
                 <span className="event-date">📅 {formatDateGerman(formular.event_datum)}</span>
               )}
               {formular.event_ort && (
                 <span className="event-location">📍 {formular.event_ort}</span>
+              )}
+              {formular.preis && (
+                <span className="event-price">💰 {formular.preis}</span>
+              )}
+              {formular.absagefrist && (
+                <span className="event-deadline">⏰ Absage: {formular.absagefrist}</span>
               )}
             </div>
           )}
@@ -9110,6 +9116,12 @@ function FormulareView({
                     {formular.event_ort && (
                       <span>📍 {formular.event_ort}</span>
                     )}
+                    {formular.preis && (
+                      <span>💰 {formular.preis}</span>
+                    )}
+                    {formular.absagefrist && (
+                      <span>⏰ {formular.absagefrist}</span>
+                    )}
                     <span>📋 {getAnmeldungenCount(formular.id)} Anmeldungen</span>
                     {formular.max_anmeldungen && (
                       <span>👥 Max. {formular.max_anmeldungen}</span>
@@ -9290,6 +9302,8 @@ function FormularModal({
   const [eventOrt, setEventOrt] = useState(formular?.event_ort || '')
   const [maxAnmeldungen, setMaxAnmeldungen] = useState(formular?.max_anmeldungen?.toString() || '')
   const [anmeldeschluss, setAnmeldeschluss] = useState(formular?.anmeldeschluss?.split('T')[0] || '')
+  const [preis, setPreis] = useState(formular?.preis || '')
+  const [absagefrist, setAbsagefrist] = useState(formular?.absagefrist || '')
   const [saving, setSaving] = useState(false)
 
   const addFeld = (typ: FormularFeld['typ']) => {
@@ -9374,7 +9388,9 @@ function FormularModal({
       event_datum: eventDatum || null,
       event_ort: eventOrt.trim() || null,
       max_anmeldungen: maxAnmeldungen ? parseInt(maxAnmeldungen) : null,
-      anmeldeschluss: anmeldeschluss ? new Date(anmeldeschluss).toISOString() : null
+      anmeldeschluss: anmeldeschluss ? new Date(anmeldeschluss).toISOString() : null,
+      preis: preis.trim() || null,
+      absagefrist: absagefrist.trim() || null
     }
 
     try {
@@ -9467,6 +9483,26 @@ function FormularModal({
                   type="date"
                   value={anmeldeschluss}
                   onChange={e => setAnmeldeschluss(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Preis</label>
+                <input
+                  type="text"
+                  value={preis}
+                  onChange={e => setPreis(e.target.value)}
+                  placeholder="z.B. 25€ pro Person"
+                />
+              </div>
+              <div className="form-group">
+                <label>Absagefrist</label>
+                <input
+                  type="text"
+                  value={absagefrist}
+                  onChange={e => setAbsagefrist(e.target.value)}
+                  placeholder="z.B. bis 3 Tage vorher"
                 />
               </div>
             </div>

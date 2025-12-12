@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS formulare (
   event_ort TEXT,
   max_anmeldungen INTEGER,
   anmeldeschluss TIMESTAMP WITH TIME ZONE,
+  preis TEXT,
+  absagefrist TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
