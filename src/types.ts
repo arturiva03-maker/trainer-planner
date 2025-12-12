@@ -133,12 +133,15 @@ export interface Ausgabe {
   user_id: string
   datum: string
   betrag: number
-  kategorie: 'platzmiete' | 'material' | 'fahrtkosten' | 'fortbildung' | 'sonstiges'
+  kategorie: 'platzmiete' | 'material' | 'fahrtkosten' | 'fortbildung' | 'tennistraining' | 'sonstiges'
   beschreibung?: string
   hat_vorsteuer: boolean
   vorsteuer_satz: number
   beleg_path?: string
   beleg_name?: string
+  rechnungsnummer?: string
+  rechnungsdatum?: string
+  bezahlt: boolean
   created_at: string
 }
 
@@ -147,6 +150,7 @@ export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[
   { value: 'material', label: 'Material' },
   { value: 'fahrtkosten', label: 'Fahrtkosten' },
   { value: 'fortbildung', label: 'Fortbildung' },
+  { value: 'tennistraining', label: 'Tennistraining' },
   { value: 'sonstiges', label: 'Sonstiges' }
 ]
 
@@ -217,6 +221,7 @@ export const EMAIL_PLATZHALTER = [
   { key: '{{iban}}', beschreibung: 'IBAN des Trainers' },
   { key: '{{trainer_name}}', beschreibung: 'Name des Trainers' },
   { key: '{{trainer_adresse}}', beschreibung: 'Adresse des Trainers' },
+  { key: '{{steuernummer}}', beschreibung: 'Steuernummer des Trainers' },
   { key: '{{empfaenger_name}}', beschreibung: 'Name des Rechnungsempfängers' },
   { key: '{{empfaenger_adresse}}', beschreibung: 'Adresse des Rechnungsempfängers' },
   { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis (falls zutreffend)' },
@@ -236,6 +241,7 @@ export const PDF_PLATZHALTER = [
   { key: '{{iban}}', beschreibung: 'IBAN des Trainers' },
   { key: '{{trainer_name}}', beschreibung: 'Name des Trainers' },
   { key: '{{trainer_adresse_html}}', beschreibung: 'Adresse des Trainers (HTML)' },
+  { key: '{{steuernummer}}', beschreibung: 'Steuernummer des Trainers' },
   { key: '{{empfaenger_name}}', beschreibung: 'Name des Rechnungsempfängers' },
   { key: '{{empfaenger_adresse_html}}', beschreibung: 'Adresse des Empfängers (HTML)' },
   { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis' },

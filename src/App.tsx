@@ -466,6 +466,11 @@ function MainApp({ user }: { user: User }) {
   const [pdfVorlagen, setPdfVorlagen] = useState<PdfVorlage[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
+  // Persistenter Navigation-State (wird nicht bei Daten-Refresh zurückgesetzt)
+  const [kalenderDate, setKalenderDate] = useState(new Date())
+  const [buchhaltungYear, setBuchhaltungYear] = useState(new Date().getFullYear())
+  const [buchhaltungSubTab, setBuchhaltungSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
+
   // Load all data
   useEffect(() => {
     loadAllData()
@@ -664,6 +669,8 @@ function MainApp({ user }: { user: User }) {
                 userId={user.id}
                 navigateToTraining={navigateToTraining}
                 onNavigateComplete={() => setNavigateToTraining(null)}
+                currentDate={kalenderDate}
+                onDateChange={setKalenderDate}
               />
             )}
             {activeTab === 'verwaltung' && (
@@ -723,6 +730,10 @@ function MainApp({ user }: { user: User }) {
                 onUpdate={loadAllData}
                 userId={user.id}
                 userEmail={user.email || ''}
+                selectedYear={buchhaltungYear}
+                onYearChange={setBuchhaltungYear}
+                activeSubTab={buchhaltungSubTab}
+                onSubTabChange={setBuchhaltungSubTab}
               />
             )}
             {activeTab === 'weiteres' && (
@@ -750,7 +761,9 @@ function KalenderView({
   onUpdate,
   userId,
   navigateToTraining,
-  onNavigateComplete
+  onNavigateComplete,
+  currentDate,
+  onDateChange
 }: {
   trainings: Training[]
   spieler: Spieler[]
@@ -759,8 +772,9 @@ function KalenderView({
   userId: string
   navigateToTraining?: Training | null
   onNavigateComplete?: () => void
+  currentDate: Date
+  onDateChange: (date: Date) => void
 }) {
-  const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'week' | 'day'>(() =>
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
   )
@@ -770,11 +784,11 @@ function KalenderView({
   useEffect(() => {
     if (navigateToTraining) {
       const trainingDate = new Date(navigateToTraining.datum + 'T12:00:00')
-      setCurrentDate(trainingDate)
+      onDateChange(trainingDate)
       setEditingTraining(navigateToTraining)
       onNavigateComplete?.()
     }
-  }, [navigateToTraining, onNavigateComplete])
+  }, [navigateToTraining, onNavigateComplete, onDateChange])
 
   // Automatisch zwischen Tag- und Wochenansicht wechseln bei Resize
   useEffect(() => {
@@ -838,7 +852,7 @@ function KalenderView({
   const navigateDay = (direction: number) => {
     const newDate = new Date(currentDate)
     newDate.setDate(newDate.getDate() + direction)
-    setCurrentDate(newDate)
+    onDateChange(newDate)
   }
 
   const handleDoubleClick = async (training: Training) => {
@@ -850,11 +864,11 @@ function KalenderView({
   const navigateWeek = (direction: number) => {
     const newDate = new Date(currentDate)
     newDate.setDate(newDate.getDate() + direction * 7)
-    setCurrentDate(newDate)
+    onDateChange(newDate)
   }
 
   const goToToday = () => {
-    setCurrentDate(new Date())
+    onDateChange(new Date())
   }
 
   const isDayView = viewMode === 'day'
@@ -4279,6 +4293,7 @@ function InvoiceModal({
       '{{trainer_name}}': rechnungsstellerName,
       '{{trainer_adresse}}': rechnungsstellerAdresse,
       '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+      '{{steuernummer}}': profile?.steuernummer || '',
       '{{empfaenger_name}}': rechnungsempfaengerName,
       '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
       '{{empfaenger_adresse_html}}': rechnungsempfaengerAdresse.replace(/\n/g, '<br>'),
@@ -4806,6 +4821,7 @@ function InvoiceModal({
                     '{{iban}}': iban,
                     '{{trainer_name}}': rechnungsstellerName,
                     '{{trainer_adresse}}': rechnungsstellerAdresse + (ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''),
+                    '{{steuernummer}}': profile?.steuernummer || '',
                     '{{empfaenger_name}}': rechnungsempfaengerName,
                     '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
                     '{{kleinunternehmer_hinweis}}': kleinunternehmer ? 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.' : '',
@@ -5728,7 +5744,11 @@ function BuchhaltungView({
   profile,
   onUpdate,
   userId,
-  userEmail
+  userEmail,
+  selectedYear,
+  onYearChange,
+  activeSubTab,
+  onSubTabChange
 }: {
   trainings: Training[]
   tarife: Tarif[]
@@ -5742,10 +5762,12 @@ function BuchhaltungView({
   onUpdate: () => void
   userId: string
   userEmail: string
+  selectedYear: number
+  onYearChange: (year: number) => void
+  activeSubTab: 'einnahmen' | 'ausgaben' | 'ust' | 'euer'
+  onSubTabChange: (tab: 'einnahmen' | 'ausgaben' | 'ust' | 'euer') => void
 }) {
   const isAdmin = userEmail === 'arturiva03@gmail.com'
-  const [activeSubTab, setActiveSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [ustZeitraumTyp, setUstZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
   const [euerZeitraumTyp, setEuerZeitraumTyp] = useState<'monat' | 'jahr'>('monat')
   const [showAusgabeModal, setShowAusgabeModal] = useState(false)
@@ -5753,6 +5775,11 @@ function BuchhaltungView({
   const [inclBarEinnahmen, setInclBarEinnahmen] = useState(!isAdmin)
   const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
   const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
+
+  // Reset detailPeriode wenn Zeitraum-Typ geändert wird
+  useEffect(() => {
+    setDetailPeriode(null)
+  }, [ustZeitraumTyp, euerZeitraumTyp])
 
   const kleinunternehmer = profile?.kleinunternehmer ?? false
 
@@ -6142,7 +6169,7 @@ function BuchhaltungView({
           <button
             key={tab}
             className={`tab ${activeSubTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveSubTab(tab)}
+            onClick={() => onSubTabChange(tab)}
           >
             {tab === 'einnahmen' ? 'Einnahmen' :
              tab === 'ausgaben' ? 'Ausgaben' :
@@ -6159,7 +6186,7 @@ function BuchhaltungView({
             <select
               className="form-control"
               value={selectedYear}
-              onChange={e => setSelectedYear(parseInt(e.target.value))}
+              onChange={e => onYearChange(parseInt(e.target.value))}
             >
               {verfuegbareJahre.map(j => (
                 <option key={j} value={j}>{j}</option>
@@ -6388,10 +6415,12 @@ function BuchhaltungView({
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <div>Brutto: <strong>{filteredBrutto.toFixed(2)} €</strong></div>
                 <div>Netto: <strong>{filteredNetto.toFixed(2)} €</strong></div>
                 {!kleinunternehmer && <div>Vorsteuer: <strong>{filteredVorsteuer.toFixed(2)} €</strong></div>}
+                <div style={{ color: 'var(--success)' }}>Bezahlt: <strong>{gefilterteAusgaben.filter(a => a.bezahlt).reduce((s, a) => s + (a.betrag || 0), 0).toFixed(2)} €</strong></div>
+                <div style={{ color: 'var(--danger)' }}>Offen: <strong>{gefilterteAusgaben.filter(a => !a.bezahlt).reduce((s, a) => s + (a.betrag || 0), 0).toFixed(2)} €</strong></div>
               </div>
             </div>
 
@@ -6407,6 +6436,7 @@ function BuchhaltungView({
                       <th>Beschreibung</th>
                       <th style={{ textAlign: 'right' }}>Brutto</th>
                       {!kleinunternehmer && <th style={{ textAlign: 'right' }}>Vorsteuer</th>}
+                      <th>Status</th>
                       <th>Aktionen</th>
                     </tr>
                   </thead>
@@ -6431,6 +6461,17 @@ function BuchhaltungView({
                               {a.hat_vorsteuer ? `${(vorsteuer || 0).toFixed(2)} € (${a.vorsteuer_satz || 0}%)` : '-'}
                             </td>
                           )}
+                          <td>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              fontSize: 12,
+                              background: a.bezahlt ? 'var(--success-light)' : 'var(--warning-light)',
+                              color: a.bezahlt ? 'var(--success)' : 'var(--warning)'
+                            }}>
+                              {a.bezahlt ? 'Bezahlt' : 'Offen'}
+                            </span>
+                          </td>
                           <td>
                             <button
                               className="btn btn-sm btn-secondary"
@@ -7061,11 +7102,16 @@ function AusgabeModal({
   const [beschreibung, setBeschreibung] = useState(ausgabe?.beschreibung || '')
   const [hatVorsteuer, setHatVorsteuer] = useState(ausgabe?.hat_vorsteuer || false)
   const [vorsteuerSatz, setVorsteuerSatz] = useState(ausgabe?.vorsteuer_satz || 19)
+  const [rechnungsnummer, setRechnungsnummer] = useState(ausgabe?.rechnungsnummer || '')
+  const [rechnungsdatum, setRechnungsdatum] = useState(ausgabe?.rechnungsdatum || '')
+  const [bezahlt, setBezahlt] = useState(ausgabe?.bezahlt ?? false)
   const [saving, setSaving] = useState(false)
   const [belegFile, setBelegFile] = useState<File | null>(null)
   const [belegPreview, setBelegPreview] = useState<string | null>(ausgabe?.beleg_path ? null : null)
   const [uploading, setUploading] = useState(false)
   const [existingBelegUrl, setExistingBelegUrl] = useState<string | null>(null)
+  const [parsing, setParsing] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
 
   // Bestehenden Beleg laden
   useEffect(() => {
@@ -7090,10 +7136,80 @@ function AusgabeModal({
     const file = e.target.files?.[0]
     if (file) {
       setBelegFile(file)
+      setParseError(null)
       // Preview erstellen
       const reader = new FileReader()
       reader.onload = (e) => setBelegPreview(e.target?.result as string)
       reader.readAsDataURL(file)
+    }
+  }
+
+  // Beleg mit KI analysieren
+  const parseBelegWithAI = async () => {
+    if (!belegFile) return
+
+    // Bilder und PDFs unterstützt
+    const isImage = belegFile.type.startsWith('image/')
+    const isPdf = belegFile.type === 'application/pdf'
+
+    if (!isImage && !isPdf) {
+      setParseError('Nur Bilder (JPG, PNG) und PDFs werden unterstützt.')
+      return
+    }
+
+    setParsing(true)
+    setParseError(null)
+
+    try {
+      // Datei als Base64 konvertieren
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          // Data URL: "data:image/jpeg;base64,..." - wir brauchen nur den Base64-Teil
+          const base64Data = result.split(',')[1]
+          resolve(base64Data)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(belegFile)
+      })
+
+      // Edge Function aufrufen
+      const { data, error } = await supabase.functions.invoke('parse-beleg', {
+        body: {
+          imageBase64: base64,
+          mimeType: belegFile.type
+        }
+      })
+
+      if (error) throw error
+      if (!data.success) throw new Error(data.error || 'Unbekannter Fehler')
+
+      const belegData = data.data
+
+      // Formularfelder automatisch ausfüllen
+      if (belegData.datum) setDatum(belegData.datum)
+      if (belegData.betrag) setBetrag(belegData.betrag.toString())
+      if (belegData.beschreibung) {
+        // Händler + Beschreibung kombinieren
+        const desc = belegData.haendler
+          ? `${belegData.haendler}: ${belegData.beschreibung}`
+          : belegData.beschreibung
+        setBeschreibung(desc)
+      } else if (belegData.haendler) {
+        setBeschreibung(belegData.haendler)
+      }
+      if (belegData.kategorie) setKategorie(belegData.kategorie)
+      if (belegData.hatVorsteuer !== undefined) setHatVorsteuer(belegData.hatVorsteuer)
+      if (belegData.vorsteuerSatz) setVorsteuerSatz(belegData.vorsteuerSatz)
+      if (belegData.rechnungsnummer) setRechnungsnummer(belegData.rechnungsnummer)
+      if (belegData.rechnungsdatum) setRechnungsdatum(belegData.rechnungsdatum)
+
+    } catch (err) {
+      console.error('Error parsing beleg:', err)
+      setParseError(err instanceof Error ? err.message : 'Fehler bei der KI-Erkennung')
+    } finally {
+      setParsing(false)
     }
   }
 
@@ -7139,7 +7255,10 @@ function AusgabeModal({
         hat_vorsteuer: hatVorsteuer,
         vorsteuer_satz: hatVorsteuer ? vorsteuerSatz : 0,
         beleg_path,
-        beleg_name
+        beleg_name,
+        rechnungsnummer: rechnungsnummer || null,
+        rechnungsdatum: rechnungsdatum || null,
+        bezahlt
       }
 
       if (ausgabe) {
@@ -7248,6 +7367,28 @@ function AusgabeModal({
             />
           </div>
 
+          <div className="form-row">
+            <div className="form-group">
+              <label>Rechnungsnummer</label>
+              <input
+                type="text"
+                className="form-control"
+                value={rechnungsnummer}
+                onChange={e => setRechnungsnummer(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="form-group">
+              <label>Rechnungsdatum</label>
+              <input
+                type="date"
+                className="form-control"
+                value={rechnungsdatum}
+                onChange={e => setRechnungsdatum(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <input
@@ -7272,6 +7413,17 @@ function AusgabeModal({
               </select>
             </div>
           )}
+
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={bezahlt}
+                onChange={e => setBezahlt(e.target.checked)}
+              />
+              Bezahlt
+            </label>
+          </div>
 
           {/* Beleg Upload */}
           <div className="form-group">
@@ -7319,6 +7471,33 @@ function AusgabeModal({
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <span style={{ fontSize: 24 }}>📎</span>
                         <span>{belegFile?.name}</span>
+                      </div>
+                    )}
+                    {/* Automatisch ausfüllen Button - für Bilder und PDFs */}
+                    {(belegFile?.type.startsWith('image/') || belegFile?.type === 'application/pdf') && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ width: '100%', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                        onClick={parseBelegWithAI}
+                        disabled={parsing}
+                      >
+                        {parsing ? (
+                          <>
+                            <span className="spinner" style={{ width: 16, height: 16 }} />
+                            Analysiere Beleg...
+                          </>
+                        ) : (
+                          <>
+                            <span>🤖</span>
+                            Automatisch ausfüllen
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {parseError && (
+                      <div style={{ color: 'var(--danger)', fontSize: 12, marginBottom: 8 }}>
+                        {parseError}
                       </div>
                     )}
                   </div>
@@ -7683,17 +7862,6 @@ function WeiteresView({
             </button>
           </div>
 
-          <div className="card" style={{ marginBottom: 16, padding: 12, background: 'var(--primary-light)' }}>
-            <strong>Verfügbare Platzhalter:</strong>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {EMAIL_PLATZHALTER.map(p => (
-                <span key={p.key} style={{ fontSize: 11, background: 'white', padding: '2px 6px', borderRadius: 4 }} title={p.beschreibung}>
-                  {p.key}
-                </span>
-              ))}
-            </div>
-          </div>
-
           {/* Standard-Vorlage (immer sichtbar) */}
           <div className="card" style={{ marginBottom: 12, border: '2px solid var(--success)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -7774,17 +7942,6 @@ function WeiteresView({
             <button className="btn btn-primary" onClick={() => setShowPdfVorlageModal(true)}>
               + Neue PDF-Vorlage
             </button>
-          </div>
-
-          <div className="card" style={{ marginBottom: 16, padding: 12, background: 'var(--primary-light)' }}>
-            <strong>Verfügbare Platzhalter:</strong>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {PDF_PLATZHALTER.map(p => (
-                <span key={p.key} style={{ fontSize: 11, background: 'white', padding: '2px 6px', borderRadius: 4 }} title={p.beschreibung}>
-                  {p.key}
-                </span>
-              ))}
-            </div>
           </div>
 
           {/* Standard PDF-Vorlage (immer sichtbar) */}
@@ -8084,6 +8241,9 @@ function PdfVorlageModal({
   const [inhalt, setInhalt] = useState(vorlage?.inhalt || getDefaultPdfVorlage())
   const [istStandard, setIstStandard] = useState(vorlage?.ist_standard || vorlagen.length === 0)
   const [saving, setSaving] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [showAiHelper, setShowAiHelper] = useState(!vorlage) // Bei neuer Vorlage standardmäßig anzeigen
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -8136,9 +8296,37 @@ function PdfVorlageModal({
     setInhalt(prev => prev + key)
   }
 
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) {
+      alert('Bitte beschreibe, wie die Vorlage aussehen soll')
+      return
+    }
+
+    setAiGenerating(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-pdf-vorlage', {
+        body: {
+          prompt: aiPrompt,
+          currentVorlage: inhalt !== getDefaultPdfVorlage() ? inhalt : null
+        }
+      })
+
+      if (error) throw error
+      if (!data.success) throw new Error(data.error || 'Unbekannter Fehler')
+
+      setInhalt(data.html)
+      setShowAiHelper(false)
+    } catch (err) {
+      console.error('Error generating vorlage:', err)
+      alert('Fehler bei der KI-Generierung: ' + (err instanceof Error ? err.message : 'Unbekannt'))
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900 }}>
         <div className="modal-header">
           <h3>{vorlage ? 'PDF-Vorlage bearbeiten' : 'Neue PDF-Vorlage'}</h3>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -8166,6 +8354,91 @@ function PdfVorlageModal({
             </label>
           </div>
 
+          {/* KI-Assistent */}
+          <div className="form-group">
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 8
+            }}>
+              <label style={{ margin: 0, fontWeight: 600 }}>
+                KI-Assistent
+              </label>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setShowAiHelper(!showAiHelper)}
+              >
+                {showAiHelper ? 'Ausblenden' : 'Einblenden'}
+              </button>
+            </div>
+
+            {showAiHelper && (
+              <div style={{
+                background: 'var(--primary-light)',
+                borderRadius: 8,
+                padding: 16,
+                marginBottom: 16
+              }}>
+                <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--gray-700)' }}>
+                  Beschreibe in eigenen Worten, wie deine Rechnung aussehen soll. Die KI erstellt dann den HTML-Code für dich.
+                </p>
+                <textarea
+                  className="form-control"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  rows={3}
+                  placeholder="z.B.: Erstelle eine moderne, minimalistische Rechnung mit Logo-Bereich oben links, Rechnungsdetails rechts, und einem freundlichen Abschlusstext. Die Tabelle soll abgerundete Ecken haben."
+                  style={{ marginBottom: 12 }}
+                />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={generateWithAI}
+                    disabled={aiGenerating || !aiPrompt.trim()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    {aiGenerating ? (
+                      <>
+                        <span className="spinner" style={{ width: 16, height: 16 }} />
+                        Generiere...
+                      </>
+                    ) : (
+                      <>
+                        <span>🤖</span>
+                        Vorlage generieren
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setAiPrompt('Erstelle eine professionelle, klassische Rechnung mit klarer Struktur')}
+                  >
+                    Klassisch
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setAiPrompt('Erstelle eine moderne, minimalistische Rechnung mit viel Weißraum und klaren Linien')}
+                  >
+                    Modern
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setAiPrompt('Erstelle eine kompakte Rechnung die wenig Platz braucht und alle wichtigen Infos enthält')}
+                  >
+                    Kompakt
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Platzhalter */}
           <div className="form-group">
             <label>Platzhalter einfügen:</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
@@ -8190,7 +8463,7 @@ function PdfVorlageModal({
               className="form-control"
               value={inhalt}
               onChange={(e) => setInhalt(e.target.value)}
-              rows={18}
+              rows={16}
               style={{ fontFamily: 'monospace', fontSize: 11 }}
               placeholder="HTML für das PDF-Layout..."
             />
@@ -8225,7 +8498,8 @@ function getDefaultPdfVorlage(): string {
   <div class="section">
     <strong>Rechnungssteller:</strong><br>
     {{trainer_name}}<br>
-    {{trainer_adresse_html}}
+    {{trainer_adresse_html}}<br>
+    Steuernummer: {{steuernummer}}
   </div>
   <div class="section" style="text-align: right;">
     <strong>Rechnungsempfänger:</strong><br>
