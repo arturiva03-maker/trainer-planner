@@ -7656,6 +7656,7 @@ function WeiteresView({
   const [editingVorlage, setEditingVorlage] = useState<EmailVorlage | null>(null)
   const [showPdfVorlageModal, setShowPdfVorlageModal] = useState(false)
   const [editingPdfVorlage, setEditingPdfVorlage] = useState<PdfVorlage | null>(null)
+  const [showRechtlichesModal, setShowRechtlichesModal] = useState<'impressum' | 'datenschutz' | null>(null)
 
   // Profile form
   const [name, setName] = useState(profile?.name || '')
@@ -8071,6 +8072,139 @@ function WeiteresView({
             onUpdate()
           }}
         />
+      )}
+
+      {/* Rechtliches Section */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <h3>Rechtliches</h3>
+        </div>
+        <p style={{ color: 'var(--gray-600)', marginBottom: 16, fontSize: 14 }}>
+          Impressum und Datenschutzerklärung für deine öffentlichen Formulare
+        </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={() => setShowRechtlichesModal('impressum')}>
+            📋 Impressum anzeigen
+          </button>
+          <button className="btn" onClick={() => setShowRechtlichesModal('datenschutz')}>
+            🔒 Datenschutz anzeigen
+          </button>
+        </div>
+      </div>
+
+      {/* Rechtliches Modal */}
+      {showRechtlichesModal && (
+        <div className="modal-overlay" onClick={() => setShowRechtlichesModal(null)}>
+          <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{showRechtlichesModal === 'impressum' ? 'Impressum' : 'Datenschutzerklärung'}</h3>
+              <button className="modal-close" onClick={() => setShowRechtlichesModal(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+              {showRechtlichesModal === 'impressum' ? (
+                <div className="rechtliches-content">
+                  <h4>Angaben gemäß § 5 TMG</h4>
+                  <p>
+                    <strong>{profile?.name || '[Name]'} {profile?.nachname || ''}</strong><br />
+                    {profile?.adresse ? profile.adresse.split('\n').map((line, i) => <span key={i}>{line}<br /></span>) : '[Adresse]'}
+                  </p>
+
+                  <h4>Kontakt</h4>
+                  <p>E-Mail: [Ihre E-Mail-Adresse]</p>
+
+                  {profile?.steuernummer && (
+                    <>
+                      <h4>Steuernummer</h4>
+                      <p>{profile.steuernummer}</p>
+                    </>
+                  )}
+
+                  {profile?.ust_id_nr && (
+                    <>
+                      <h4>Umsatzsteuer-ID</h4>
+                      <p>Umsatzsteuer-Identifikationsnummer gemäß § 27 a Umsatzsteuergesetz: {profile.ust_id_nr}</p>
+                    </>
+                  )}
+
+                  <h4>Verantwortlich für den Inhalt</h4>
+                  <p>{profile?.name || '[Name]'} {profile?.nachname || ''}</p>
+
+                  <div style={{ marginTop: 24, padding: 16, background: 'var(--warning-light)', borderRadius: 8 }}>
+                    <strong>Hinweis:</strong> Bitte ergänze die fehlenden Angaben (E-Mail, ggf. Telefon) in deinem Impressum.
+                    Die Daten werden automatisch aus deinem Profil übernommen.
+                  </div>
+                </div>
+              ) : (
+                <div className="rechtliches-content">
+                  <h4>1. Datenschutz auf einen Blick</h4>
+                  <p><strong>Allgemeine Hinweise</strong></p>
+                  <p>
+                    Die folgenden Hinweise geben einen einfachen Überblick darüber, was mit Ihren personenbezogenen
+                    Daten passiert, wenn Sie diese Website nutzen. Personenbezogene Daten sind alle Daten, mit denen
+                    Sie persönlich identifiziert werden können.
+                  </p>
+
+                  <h4>2. Verantwortliche Stelle</h4>
+                  <p>
+                    <strong>{profile?.name || '[Name]'} {profile?.nachname || ''}</strong><br />
+                    {profile?.adresse ? profile.adresse.split('\n').map((line, i) => <span key={i}>{line}<br /></span>) : '[Adresse]'}
+                  </p>
+
+                  <h4>3. Datenerfassung bei Formular-Anmeldungen</h4>
+                  <p><strong>Welche Daten werden erfasst?</strong></p>
+                  <p>
+                    Bei der Nutzung unserer Anmeldeformulare werden die von Ihnen eingegebenen Daten erfasst.
+                    Dies können sein: Name, E-Mail-Adresse, Telefonnummer und weitere von Ihnen angegebene Informationen.
+                  </p>
+                  <p><strong>Wofür werden die Daten genutzt?</strong></p>
+                  <p>
+                    Die Daten werden ausschließlich zur Bearbeitung Ihrer Anmeldung und zur Kommunikation
+                    bezüglich der Veranstaltung/des Trainings verwendet.
+                  </p>
+                  <p><strong>Rechtsgrundlage</strong></p>
+                  <p>
+                    Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung)
+                    sowie Art. 6 Abs. 1 lit. a DSGVO (Einwilligung).
+                  </p>
+
+                  <h4>4. Hosting</h4>
+                  <p>
+                    Diese Website wird bei externen Dienstleistern gehostet (Vercel, Supabase).
+                    Die personenbezogenen Daten, die auf dieser Website erfasst werden, werden auf den
+                    Servern dieser Anbieter gespeichert.
+                  </p>
+
+                  <h4>5. Ihre Rechte</h4>
+                  <p>Sie haben jederzeit das Recht:</p>
+                  <ul style={{ marginLeft: 20, marginBottom: 16 }}>
+                    <li>Auskunft über Ihre gespeicherten Daten zu erhalten</li>
+                    <li>Berichtigung unrichtiger Daten zu verlangen</li>
+                    <li>Löschung Ihrer Daten zu verlangen</li>
+                    <li>Die Einschränkung der Verarbeitung zu verlangen</li>
+                    <li>Der Verarbeitung zu widersprechen</li>
+                    <li>Ihre Daten in einem übertragbaren Format zu erhalten</li>
+                  </ul>
+
+                  <h4>6. Cookies</h4>
+                  <p>
+                    Diese Website verwendet nur technisch notwendige Cookies für die Authentifizierung.
+                    Es werden keine Tracking- oder Analyse-Cookies verwendet.
+                  </p>
+
+                  <div style={{ marginTop: 24, padding: 16, background: 'var(--warning-light)', borderRadius: 8 }}>
+                    <strong>Hinweis:</strong> Dies ist eine Vorlage. Bitte prüfe und passe den Text an deine
+                    spezifischen Anforderungen an. Bei Unsicherheit konsultiere einen Rechtsanwalt.
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowRechtlichesModal(null)}>
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -8698,12 +8832,14 @@ function NotizModal({
 // ============ PUBLIC FORMULAR VIEW (öffentlich ohne Login) ============
 function PublicFormularView({ formularId }: { formularId: string }) {
   const [formular, setFormular] = useState<Formular | null>(null)
+  const [trainerProfile, setTrainerProfile] = useState<TrainerProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState<Record<string, string | boolean | number>>({})
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [showLegal, setShowLegal] = useState<'impressum' | 'datenschutz' | null>(null)
 
   useEffect(() => {
     loadFormular()
@@ -8746,6 +8882,17 @@ function PublicFormularView({ formularId }: { formularId: string }) {
       }
 
       setFormular(data)
+
+      // Lade Trainer-Profil für Impressum/Datenschutz
+      const { data: profileData } = await supabase
+        .from('trainer_profiles')
+        .select('*')
+        .eq('user_id', data.user_id)
+        .single()
+
+      if (profileData) {
+        setTrainerProfile(profileData)
+      }
 
       // Initialisiere formData mit leeren Werten
       const initial: Record<string, string | boolean | number> = {}
@@ -8976,7 +9123,77 @@ function PublicFormularView({ formularId }: { formularId: string }) {
             {submitting ? 'Wird gesendet...' : 'Anmeldung absenden'}
           </button>
         </form>
+
+        {/* Footer mit Impressum/Datenschutz */}
+        <div className="public-form-footer">
+          <button onClick={() => setShowLegal('impressum')}>Impressum</button>
+          <span>|</span>
+          <button onClick={() => setShowLegal('datenschutz')}>Datenschutz</button>
+        </div>
       </div>
+
+      {/* Legal Modal */}
+      {showLegal && (
+        <div className="modal-overlay" onClick={() => setShowLegal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+            <div className="modal-header">
+              <h3>{showLegal === 'impressum' ? 'Impressum' : 'Datenschutzerklärung'}</h3>
+              <button className="modal-close" onClick={() => setShowLegal(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+              {showLegal === 'impressum' ? (
+                <div className="rechtliches-content">
+                  <h4>Angaben gemäß § 5 TMG</h4>
+                  <p>
+                    <strong>{trainerProfile?.name || ''} {trainerProfile?.nachname || ''}</strong><br />
+                    {trainerProfile?.adresse ? trainerProfile.adresse.split('\n').map((line, i) => <span key={i}>{line}<br /></span>) : ''}
+                  </p>
+                  {trainerProfile?.steuernummer && (
+                    <>
+                      <h4>Steuernummer</h4>
+                      <p>{trainerProfile.steuernummer}</p>
+                    </>
+                  )}
+                  {trainerProfile?.ust_id_nr && (
+                    <>
+                      <h4>Umsatzsteuer-ID</h4>
+                      <p>{trainerProfile.ust_id_nr}</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="rechtliches-content">
+                  <h4>Datenschutz</h4>
+                  <p>
+                    <strong>Verantwortlich:</strong><br />
+                    {trainerProfile?.name || ''} {trainerProfile?.nachname || ''}<br />
+                    {trainerProfile?.adresse ? trainerProfile.adresse.split('\n').map((line, i) => <span key={i}>{line}<br /></span>) : ''}
+                  </p>
+                  <h4>Datenerfassung</h4>
+                  <p>
+                    Die von Ihnen eingegebenen Daten werden zur Bearbeitung Ihrer Anmeldung verwendet.
+                    Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.
+                  </p>
+                  <h4>Ihre Rechte</h4>
+                  <p>
+                    Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der
+                    Verarbeitung Ihrer Daten.
+                  </p>
+                  <h4>Cookies</h4>
+                  <p>
+                    Diese Seite verwendet nur technisch notwendige Cookies.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowLegal(null)}>
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
