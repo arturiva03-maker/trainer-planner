@@ -1052,12 +1052,21 @@ function KalenderView({
         <div className="calendar-header">
           <div className="calendar-nav">
             <button onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
-            <h3>
-              {isDayView
-                ? currentDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' })
-                : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
-              }
-            </h3>
+            <div className="calendar-nav-center">
+              <h3>
+                {isDayView
+                  ? currentDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' })
+                  : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
+                }
+              </h3>
+              <button
+                className={`btn btn-sm ${formatDate(currentDate) === formatDate(new Date()) ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={goToToday}
+                style={{ marginTop: 4 }}
+              >
+                Heute
+              </button>
+            </div>
             <button onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
           <div className="view-toggle">
@@ -1073,7 +1082,6 @@ function KalenderView({
             >
               Tag
             </button>
-            <button className={`btn ${formatDate(currentDate) === formatDate(new Date()) ? 'btn-primary' : ''}`} onClick={goToToday}>Heute</button>
             <button className="btn btn-success" onClick={() => setShowAddTraining(true)}>
               + Neu
             </button>

@@ -1155,11 +1155,22 @@ tbody tr:last-child td {
 }
 
 .calendar-nav h3 {
-  margin: 0 8px;
-  min-width: 180px;
+  margin: 0;
   text-align: center;
   font-size: 18px;
   font-weight: 600;
+}
+
+.calendar-nav-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 180px;
+}
+
+.calendar-nav-center .btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
 }
 
 .view-toggle {
