@@ -1199,6 +1199,7 @@ function TrainingModal({
   const [wiederholenBis, setWiederholenBis] = useState('2026-03-29')
   const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
+  const [spielerSuche, setSpielerSuche] = useState('')
 
   // State für Bezahl-Abfrage bei Spieler-Entfernung
   const [removeDialog, setRemoveDialog] = useState<{spielerId: string, spielerName: string} | null>(null)
@@ -1488,8 +1489,18 @@ function TrainingModal({
 
           <div className="form-group">
             <label>Spieler auswählen</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Spieler suchen..."
+              value={spielerSuche}
+              onChange={(e) => setSpielerSuche(e.target.value)}
+              style={{ marginBottom: 8 }}
+            />
             <div className="multi-select">
-              {spieler.map((s) => (
+              {spieler
+                .filter(s => s.name.toLowerCase().includes(spielerSuche.toLowerCase()))
+                .map((s) => (
                 <div
                   key={s.id}
                   className={`multi-select-item ${selectedSpieler.includes(s.id) ? 'selected' : ''}`}
@@ -1506,6 +1517,11 @@ function TrainingModal({
               {spieler.length === 0 && (
                 <div style={{ padding: 12, color: 'var(--gray-500)' }}>
                   Noch keine Spieler angelegt
+                </div>
+              )}
+              {spieler.length > 0 && spieler.filter(s => s.name.toLowerCase().includes(spielerSuche.toLowerCase())).length === 0 && (
+                <div style={{ padding: 12, color: 'var(--gray-500)' }}>
+                  Kein Spieler gefunden
                 </div>
               )}
             </div>
