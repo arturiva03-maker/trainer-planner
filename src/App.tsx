@@ -1051,17 +1051,29 @@ function KalenderView({
             })
 
           // Training als bezahlt markieren für diesen Spieler
-          await supabase
+          const { data: existingPayment } = await supabase
             .from('spieler_training_payments')
-            .upsert({
-              user_id: userId,
-              training_id: training.id,
-              spieler_id: spielerId,
-              bezahlt: true,
-              bar_bezahlt: false
-            }, {
-              onConflict: 'training_id,spieler_id'
-            })
+            .select('id')
+            .eq('training_id', training.id)
+            .eq('spieler_id', spielerId)
+            .single()
+
+          if (existingPayment) {
+            await supabase
+              .from('spieler_training_payments')
+              .update({ bezahlt: true })
+              .eq('id', existingPayment.id)
+          } else {
+            await supabase
+              .from('spieler_training_payments')
+              .insert({
+                user_id: userId,
+                training_id: training.id,
+                spieler_id: spielerId,
+                bezahlt: true,
+                bar_bezahlt: false
+              })
+          }
         }
       }
     }
