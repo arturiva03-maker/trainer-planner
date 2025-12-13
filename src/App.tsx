@@ -702,7 +702,6 @@ function MainApp({ user }: { user: User }) {
                 trainings={trainings}
                 spieler={spieler}
                 tarife={tarife}
-                guthabenListe={guthabenListe}
                 onUpdate={loadAllData}
                 userId={user.id}
                 navigateToTraining={navigateToTraining}
@@ -805,7 +804,6 @@ function KalenderView({
   trainings,
   spieler,
   tarife,
-  guthabenListe,
   onUpdate,
   userId,
   navigateToTraining,
@@ -816,7 +814,6 @@ function KalenderView({
   trainings: Training[]
   spieler: Spieler[]
   tarife: Tarif[]
-  guthabenListe: Guthaben[]
   onUpdate: () => void
   userId: string
   navigateToTraining?: Training | null
@@ -1022,9 +1019,15 @@ function KalenderView({
       }
       betragProSpieler += (training.korrektur_betrag || 0) / training.spieler_ids.length
 
-      // Für jeden Spieler prüfen ob Guthaben vorhanden
+      // Für jeden Spieler prüfen ob Guthaben vorhanden (direkt aus DB laden für Aktualität)
       for (const spielerId of training.spieler_ids) {
-        const guthaben = guthabenListe.find(g => g.spieler_id === spielerId)
+        const { data: guthaben } = await supabase
+          .from('guthaben')
+          .select('*')
+          .eq('spieler_id', spielerId)
+          .eq('user_id', userId)
+          .single()
+
         if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
           // Guthaben abbuchen
           await supabase
