@@ -15,6 +15,7 @@ import type {
   Ausgabe,
   ManuelleRechnung,
   Guthaben,
+  GuthabenTransaktion,
   SpielerTrainingPayment,
   EmailVorlage,
   PdfVorlage,
@@ -474,6 +475,7 @@ function MainApp({ user }: { user: User }) {
   const [trainer, setTrainer] = useState<Trainer[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
   const [guthabenListe, setGuthabenListe] = useState<Guthaben[]>([])
+  const [guthabenTransaktionen, setGuthabenTransaktionen] = useState<GuthabenTransaktion[]>([])
   const [spielerPayments, setSpielerPayments] = useState<SpielerTrainingPayment[]>([])
   const [notizen, setNotizen] = useState<Notiz[]>([])
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
@@ -510,6 +512,7 @@ function MainApp({ user }: { user: User }) {
         ausgabenRes,
         manuelleRechnungenRes,
         guthabenRes,
+        guthabenTransaktionenRes,
         spielerPaymentsRes,
         emailVorlagenRes,
         pdfVorlagenRes,
@@ -527,6 +530,7 @@ function MainApp({ user }: { user: User }) {
         supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('manuelle_rechnungen').select('*').eq('user_id', user.id).order('rechnungsdatum', { ascending: false }),
         supabase.from('guthaben').select('*').eq('user_id', user.id),
+        supabase.from('guthaben_transaktionen').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('spieler_training_payments').select('*').eq('user_id', user.id),
         supabase.from('email_vorlagen').select('*').eq('user_id', user.id).order('name'),
         supabase.from('pdf_vorlagen').select('*').eq('user_id', user.id).order('name'),
@@ -541,6 +545,7 @@ function MainApp({ user }: { user: User }) {
       if (trainerRes.data) setTrainer(trainerRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
       if (guthabenRes.data) setGuthabenListe(guthabenRes.data)
+      if (guthabenTransaktionenRes.data) setGuthabenTransaktionen(guthabenTransaktionenRes.data)
       if (spielerPaymentsRes.data) setSpielerPayments(spielerPaymentsRes.data)
       if (notizenRes.data) setNotizen(notizenRes.data)
       if (planungRes.data) setPlanungSheets(planungRes.data)
@@ -697,6 +702,7 @@ function MainApp({ user }: { user: User }) {
                 trainings={trainings}
                 spieler={spieler}
                 tarife={tarife}
+                guthabenListe={guthabenListe}
                 onUpdate={loadAllData}
                 userId={user.id}
                 navigateToTraining={navigateToTraining}
@@ -757,6 +763,7 @@ function MainApp({ user }: { user: User }) {
                 manuelleRechnungen={manuelleRechnungen}
                 adjustments={adjustments}
                 spielerPayments={spielerPayments}
+                guthabenTransaktionen={guthabenTransaktionen}
                 profile={profile}
                 onUpdate={loadAllData}
                 userId={user.id}
@@ -798,6 +805,7 @@ function KalenderView({
   trainings,
   spieler,
   tarife,
+  guthabenListe,
   onUpdate,
   userId,
   navigateToTraining,
@@ -808,6 +816,7 @@ function KalenderView({
   trainings: Training[]
   spieler: Spieler[]
   tarife: Tarif[]
+  guthabenListe: Guthaben[]
   onUpdate: () => void
   userId: string
   navigateToTraining?: Training | null
@@ -997,6 +1006,66 @@ function KalenderView({
   const handleDoubleClick = async (training: Training) => {
     const newStatus = training.status === 'geplant' ? 'durchgefuehrt' : 'geplant'
     await supabase.from('trainings').update({ status: newStatus }).eq('id', training.id)
+
+    // Bei Wechsel auf "durchgeführt": Automatisch Guthaben verrechnen
+    if (newStatus === 'durchgefuehrt' && training.spieler_ids.length > 0) {
+      const tarif = tarife.find(ta => ta.id === training.tarif_id)
+      const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+      const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+      const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+      // Berechne Betrag pro Spieler
+      let betragProSpieler = preis * duration
+      if (abrechnungsart === 'proSpieler') {
+        const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+        betragProSpieler = betragProSpieler / (training.spieler_ids.length + entfernteMitBezahlung.length)
+      }
+      betragProSpieler += (training.korrektur_betrag || 0) / training.spieler_ids.length
+
+      // Für jeden Spieler prüfen ob Guthaben vorhanden
+      for (const spielerId of training.spieler_ids) {
+        const guthaben = guthabenListe.find(g => g.spieler_id === spielerId)
+        if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
+          // Guthaben abbuchen
+          await supabase
+            .from('guthaben')
+            .update({
+              aktuell: guthaben.aktuell - betragProSpieler,
+              verbraucht_gesamt: guthaben.verbraucht_gesamt + betragProSpieler,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', guthaben.id)
+
+          // Transaktion speichern
+          await supabase
+            .from('guthaben_transaktionen')
+            .insert({
+              user_id: userId,
+              spieler_id: spielerId,
+              betrag: -betragProSpieler,
+              typ: 'abbuchung',
+              training_id: training.id,
+              beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
+              bar: false,
+              datum: formatDate(new Date())
+            })
+
+          // Training als bezahlt markieren für diesen Spieler
+          await supabase
+            .from('spieler_training_payments')
+            .upsert({
+              user_id: userId,
+              training_id: training.id,
+              spieler_id: spielerId,
+              bezahlt: true,
+              bar_bezahlt: false
+            }, {
+              onConflict: 'training_id,spieler_id'
+            })
+        }
+      }
+    }
+
     onUpdate()
   }
 
@@ -6332,6 +6401,7 @@ function BuchhaltungView({
   manuelleRechnungen,
   adjustments,
   spielerPayments,
+  guthabenTransaktionen,
   profile,
   onUpdate,
   userId,
@@ -6348,6 +6418,7 @@ function BuchhaltungView({
   manuelleRechnungen: ManuelleRechnung[]
   adjustments: MonthlyAdjustment[]
   spielerPayments: SpielerTrainingPayment[]
+  guthabenTransaktionen: GuthabenTransaktion[]
   profile: TrainerProfile | null
   onUpdate: () => void
   userId: string
@@ -6560,14 +6631,43 @@ function BuchhaltungView({
       })
   }, [adjustments, selectedYear, spieler, kleinunternehmer])
 
-  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen)
-  // Guthaben-Einzahlungen werden separat in der guthaben_transaktionen Tabelle getrackt
+  // Guthaben-Einzahlungen als Einnahmen
+  const guthabenEinzahlungen = useMemo(() => {
+    return guthabenTransaktionen
+      .filter(t => {
+        if (t.typ !== 'einzahlung') return false
+        if (!t.datum.startsWith(selectedYear.toString())) return false
+        // Bar-Einzahlungen nur bei inclBarEinnahmen anzeigen
+        if (!inclBarEinnahmen && t.bar) return false
+        return true
+      })
+      .map(t => {
+        const sp = spieler.find(s => s.id === t.spieler_id)
+        // Guthaben-Einzahlungen sind ohne USt (Vorauszahlung)
+        return {
+          guthabenId: t.id,
+          datum: t.datum,
+          spielerName: sp?.name || 'Unbekannt',
+          tarifName: t.beschreibung || 'Guthaben-Einzahlung',
+          brutto: t.betrag,
+          netto: t.betrag,
+          ust: 0,
+          ustSatz: 0,
+          barBezahlt: t.bar,
+          istGuthabenEinzahlung: true
+        }
+      })
+      .sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [guthabenTransaktionen, selectedYear, spieler, inclBarEinnahmen])
+
+  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen + Guthaben-Einzahlungen)
   const alleEinnahmen = useMemo(() => {
-    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false }))
-    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istKorrektur: false }))
-    const korrekturenMapped = korrekturEinnahmen
-    return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen])
+    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: false }))
+    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istKorrektur: false, istGuthabenEinzahlung: false }))
+    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istManuelleRechnung: false, istGuthabenEinzahlung: false }))
+    const guthabenMapped = guthabenEinzahlungen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false }))
+    return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped, ...guthabenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen, guthabenEinzahlungen])
 
   // Einnahmen nach Monat gruppiert
   const einnahmenNachMonat = useMemo(() => {
