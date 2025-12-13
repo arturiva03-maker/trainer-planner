@@ -3445,10 +3445,12 @@ function AbrechnungView({
     const existing = getGuthaben(showGuthabenModal)
     if (!existing) return
 
-    if (!confirm(`Guthaben wirklich löschen? Aktueller Stand: ${existing.aktuell.toFixed(2)} €`)) return
+    if (!confirm(`Guthaben wirklich löschen? Aktueller Stand: ${existing.aktuell.toFixed(2)} €\n\nAlle Transaktionen werden ebenfalls gelöscht.`)) return
 
+    // Erst alle Transaktionen für diesen Spieler löschen
+    await supabase.from('guthaben_transaktionen').delete().eq('spieler_id', showGuthabenModal)
+    // Dann das Guthaben selbst löschen
     await supabase.from('guthaben').delete().eq('id', existing.id)
-    // Transaktionen können bestehen bleiben als Historie
 
     setShowGuthabenModal(null)
     resetGuthabenForm()
