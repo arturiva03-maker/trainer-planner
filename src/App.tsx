@@ -1340,17 +1340,15 @@ function TrainingModal({
         await executeDelete()
       }
     } else if (cancelDialog.type === 'cancel') {
-      // Bei Absagen: Spieler als entfernt markieren wenn Bezahlung nötig
-      if (mussBezahlen) {
-        const neueEntfernteSpieler = selectedSpieler.map(spielerId => ({
-          spieler_id: spielerId,
-          muss_bezahlen: true,
-          entfernt_am: new Date().toISOString()
-        }))
+      // Bei Absagen: Spieler immer als entfernt markieren (mit oder ohne Bezahlpflicht)
+      const neueEntfernteSpieler = selectedSpieler.map(spielerId => ({
+        spieler_id: spielerId,
+        muss_bezahlen: mussBezahlen,
+        entfernt_am: new Date().toISOString()
+      }))
 
-        setEntfernteSpieler(prev => [...prev, ...neueEntfernteSpieler])
-        setSelectedSpieler([]) // Alle Spieler entfernen
-      }
+      setEntfernteSpieler(prev => [...prev, ...neueEntfernteSpieler])
+      setSelectedSpieler([]) // Alle Spieler entfernen
       setStatus('abgesagt')
       setCancelDialog(null)
     }
