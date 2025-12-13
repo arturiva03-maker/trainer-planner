@@ -1257,9 +1257,8 @@ function TrainingModal({
   }
 
   const handleSave = async () => {
-    // Bei abgesagten Trainings mit entfernten Spielern sind keine aktiven Spieler nötig
-    const hatEntfernteSpieler = entfernteSpieler.length > 0
-    if (selectedSpieler.length === 0 && !(status === 'abgesagt' && hatEntfernteSpieler)) {
+    // Bei abgesagten Trainings sind keine aktiven Spieler nötig
+    if (selectedSpieler.length === 0 && status !== 'abgesagt') {
       alert('Bitte mindestens einen Spieler auswählen')
       return
     }
