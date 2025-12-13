@@ -2684,7 +2684,9 @@ function AbrechnungView({
   const [trainingKorrekturBetrag, setTrainingKorrekturBetrag] = useState('')
   const [trainingKorrekturGrund, setTrainingKorrekturGrund] = useState('')
   const [showGuthabenModal, setShowGuthabenModal] = useState<string | null>(null) // spielerId
+  const [guthabenModus, setGuthabenModus] = useState<'einzahlen' | 'bearbeiten'>('einzahlen')
   const [guthabenBetrag, setGuthabenBetrag] = useState('')
+  const [guthabenNeuerStand, setGuthabenNeuerStand] = useState('')
   const [guthabenDatum, setGuthabenDatum] = useState(formatDate(new Date()))
   const [guthabenNotiz, setGuthabenNotiz] = useState('')
   const [guthabenBar, setGuthabenBar] = useState(false)
@@ -3297,15 +3299,101 @@ function AbrechnungView({
   }
 
   const resetGuthabenForm = () => {
+    setGuthabenModus('einzahlen')
     setGuthabenBetrag('')
+    setGuthabenNeuerStand('')
     setGuthabenDatum(formatDate(new Date()))
     setGuthabenNotiz('')
     setGuthabenBar(false)
   }
 
+  // Guthaben bearbeiten (Stand direkt setzen)
+  const saveGuthabenBearbeitung = async () => {
+    if (!showGuthabenModal) return
+
+    const neuerStand = parseFloat(guthabenNeuerStand.replace(',', '.'))
+    if (isNaN(neuerStand) || neuerStand < 0) {
+      alert('Bitte gültigen Betrag eingeben (0 oder mehr)')
+      return
+    }
+
+    const spielerId = showGuthabenModal
+    const existing = getGuthaben(spielerId)
+
+    if (existing) {
+      // Guthaben aktualisieren
+      const differenz = neuerStand - existing.aktuell
+      await supabase
+        .from('guthaben')
+        .update({
+          aktuell: neuerStand,
+          // Bei Erhöhung: eingezahlt_gesamt anpassen, bei Verringerung: verbraucht_gesamt
+          eingezahlt_gesamt: differenz > 0 ? existing.eingezahlt_gesamt + differenz : existing.eingezahlt_gesamt,
+          verbraucht_gesamt: differenz < 0 ? existing.verbraucht_gesamt + Math.abs(differenz) : existing.verbraucht_gesamt,
+          notiz: guthabenNotiz || existing.notiz || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+
+      // Korrektur-Transaktion speichern
+      if (differenz !== 0) {
+        await supabase
+          .from('guthaben_transaktionen')
+          .insert({
+            user_id: userId,
+            spieler_id: spielerId,
+            betrag: differenz,
+            typ: differenz > 0 ? 'einzahlung' : 'abbuchung',
+            beschreibung: guthabenNotiz || 'Manuelle Korrektur',
+            bar: false,
+            datum: formatDate(new Date())
+          })
+      }
+    } else if (neuerStand > 0) {
+      // Neues Guthaben anlegen
+      await supabase
+        .from('guthaben')
+        .insert({
+          user_id: userId,
+          spieler_id: spielerId,
+          aktuell: neuerStand,
+          eingezahlt_gesamt: neuerStand,
+          verbraucht_gesamt: 0,
+          letzte_einzahlung: formatDate(new Date()),
+          notiz: guthabenNotiz || null
+        })
+    }
+
+    setShowGuthabenModal(null)
+    resetGuthabenForm()
+    onUpdate()
+  }
+
+  // Guthaben löschen
+  const deleteGuthaben = async () => {
+    if (!showGuthabenModal) return
+
+    const existing = getGuthaben(showGuthabenModal)
+    if (!existing) return
+
+    if (!confirm(`Guthaben wirklich löschen? Aktueller Stand: ${existing.aktuell.toFixed(2)} €`)) return
+
+    await supabase.from('guthaben').delete().eq('id', existing.id)
+    // Transaktionen können bestehen bleiben als Historie
+
+    setShowGuthabenModal(null)
+    resetGuthabenForm()
+    onUpdate()
+  }
+
   // Guthaben Modal öffnen
   const openGuthabenModal = (spielerId: string) => {
     resetGuthabenForm()
+    const existing = getGuthaben(spielerId)
+    if (existing) {
+      setGuthabenNeuerStand(existing.aktuell.toString())
+      setGuthabenNotiz(existing.notiz || '')
+    }
     setShowGuthabenModal(spielerId)
   }
 
@@ -4330,7 +4418,7 @@ function AbrechnungView({
           <div className="modal-overlay" onClick={() => setShowGuthabenModal(null)}>
             <div className="modal" style={{ maxWidth: 450 }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <h3>Guthaben aufladen</h3>
+                <h3>Guthaben verwalten</h3>
                 <button className="modal-close" onClick={() => setShowGuthabenModal(null)}>×</button>
               </div>
               <div className="modal-body">
@@ -4344,58 +4432,125 @@ function AbrechnungView({
                   )}
                 </div>
 
-                <div className="form-group">
-                  <label>Einzahlungsbetrag (€)</label>
-                  <input
-                    type="text"
-                    value={guthabenBetrag}
-                    onChange={e => setGuthabenBetrag(e.target.value)}
-                    placeholder="0.00"
-                    style={{ fontFamily: 'monospace' }}
-                  />
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button
+                    className={`btn ${guthabenModus === 'einzahlen' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setGuthabenModus('einzahlen')}
+                  >
+                    Einzahlen
+                  </button>
+                  <button
+                    className={`btn ${guthabenModus === 'bearbeiten' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setGuthabenModus('bearbeiten')}
+                  >
+                    Bearbeiten
+                  </button>
                 </div>
 
-                <div className="form-group">
-                  <label>Einzahlungsdatum</label>
-                  <input
-                    type="date"
-                    value={guthabenDatum}
-                    onChange={e => setGuthabenDatum(e.target.value)}
-                  />
-                </div>
+                {guthabenModus === 'einzahlen' ? (
+                  <>
+                    <div className="form-group">
+                      <label>Einzahlungsbetrag (€)</label>
+                      <input
+                        type="text"
+                        value={guthabenBetrag}
+                        onChange={e => setGuthabenBetrag(e.target.value)}
+                        placeholder="0.00"
+                        style={{ fontFamily: 'monospace' }}
+                      />
+                    </div>
 
-                <div className="form-group">
-                  <label>Notiz (optional)</label>
-                  <input
-                    type="text"
-                    value={guthabenNotiz}
-                    onChange={e => setGuthabenNotiz(e.target.value)}
-                    placeholder="z.B. Einzahlung für Q1 2025"
-                  />
-                </div>
+                    <div className="form-group">
+                      <label>Einzahlungsdatum</label>
+                      <input
+                        type="date"
+                        value={guthabenDatum}
+                        onChange={e => setGuthabenDatum(e.target.value)}
+                      />
+                    </div>
 
-                <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={guthabenBar}
-                      onChange={e => setGuthabenBar(e.target.checked)}
-                    />
-                    Bar eingezahlt
-                  </label>
-                </div>
+                    <div className="form-group">
+                      <label>Notiz (optional)</label>
+                      <input
+                        type="text"
+                        value={guthabenNotiz}
+                        onChange={e => setGuthabenNotiz(e.target.value)}
+                        placeholder="z.B. Einzahlung für Q1 2025"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={guthabenBar}
+                          onChange={e => setGuthabenBar(e.target.checked)}
+                        />
+                        Bar eingezahlt
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="form-group">
+                      <label>Neuer Guthaben-Stand (€)</label>
+                      <input
+                        type="text"
+                        value={guthabenNeuerStand}
+                        onChange={e => setGuthabenNeuerStand(e.target.value)}
+                        placeholder="0.00"
+                        style={{ fontFamily: 'monospace' }}
+                      />
+                      <small style={{ color: 'var(--gray-500)', display: 'block', marginTop: 4 }}>
+                        Aktuell: {existing ? existing.aktuell.toFixed(2) : '0.00'} €
+                      </small>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Notiz / Grund (optional)</label>
+                      <input
+                        type="text"
+                        value={guthabenNotiz}
+                        onChange={e => setGuthabenNotiz(e.target.value)}
+                        placeholder="z.B. Korrektur, Rückerstattung..."
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="btn btn-secondary" onClick={() => setShowGuthabenModal(null)}>
-                  Abbrechen
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={saveGuthabenEinzahlung}
-                  disabled={!guthabenBetrag}
-                >
-                  Einzahlen
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+                <div>
+                  {existing && guthabenModus === 'bearbeiten' && (
+                    <button className="btn btn-danger" onClick={deleteGuthaben}>
+                      Löschen
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-secondary" onClick={() => setShowGuthabenModal(null)}>
+                    Abbrechen
+                  </button>
+                  {guthabenModus === 'einzahlen' ? (
+                    <button
+                      className="btn btn-primary"
+                      onClick={saveGuthabenEinzahlung}
+                      disabled={!guthabenBetrag}
+                    >
+                      Einzahlen
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary"
+                      onClick={saveGuthabenBearbeitung}
+                      disabled={guthabenNeuerStand === ''}
+                    >
+                      Speichern
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
