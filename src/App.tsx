@@ -866,15 +866,6 @@ function KalenderView({
     return trainingsForWeek.filter((t) => t.datum === dateStr)
   }
 
-  const getSpielerNames = (ids: string[], vornameOnly = false) => {
-    return ids
-      .map((id) => {
-        const name = spieler.find((s) => s.id === id)?.name || 'Unbekannt'
-        return vornameOnly ? name.split(' ')[0] : name
-      })
-      .join(', ')
-  }
-
   // Gibt Spielernamen mit durchgestrichenen entfernten Spielern zurück
   const getTrainingDisplayTitle = (training: Training, vornameOnly = false) => {
     const aktiveSpieler = training.spieler_ids.map(id => {
