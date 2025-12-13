@@ -2906,6 +2906,7 @@ function AbrechnungView({
           let summe = 0
           let barSumme = 0
           let bezahltSumme = 0
+          let vorauszahlungSumme = 0
           let offeneSumme = 0
 
           tagTrainings.forEach(t => {
@@ -2926,10 +2927,17 @@ function AbrechnungView({
             betrag += (t.korrektur_betrag || 0)
 
             summe += betrag
-            if (t.bar_bezahlt) {
+
+            // Spieler-spezifischen Bezahlstatus verwenden
+            const paymentStatus = getSpielerPaymentStatus(s.spieler.id, t)
+            const vorauszahlung = istVorauszahlungAktiv(s.spieler.id, t)
+
+            if (paymentStatus.barBezahlt) {
               barSumme += betrag
-            } else if (t.bezahlt) {
+            } else if (paymentStatus.bezahlt) {
               bezahltSumme += betrag
+            } else if (vorauszahlung) {
+              vorauszahlungSumme += betrag
             } else {
               offeneSumme += betrag
             }
@@ -2941,6 +2949,7 @@ function AbrechnungView({
             summe,
             barSumme,
             bezahltSumme,
+            vorauszahlungSumme,
             offeneSumme,
             bezahlt: offeneSumme <= 0
           }
