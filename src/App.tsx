@@ -14,7 +14,7 @@ import type {
   Tab,
   Ausgabe,
   ManuelleRechnung,
-  Vorauszahlung,
+  Guthaben,
   SpielerTrainingPayment,
   EmailVorlage,
   PdfVorlage,
@@ -32,7 +32,6 @@ import {
   calculateDuration,
   generateRechnungsnummer,
   WOCHENTAGE,
-  WOCHENTAGE_LANG,
   formatMonthGerman,
   formatQuartal
 } from './utils'
@@ -474,7 +473,7 @@ function MainApp({ user }: { user: User }) {
   const [trainings, setTrainings] = useState<Training[]>([])
   const [trainer, setTrainer] = useState<Trainer[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
-  const [vorauszahlungen, setVorauszahlungen] = useState<Vorauszahlung[]>([])
+  const [guthabenListe, setGuthabenListe] = useState<Guthaben[]>([])
   const [spielerPayments, setSpielerPayments] = useState<SpielerTrainingPayment[]>([])
   const [notizen, setNotizen] = useState<Notiz[]>([])
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
@@ -510,7 +509,7 @@ function MainApp({ user }: { user: User }) {
         planungRes,
         ausgabenRes,
         manuelleRechnungenRes,
-        vorauszahlungenRes,
+        guthabenRes,
         spielerPaymentsRes,
         emailVorlagenRes,
         pdfVorlagenRes,
@@ -527,7 +526,7 @@ function MainApp({ user }: { user: User }) {
         supabase.from('planung_sheets').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('manuelle_rechnungen').select('*').eq('user_id', user.id).order('rechnungsdatum', { ascending: false }),
-        supabase.from('vorauszahlungen').select('*').eq('user_id', user.id).order('zahlungsdatum', { ascending: false }),
+        supabase.from('guthaben').select('*').eq('user_id', user.id),
         supabase.from('spieler_training_payments').select('*').eq('user_id', user.id),
         supabase.from('email_vorlagen').select('*').eq('user_id', user.id).order('name'),
         supabase.from('pdf_vorlagen').select('*').eq('user_id', user.id).order('name'),
@@ -541,7 +540,7 @@ function MainApp({ user }: { user: User }) {
       if (trainingsRes.data) setTrainings(trainingsRes.data)
       if (trainerRes.data) setTrainer(trainerRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
-      if (vorauszahlungenRes.data) setVorauszahlungen(vorauszahlungenRes.data)
+      if (guthabenRes.data) setGuthabenListe(guthabenRes.data)
       if (spielerPaymentsRes.data) setSpielerPayments(spielerPaymentsRes.data)
       if (notizenRes.data) setNotizen(notizenRes.data)
       if (planungRes.data) setPlanungSheets(planungRes.data)
@@ -721,7 +720,7 @@ function MainApp({ user }: { user: User }) {
                 spieler={spieler}
                 tarife={tarife}
                 adjustments={adjustments}
-                vorauszahlungen={vorauszahlungen}
+                guthabenListe={guthabenListe}
                 spielerPayments={spielerPayments}
                 profile={profile}
                 manuelleRechnungen={manuelleRechnungen}
@@ -757,7 +756,6 @@ function MainApp({ user }: { user: User }) {
                 ausgaben={ausgaben}
                 manuelleRechnungen={manuelleRechnungen}
                 adjustments={adjustments}
-                vorauszahlungen={vorauszahlungen}
                 spielerPayments={spielerPayments}
                 profile={profile}
                 onUpdate={loadAllData}
@@ -2645,7 +2643,7 @@ function AbrechnungView({
   spieler,
   tarife,
   adjustments,
-  vorauszahlungen,
+  guthabenListe,
   spielerPayments,
   profile,
   manuelleRechnungen,
@@ -2659,7 +2657,7 @@ function AbrechnungView({
   spieler: Spieler[]
   tarife: Tarif[]
   adjustments: MonthlyAdjustment[]
-  vorauszahlungen: Vorauszahlung[]
+  guthabenListe: Guthaben[]
   spielerPayments: SpielerTrainingPayment[]
   profile: TrainerProfile | null
   manuelleRechnungen: ManuelleRechnung[]
@@ -2685,12 +2683,11 @@ function AbrechnungView({
   const [showTrainingKorrekturModal, setShowTrainingKorrekturModal] = useState<Training | null>(null)
   const [trainingKorrekturBetrag, setTrainingKorrekturBetrag] = useState('')
   const [trainingKorrekturGrund, setTrainingKorrekturGrund] = useState('')
-  const [showVorauszahlungModal, setShowVorauszahlungModal] = useState<{spielerId: string, serieId: string} | null>(null)
-  const [vorauszahlungBetrag, setVorauszahlungBetrag] = useState('')
-  const [vorauszahlungDatum, setVorauszahlungDatum] = useState(formatDate(new Date()))
-  const [vorauszahlungBis, setVorauszahlungBis] = useState('')
-  const [vorauszahlungNotiz, setVorauszahlungNotiz] = useState('')
-  const [vorauszahlungBar, setVorauszahlungBar] = useState(false)
+  const [showGuthabenModal, setShowGuthabenModal] = useState<string | null>(null) // spielerId
+  const [guthabenBetrag, setGuthabenBetrag] = useState('')
+  const [guthabenDatum, setGuthabenDatum] = useState(formatDate(new Date()))
+  const [guthabenNotiz, setGuthabenNotiz] = useState('')
+  const [guthabenBar, setGuthabenBar] = useState(false)
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -2710,14 +2707,9 @@ function AbrechnungView({
     })
   }, [trainings, selectedMonth])
 
-  // Hilfsfunktion: Prüft ob ein Training durch Vorauszahlung abgedeckt ist
-  const istVorauszahlungAktiv = (spielerId: string, training: Training): Vorauszahlung | null => {
-    if (!training.serie_id) return null
-    return vorauszahlungen.find(v =>
-      v.spieler_id === spielerId &&
-      v.serie_id === training.serie_id &&
-      training.datum <= v.gueltig_bis
-    ) || null
+  // Hilfsfunktion: Holt Guthaben für einen Spieler
+  const getGuthaben = (spielerId: string): Guthaben | null => {
+    return guthabenListe.find(g => g.spieler_id === spielerId) || null
   }
 
   // Prüft den Bezahlstatus eines Spielers für ein Training
@@ -2743,7 +2735,7 @@ function AbrechnungView({
         summe: number
         barSumme: number
         bezahltSumme: number
-        vorauszahlungSumme: number
+        guthabenVerfuegbar: number // Aktuelles Guthaben des Spielers
         offeneSumme: number
         bezahlt: boolean
         adjustment: number
@@ -2765,13 +2757,14 @@ function AbrechnungView({
         if (!summary[spielerId]) {
           const sp = spieler.find((s) => s.id === spielerId)
           if (!sp) return
+          const guthaben = getGuthaben(spielerId)
           summary[spielerId] = {
             spieler: sp,
             trainings: [],
             summe: 0,
             barSumme: 0,
             bezahltSumme: 0,
-            vorauszahlungSumme: 0,
+            guthabenVerfuegbar: guthaben?.aktuell || 0,
             offeneSumme: 0,
             bezahlt: false,
             adjustment: 0,
@@ -2809,18 +2802,14 @@ function AbrechnungView({
 
         summary[spielerId].summe += spielerPreis
 
-        // Kategorisiere nach Bezahlstatus (inkl. Vorauszahlung)
+        // Kategorisiere nach Bezahlstatus
         // Nutze spieler-spezifischen Bezahlstatus!
         const paymentStatus = getSpielerPaymentStatus(spielerId, t)
-        const vorauszahlung = istVorauszahlungAktiv(spielerId, t)
         if (spielerPreis > 0 || trainingsKorrektur !== 0) {
           if (paymentStatus.barBezahlt) {
             summary[spielerId].barSumme += spielerPreis
           } else if (paymentStatus.bezahlt) {
             summary[spielerId].bezahltSumme += spielerPreis
-          } else if (vorauszahlung) {
-            // Training ist durch Vorauszahlung abgedeckt
-            summary[spielerId].vorauszahlungSumme += spielerPreis
           } else {
             summary[spielerId].offeneSumme += spielerPreis
           }
@@ -2834,13 +2823,14 @@ function AbrechnungView({
           if (!summary[spielerId]) {
             const sp = spieler.find((s) => s.id === spielerId)
             if (!sp) return
+            const guthaben = getGuthaben(spielerId)
             summary[spielerId] = {
               spieler: sp,
               trainings: [],
               summe: 0,
               barSumme: 0,
               bezahltSumme: 0,
-              vorauszahlungSumme: 0,
+              guthabenVerfuegbar: guthaben?.aktuell || 0,
               offeneSumme: 0,
               bezahlt: false,
               adjustment: 0,
@@ -2893,7 +2883,7 @@ function AbrechnungView({
     })
 
     return Object.values(summary)
-  }, [monthTrainings, spieler, tarife, adjustments, vorauszahlungen, spielerPayments, selectedMonth])
+  }, [monthTrainings, spieler, tarife, adjustments, guthabenListe, spielerPayments, selectedMonth])
 
   // Alle Tage im Monat mit Trainings
   const tageImMonat = useMemo(() => {
@@ -2914,7 +2904,6 @@ function AbrechnungView({
           let summe = 0
           let barSumme = 0
           let bezahltSumme = 0
-          let vorauszahlungSumme = 0
           let offeneSumme = 0
 
           tagTrainings.forEach(t => {
@@ -2938,14 +2927,11 @@ function AbrechnungView({
 
             // Spieler-spezifischen Bezahlstatus verwenden
             const paymentStatus = getSpielerPaymentStatus(s.spieler.id, t)
-            const vorauszahlung = istVorauszahlungAktiv(s.spieler.id, t)
 
             if (paymentStatus.barBezahlt) {
               barSumme += betrag
             } else if (paymentStatus.bezahlt) {
               bezahltSumme += betrag
-            } else if (vorauszahlung) {
-              vorauszahlungSumme += betrag
             } else {
               offeneSumme += betrag
             }
@@ -2957,7 +2943,6 @@ function AbrechnungView({
             summe,
             barSumme,
             bezahltSumme,
-            vorauszahlungSumme,
             offeneSumme,
             bezahlt: offeneSumme <= 0
           }
@@ -3008,9 +2993,9 @@ function AbrechnungView({
     // Trainings-Stats
     const trainingsTotal = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
     const trainingsBar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
-    const trainingsVorauszahlung = filteredSummary.reduce((sum, s) => sum + s.vorauszahlungSumme, 0)
-    const trainingsBezahlt = trainingsBar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0) + trainingsVorauszahlung
+    const trainingsBezahlt = trainingsBar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
     const trainingsOffen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
+    const guthabenGesamt = filteredSummary.reduce((sum, s) => sum + s.guthabenVerfuegbar, 0)
 
     // Manuelle Rechnungen Stats
     const manuelleTotal = monthManuelleRechnungen.reduce((sum, r) => sum + r.brutto_gesamt, 0)
@@ -3021,7 +3006,7 @@ function AbrechnungView({
     return {
       total: trainingsTotal + manuelleTotal,
       bar: trainingsBar + manuelleBar,
-      vorauszahlung: trainingsVorauszahlung,
+      guthaben: guthabenGesamt,
       bezahlt: trainingsBezahlt + manuelleBezahlt,
       offen: trainingsOffen + manuelleOffen
     }
@@ -3253,104 +3238,75 @@ function AbrechnungView({
     onUpdate()
   }
 
-  // Vorauszahlung speichern
-  const saveVorauszahlung = async () => {
-    if (!showVorauszahlungModal) return
+  // Guthaben einzahlen
+  const saveGuthabenEinzahlung = async () => {
+    if (!showGuthabenModal) return
 
-    const betrag = parseFloat(vorauszahlungBetrag.replace(',', '.'))
+    const betrag = parseFloat(guthabenBetrag.replace(',', '.'))
     if (isNaN(betrag) || betrag <= 0) {
       alert('Bitte gültigen Betrag eingeben')
       return
     }
-    if (!vorauszahlungBis) {
-      alert('Bitte Enddatum angeben')
-      return
-    }
 
-    // Prüfen ob bereits eine Vorauszahlung für diese Serie existiert
-    const existing = vorauszahlungen.find(v =>
-      v.spieler_id === showVorauszahlungModal.spielerId &&
-      v.serie_id === showVorauszahlungModal.serieId
-    )
+    const spielerId = showGuthabenModal
+    const existing = getGuthaben(spielerId)
 
     if (existing) {
+      // Guthaben aufstocken
       await supabase
-        .from('vorauszahlungen')
+        .from('guthaben')
         .update({
-          betrag,
-          zahlungsdatum: vorauszahlungDatum,
-          gueltig_bis: vorauszahlungBis,
-          notiz: vorauszahlungNotiz || null,
-          bar_bezahlt: vorauszahlungBar
+          aktuell: existing.aktuell + betrag,
+          eingezahlt_gesamt: existing.eingezahlt_gesamt + betrag,
+          letzte_einzahlung: guthabenDatum,
+          notiz: guthabenNotiz || existing.notiz || null,
+          updated_at: new Date().toISOString()
         })
         .eq('id', existing.id)
     } else {
+      // Neues Guthaben anlegen
       await supabase
-        .from('vorauszahlungen')
+        .from('guthaben')
         .insert({
           user_id: userId,
-          spieler_id: showVorauszahlungModal.spielerId,
-          serie_id: showVorauszahlungModal.serieId,
-          betrag,
-          zahlungsdatum: vorauszahlungDatum,
-          gueltig_bis: vorauszahlungBis,
-          notiz: vorauszahlungNotiz || null,
-          bar_bezahlt: vorauszahlungBar
+          spieler_id: spielerId,
+          aktuell: betrag,
+          eingezahlt_gesamt: betrag,
+          verbraucht_gesamt: 0,
+          letzte_einzahlung: guthabenDatum,
+          notiz: guthabenNotiz || null
         })
     }
 
-    setShowVorauszahlungModal(null)
-    resetVorauszahlungForm()
+    // Transaktion speichern
+    await supabase
+      .from('guthaben_transaktionen')
+      .insert({
+        user_id: userId,
+        spieler_id: spielerId,
+        betrag: betrag,
+        typ: 'einzahlung',
+        beschreibung: guthabenNotiz || 'Einzahlung',
+        bar: guthabenBar,
+        datum: guthabenDatum
+      })
+
+    setShowGuthabenModal(null)
+    resetGuthabenForm()
     onUpdate()
   }
 
-  // Vorauszahlung löschen
-  const deleteVorauszahlung = async () => {
-    if (!showVorauszahlungModal) return
-
-    const existing = vorauszahlungen.find(v =>
-      v.spieler_id === showVorauszahlungModal.spielerId &&
-      v.serie_id === showVorauszahlungModal.serieId
-    )
-    if (!existing) return
-    const confirmed = await showConfirm('Vorauszahlung löschen', 'Vorauszahlung wirklich löschen?')
-    if (!confirmed) return
-
-    await supabase.from('vorauszahlungen').delete().eq('id', existing.id)
-    setShowVorauszahlungModal(null)
-    resetVorauszahlungForm()
-    onUpdate()
+  const resetGuthabenForm = () => {
+    setGuthabenBetrag('')
+    setGuthabenDatum(formatDate(new Date()))
+    setGuthabenNotiz('')
+    setGuthabenBar(false)
   }
 
-  const resetVorauszahlungForm = () => {
-    setVorauszahlungBetrag('')
-    setVorauszahlungDatum(formatDate(new Date()))
-    setVorauszahlungBis('')
-    setVorauszahlungNotiz('')
-    setVorauszahlungBar(false)
-  }
-
-  // Vorauszahlung Modal öffnen
-  const openVorauszahlungModal = (spielerId: string, serieId: string) => {
-    const existing = vorauszahlungen.find(v =>
-      v.spieler_id === spielerId &&
-      v.serie_id === serieId
-    )
-    if (existing) {
-      setVorauszahlungBetrag(existing.betrag.toString())
-      setVorauszahlungDatum(existing.zahlungsdatum)
-      setVorauszahlungBis(existing.gueltig_bis)
-      setVorauszahlungNotiz(existing.notiz || '')
-      setVorauszahlungBar(existing.bar_bezahlt)
-    } else {
-      // Berechne das letzte Datum der Serie
-      const serienTrainings = trainings.filter(t => t.serie_id === serieId).sort((a, b) => b.datum.localeCompare(a.datum))
-      const letztesDatum = serienTrainings[0]?.datum || ''
-      setVorauszahlungBis(letztesDatum)
-      resetVorauszahlungForm()
-      setVorauszahlungBis(letztesDatum)
-    }
-    setShowVorauszahlungModal({ spielerId, serieId })
+  // Guthaben Modal öffnen
+  const openGuthabenModal = (spielerId: string) => {
+    resetGuthabenForm()
+    setShowGuthabenModal(spielerId)
   }
 
   return (
@@ -3790,16 +3746,11 @@ function AbrechnungView({
             return { training: t, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }
           })
 
-        // Berechne gefilterte Summen mit korrektem Bezahlstatus (inkl. Vorauszahlung)
+        // Berechne gefilterte Summen mit korrektem Bezahlstatus
         const gefilterteSumme = trainingsDetail.reduce((sum, t) => sum + t.betrag, 0)
         const gefilterteBarSumme = trainingsDetail.filter(t => {
           const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
           return ps.barBezahlt
-        }).reduce((sum, t) => sum + t.betrag, 0)
-        const gefilterteVorauszahlungSumme = trainingsDetail.filter(t => {
-          const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
-          const va = istVorauszahlungAktiv(detail.spieler.id, t.training)
-          return !ps.barBezahlt && !ps.bezahlt && va
         }).reduce((sum, t) => sum + t.betrag, 0)
         const gefilterteBezahltSumme = trainingsDetail.filter(t => {
           const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
@@ -3807,9 +3758,9 @@ function AbrechnungView({
         }).reduce((sum, t) => sum + t.betrag, 0)
         const gefilterteOffeneSumme = trainingsDetail.filter(t => {
           const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
-          const va = istVorauszahlungAktiv(detail.spieler.id, t.training)
-          return !ps.bezahlt && !ps.barBezahlt && !va
+          return !ps.bezahlt && !ps.barBezahlt
         }).reduce((sum, t) => sum + t.betrag, 0)
+        const spielerGuthaben = getGuthaben(detail.spieler.id)
 
         return (
           <div className="modal-overlay" onClick={() => setSelectedSpielerDetail(null)}>
@@ -3831,9 +3782,9 @@ function AbrechnungView({
                       <strong>Bar:</strong> {gefilterteBarSumme.toFixed(2)} €
                     </div>
                   )}
-                  {gefilterteVorauszahlungSumme > 0 && (
+                  {spielerGuthaben && spielerGuthaben.aktuell > 0 && (
                     <div style={{ color: 'var(--primary)' }}>
-                      <strong>Vorausbez.:</strong> {gefilterteVorauszahlungSumme.toFixed(2)} €
+                      <strong>Guthaben:</strong> {spielerGuthaben.aktuell.toFixed(2)} €
                     </div>
                   )}
                   {gefilterteBezahltSumme > 0 && (
@@ -3862,7 +3813,6 @@ function AbrechnungView({
                     <tbody>
                       {trainingsDetail.map(({ training, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }) => {
                         const istMonatlich = abrechnungsart === 'monatlich'
-                        const vorauszahlungRow = istVorauszahlungAktiv(detail.spieler.id, training)
                         const paymentStatusRow = getSpielerPaymentStatus(detail.spieler.id, training)
                         return (
                           <tr
@@ -3870,8 +3820,6 @@ function AbrechnungView({
                             style={{
                               ...(paymentStatusRow.barBezahlt
                                 ? { background: 'var(--warning-light)' }
-                                : vorauszahlungRow
-                                ? { background: 'var(--primary-light)' }
                                 : paymentStatusRow.bezahlt
                                 ? { background: 'var(--success-light)' }
                                 : {}),
@@ -3922,35 +3870,22 @@ function AbrechnungView({
                               )}
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              {(() => {
-                                if (paymentStatusRow.barBezahlt) {
-                                  return (
-                                    <span className="status-badge" style={{ background: 'var(--warning)', color: '#000', fontSize: 11 }}>
-                                      Bar
-                                    </span>
-                                  )
-                                } else if (vorauszahlungRow) {
-                                  return (
-                                    <span className="status-badge" style={{ background: 'var(--primary)', color: '#fff', fontSize: 11 }}
-                                          title={`Vorauszahlung vom ${formatDateGerman(vorauszahlungRow.zahlungsdatum)}`}>
-                                      Vorausbez.
-                                    </span>
-                                  )
-                                } else {
-                                  return (
-                                    <button
-                                      className={`btn btn-sm ${paymentStatusRow.bezahlt ? 'btn-success' : 'btn-secondary'}`}
-                                      style={{ fontSize: 11, padding: '2px 8px' }}
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatusRow.bezahlt)
-                                      }}
-                                    >
-                                      {paymentStatusRow.bezahlt ? 'Bezahlt' : 'Offen'}
-                                    </button>
-                                  )
-                                }
-                              })()}
+                              {paymentStatusRow.barBezahlt ? (
+                                <span className="status-badge" style={{ background: 'var(--warning)', color: '#000', fontSize: 11 }}>
+                                  Bar
+                                </span>
+                              ) : (
+                                <button
+                                  className={`btn btn-sm ${paymentStatusRow.bezahlt ? 'btn-success' : 'btn-secondary'}`}
+                                  style={{ fontSize: 11, padding: '2px 8px' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatusRow.bezahlt)
+                                  }}
+                                >
+                                  {paymentStatusRow.bezahlt ? 'Bezahlt' : 'Offen'}
+                                </button>
+                              )}
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               <button
@@ -4031,62 +3966,43 @@ function AbrechnungView({
                   </div>
                 )}
 
-                {/* Vorauszahlung Sektion - nur wenn wiederkehrende Trainings existieren */}
-                {!(filterType === 'tag' && selectedTag) && (() => {
-                  // Finde alle Serien-IDs für diesen Spieler
-                  const serienIds = [...new Set(detail.trainings.filter(t => t.serie_id).map(t => t.serie_id!))]
-                  if (serienIds.length === 0) return null
-
-                  return serienIds.map(serieId => {
-                    const serienTrainings = detail.trainings.filter(t => t.serie_id === serieId)
-                    const vorauszahlung = vorauszahlungen.find(v =>
-                      v.spieler_id === detail.spieler.id && v.serie_id === serieId
-                    )
-                    const allSerienTrainings = trainings.filter(t => t.serie_id === serieId)
-                    const erstes = allSerienTrainings.sort((a, b) => a.datum.localeCompare(b.datum))[0]
-                    const letztes = allSerienTrainings.sort((a, b) => b.datum.localeCompare(a.datum))[0]
-
-                    // Wochentag und Uhrzeit aus dem ersten Training der Serie
-                    const wochentag = erstes ? WOCHENTAGE_LANG[(new Date(erstes.datum).getDay() + 6) % 7] : ''
-                    const uhrzeit = erstes ? `${erstes.uhrzeit_von} - ${erstes.uhrzeit_bis}` : ''
-
-                    return (
-                      <div key={serieId} style={{
-                        marginTop: 12,
-                        padding: 12,
-                        background: vorauszahlung ? 'var(--primary-light)' : 'var(--gray-50)',
-                        borderRadius: 8,
-                        border: `1px solid ${vorauszahlung ? 'var(--primary)' : 'var(--gray-200)'}`
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <strong style={{ color: vorauszahlung ? 'var(--primary)' : undefined }}>
-                              Saisonvorauszahlung {wochentag && uhrzeit ? `(${wochentag} ${uhrzeit})` : ''}
-                            </strong>
-                            <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
-                              Serie: {erstes && letztes ? `${formatDateGerman(erstes.datum)} - ${formatDateGerman(letztes.datum)}` : 'Wiederkehrend'}
-                              {' '}({serienTrainings.length} Trainings diesen Monat)
-                            </p>
-                            {vorauszahlung && (
-                              <p style={{ fontSize: 12, color: 'var(--primary)', margin: '4px 0 0', fontWeight: 500 }}>
-                                {vorauszahlung.betrag.toFixed(2)} € bezahlt am {formatDateGerman(vorauszahlung.zahlungsdatum)}
-                                {vorauszahlung.bar_bezahlt ? ' (Bar)' : ''}
-                                {' · Gültig bis: '}{formatDateGerman(vorauszahlung.gueltig_bis)}
-                              </p>
+                {/* Guthaben Sektion */}
+                {!(filterType === 'tag' && selectedTag) && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary-light)' : 'var(--gray-50)',
+                    borderRadius: 8,
+                    border: `1px solid ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : 'var(--gray-200)'}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ color: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : undefined }}>
+                          Guthaben
+                        </strong>
+                        {spielerGuthaben && spielerGuthaben.aktuell > 0 ? (
+                          <p style={{ fontSize: 12, color: 'var(--primary)', margin: '4px 0 0', fontWeight: 500 }}>
+                            Aktuell: {spielerGuthaben.aktuell.toFixed(2)} €
+                            {spielerGuthaben.letzte_einzahlung && (
+                              <> · Letzte Einzahlung: {formatDateGerman(spielerGuthaben.letzte_einzahlung)}</>
                             )}
-                          </div>
-                          <button
-                            className={`btn ${vorauszahlung ? 'btn-primary' : 'btn-secondary'}`}
-                            style={{ fontSize: 13 }}
-                            onClick={() => openVorauszahlungModal(detail.spieler.id, serieId)}
-                          >
-                            {vorauszahlung ? 'Bearbeiten' : 'Vorauszahlung eintragen'}
-                          </button>
-                        </div>
+                          </p>
+                        ) : (
+                          <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
+                            Kein Guthaben vorhanden
+                          </p>
+                        )}
                       </div>
-                    )
-                  })
-                })()}
+                      <button
+                        className={`btn ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ fontSize: 13 }}
+                        onClick={() => openGuthabenModal(detail.spieler.id)}
+                      >
+                        Guthaben aufladen
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
@@ -4294,87 +4210,56 @@ function AbrechnungView({
         )
       })()}
 
-      {/* Vorauszahlung Modal */}
-      {showVorauszahlungModal && (() => {
-        const vSpieler = spieler.find(s => s.id === showVorauszahlungModal.spielerId)
-        const serienTrainings = trainings.filter(t => t.serie_id === showVorauszahlungModal.serieId)
-          .sort((a, b) => a.datum.localeCompare(b.datum))
-        const erstes = serienTrainings[0]
-        const letztes = serienTrainings[serienTrainings.length - 1]
-        const existing = vorauszahlungen.find(v =>
-          v.spieler_id === showVorauszahlungModal.spielerId &&
-          v.serie_id === showVorauszahlungModal.serieId
-        )
-
-        // Berechne den Gesamtbetrag der Serie für diesen Spieler
-        let serienGesamtbetrag = 0
-        serienTrainings.forEach(t => {
-          const tarif = tarife.find(ta => ta.id === t.tarif_id)
-          const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-          const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-          const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-          let betrag = preis * duration
-          if (abrechnungsart === 'proSpieler') {
-            betrag = betrag / t.spieler_ids.length
-          }
-          betrag += (t.korrektur_betrag || 0)
-          serienGesamtbetrag += betrag
-        })
+      {/* Guthaben Modal */}
+      {showGuthabenModal && (() => {
+        const gSpieler = spieler.find(s => s.id === showGuthabenModal)
+        const existing = getGuthaben(showGuthabenModal)
 
         return (
-          <div className="modal-overlay" onClick={() => setShowVorauszahlungModal(null)}>
+          <div className="modal-overlay" onClick={() => setShowGuthabenModal(null)}>
             <div className="modal" style={{ maxWidth: 450 }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <h3>Saisonvorauszahlung</h3>
-                <button className="modal-close" onClick={() => setShowVorauszahlungModal(null)}>×</button>
+                <h3>Guthaben aufladen</h3>
+                <button className="modal-close" onClick={() => setShowGuthabenModal(null)}>×</button>
               </div>
               <div className="modal-body">
                 <div style={{ marginBottom: 16, padding: 12, background: 'var(--gray-50)', borderRadius: 8 }}>
-                  <div><strong>Spieler:</strong> {vSpieler?.name}</div>
-                  <div><strong>Serie:</strong> {erstes && letztes ? `${formatDateGerman(erstes.datum)} - ${formatDateGerman(letztes.datum)}` : '-'}</div>
-                  <div><strong>Anzahl Trainings:</strong> {serienTrainings.length}</div>
-                  <div><strong>Gesamtbetrag Serie:</strong> {serienGesamtbetrag.toFixed(2)} €</div>
+                  <div><strong>Spieler:</strong> {gSpieler?.name}</div>
+                  <div><strong>Aktuelles Guthaben:</strong> {existing ? existing.aktuell.toFixed(2) : '0.00'} €</div>
+                  {existing && existing.eingezahlt_gesamt > 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 4 }}>
+                      Gesamt eingezahlt: {existing.eingezahlt_gesamt.toFixed(2)} € · Verbraucht: {existing.verbraucht_gesamt.toFixed(2)} €
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group">
-                  <label>Bezahlter Betrag (€)</label>
+                  <label>Einzahlungsbetrag (€)</label>
                   <input
                     type="text"
-                    value={vorauszahlungBetrag}
-                    onChange={e => setVorauszahlungBetrag(e.target.value)}
-                    placeholder={serienGesamtbetrag.toFixed(2)}
+                    value={guthabenBetrag}
+                    onChange={e => setGuthabenBetrag(e.target.value)}
+                    placeholder="0.00"
                     style={{ fontFamily: 'monospace' }}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>Zahlungsdatum</label>
+                  <label>Einzahlungsdatum</label>
                   <input
                     type="date"
-                    value={vorauszahlungDatum}
-                    onChange={e => setVorauszahlungDatum(e.target.value)}
+                    value={guthabenDatum}
+                    onChange={e => setGuthabenDatum(e.target.value)}
                   />
-                </div>
-
-                <div className="form-group">
-                  <label>Gültig bis (Trainings bis zu diesem Datum gelten als bezahlt)</label>
-                  <input
-                    type="date"
-                    value={vorauszahlungBis}
-                    onChange={e => setVorauszahlungBis(e.target.value)}
-                  />
-                  <small style={{ color: 'var(--gray-500)', display: 'block', marginTop: 4 }}>
-                    Letztes Training der Serie: {letztes ? formatDateGerman(letztes.datum) : '-'}
-                  </small>
                 </div>
 
                 <div className="form-group">
                   <label>Notiz (optional)</label>
                   <input
                     type="text"
-                    value={vorauszahlungNotiz}
-                    onChange={e => setVorauszahlungNotiz(e.target.value)}
-                    placeholder="z.B. Saison 2024/25"
+                    value={guthabenNotiz}
+                    onChange={e => setGuthabenNotiz(e.target.value)}
+                    placeholder="z.B. Einzahlung für Q1 2025"
                   />
                 </div>
 
@@ -4382,36 +4267,24 @@ function AbrechnungView({
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={vorauszahlungBar}
-                      onChange={e => setVorauszahlungBar(e.target.checked)}
+                      checked={guthabenBar}
+                      onChange={e => setGuthabenBar(e.target.checked)}
                     />
-                    Bar bezahlt
+                    Bar eingezahlt
                   </label>
                 </div>
               </div>
-              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
-                <div>
-                  {existing && (
-                    <button
-                      className="btn btn-danger"
-                      onClick={deleteVorauszahlung}
-                    >
-                      Löschen
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-secondary" onClick={() => setShowVorauszahlungModal(null)}>
-                    Abbrechen
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={saveVorauszahlung}
-                    disabled={!vorauszahlungBetrag || !vorauszahlungBis}
-                  >
-                    Speichern
-                  </button>
-                </div>
+              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" onClick={() => setShowGuthabenModal(null)}>
+                  Abbrechen
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={saveGuthabenEinzahlung}
+                  disabled={!guthabenBetrag}
+                >
+                  Einzahlen
+                </button>
               </div>
             </div>
           </div>
@@ -6192,7 +6065,6 @@ function BuchhaltungView({
   ausgaben,
   manuelleRechnungen,
   adjustments,
-  vorauszahlungen,
   spielerPayments,
   profile,
   onUpdate,
@@ -6209,7 +6081,6 @@ function BuchhaltungView({
   ausgaben: Ausgabe[]
   manuelleRechnungen: ManuelleRechnung[]
   adjustments: MonthlyAdjustment[]
-  vorauszahlungen: Vorauszahlung[]
   spielerPayments: SpielerTrainingPayment[]
   profile: TrainerProfile | null
   onUpdate: () => void
@@ -6423,41 +6294,14 @@ function BuchhaltungView({
       })
   }, [adjustments, selectedYear, spieler, kleinunternehmer])
 
-  // Vorauszahlungen als Einnahmen-Positionen (im Monat der Zahlung)
-  const vorauszahlungEinnahmen = useMemo(() => {
-    return vorauszahlungen
-      .filter(v => v.zahlungsdatum.startsWith(selectedYear.toString()))
-      .map(v => {
-        const sp = spieler.find(s => s.id === v.spieler_id)
-        const betrag = v.betrag
-        // Bei Kleinunternehmer keine USt, sonst 19% inkl.
-        const brutto = betrag
-        const netto = kleinunternehmer ? betrag : betrag / 1.19
-        const ust = kleinunternehmer ? 0 : betrag - netto
-
-        return {
-          vorauszahlungId: v.id,
-          datum: v.zahlungsdatum,
-          spielerName: sp?.name || 'Unbekannt',
-          tarifName: `Saisonvorauszahlung (bis ${formatDateGerman(v.gueltig_bis)})`,
-          brutto,
-          netto,
-          ust,
-          ustSatz: kleinunternehmer ? 0 : 19,
-          barBezahlt: v.bar_bezahlt,
-          istVorauszahlung: true
-        }
-      })
-  }, [vorauszahlungen, selectedYear, spieler, kleinunternehmer])
-
-  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen + Vorauszahlungen)
+  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen)
+  // Guthaben-Einzahlungen werden separat in der guthaben_transaktionen Tabelle getrackt
   const alleEinnahmen = useMemo(() => {
-    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istVorauszahlung: false }))
-    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istKorrektur: false, istVorauszahlung: false }))
-    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istVorauszahlung: false }))
-    const vorauszahlungenMapped = vorauszahlungEinnahmen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false }))
-    return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped, ...vorauszahlungenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen, vorauszahlungEinnahmen])
+    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false }))
+    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istKorrektur: false }))
+    const korrekturenMapped = korrekturEinnahmen
+    return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen])
 
   // Einnahmen nach Monat gruppiert
   const einnahmenNachMonat = useMemo(() => {
@@ -6720,13 +6564,11 @@ function BuchhaltungView({
                     </thead>
                     <tbody>
                       {positionen.map((p, i) => {
-                        const hatKorrektur = !p.istKorrektur && !p.istVorauszahlung && (p as typeof einnahmenPositionen[0]).korrektur !== 0
+                        const hatKorrektur = !p.istKorrektur && (p as typeof einnahmenPositionen[0]).korrektur !== 0
                         return (
                           <tr key={i} style={
                             p.istKorrektur
                               ? { background: p.brutto < 0 ? 'var(--success-light)' : 'var(--warning-light)' }
-                              : p.istVorauszahlung
-                              ? { background: 'var(--primary-light)' }
                               : hatKorrektur
                               ? { background: 'var(--warning-light)' }
                               : {}
@@ -6734,18 +6576,6 @@ function BuchhaltungView({
                             <td>{p.istKorrektur ? formatMonthGerman((p as typeof korrekturEinnahmen[0]).monat) : formatDateGerman(p.datum)}</td>
                             <td>{p.spielerName}</td>
                             <td>
-                              {p.istVorauszahlung && (
-                                <span style={{
-                                  background: 'var(--primary)',
-                                  color: '#fff',
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  fontSize: 10,
-                                  marginRight: 6
-                                }}>
-                                  Vorauszahlung
-                                </span>
-                              )}
                               {p.istKorrektur && (
                                 <span style={{
                                   background: p.brutto < 0 ? 'var(--success)' : 'var(--warning)',
@@ -6787,11 +6617,6 @@ function BuchhaltungView({
                             <td>
                               {p.istKorrektur ? (
                                 <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Monatskorr.</span>
-                              ) : p.istVorauszahlung ? (
-                                <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
-                                      style={{ fontSize: 11 }}>
-                                  {p.barBezahlt ? 'Bar' : 'Überweisung'}
-                                </span>
                               ) : (
                                 <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
                                       style={{ fontSize: 11 }}>
@@ -7290,7 +7115,7 @@ function BuchhaltungView({
                   })
                   bericht += `\n`
 
-                  // Detaillierte Einnahmen (inkl. Vorauszahlungen, Korrekturen, manuelle Rechnungen)
+                  // Detaillierte Einnahmen (inkl. Korrekturen, manuelle Rechnungen)
                   bericht += `EINNAHMEN (DETAIL)\n`
                   bericht += `=========================================\n`
                   bericht += `Datum       | Netto      | Brutto     | USt\n`

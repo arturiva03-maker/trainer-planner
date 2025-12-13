@@ -222,16 +222,31 @@ export interface ManuelleRechnung {
   created_at: string
 }
 
-export interface Vorauszahlung {
+// Guthaben pro Spieler - wird nach und nach abgerechnet
+export interface Guthaben {
   id: string
   user_id: string
   spieler_id: string
-  serie_id: string
-  betrag: number
-  zahlungsdatum: string
-  gueltig_bis: string // Bis zu welchem Datum die Trainings als bezahlt gelten
+  aktuell: number // Aktueller Guthabenstand
+  eingezahlt_gesamt: number // Gesamtbetrag aller Einzahlungen
+  verbraucht_gesamt: number // Gesamtbetrag aller Abbuchungen
+  letzte_einzahlung?: string // Datum der letzten Einzahlung
   notiz?: string
-  bar_bezahlt: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Guthaben-Transaktionen (Einzahlungen und Abbuchungen)
+export interface GuthabenTransaktion {
+  id: string
+  user_id: string
+  spieler_id: string
+  betrag: number // positiv = Einzahlung, negativ = Abbuchung
+  typ: 'einzahlung' | 'abbuchung'
+  training_id?: string // Bei Abbuchung: welches Training
+  beschreibung?: string
+  bar: boolean
+  datum: string
   created_at: string
 }
 
