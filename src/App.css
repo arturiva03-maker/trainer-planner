@@ -1224,11 +1224,9 @@ tbody tr:last-child td {
 }
 
 .calendar-grid.day-view .training-block {
-  padding: 10px 14px;
+  padding: 10px 10px;
   font-size: 14px;
   border-radius: 10px;
-  left: 8px;
-  right: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
@@ -1341,12 +1339,11 @@ tbody tr:last-child td {
 
 .training-block {
   position: absolute;
-  left: 3px;
-  right: 3px;
+  box-sizing: border-box;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   border-radius: 8px;
-  padding: 6px 8px;
+  padding: 6px 6px;
   font-size: 11px;
   cursor: pointer;
   overflow: hidden;

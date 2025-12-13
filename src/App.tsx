@@ -891,6 +891,84 @@ function KalenderView({
     return { top, height: Math.max(height, isDayView ? 40 : 30) }
   }
 
+  // Berechnet Layout für überlappende Trainings (nebeneinander)
+  const getOverlapLayout = (dayTrainings: Training[]) => {
+    const layout: { [trainingId: string]: { column: number, totalColumns: number } } = {}
+
+    // Sortiere nach Startzeit
+    const sorted = [...dayTrainings].sort((a, b) => {
+      const aStart = a.uhrzeit_von.split(':').map(Number)
+      const bStart = b.uhrzeit_von.split(':').map(Number)
+      return (aStart[0] * 60 + aStart[1]) - (bStart[0] * 60 + bStart[1])
+    })
+
+    // Finde überlappende Gruppen
+    const groups: Training[][] = []
+
+    sorted.forEach(training => {
+      const [startH, startM] = training.uhrzeit_von.split(':').map(Number)
+      const [endH, endM] = training.uhrzeit_bis.split(':').map(Number)
+      const start = startH * 60 + startM
+      const end = endH * 60 + endM
+
+      // Finde Gruppe die mit diesem Training überlappt
+      let foundGroup = false
+      for (const group of groups) {
+        const overlaps = group.some(t => {
+          const [tStartH, tStartM] = t.uhrzeit_von.split(':').map(Number)
+          const [tEndH, tEndM] = t.uhrzeit_bis.split(':').map(Number)
+          const tStart = tStartH * 60 + tStartM
+          const tEnd = tEndH * 60 + tEndM
+          return start < tEnd && end > tStart
+        })
+        if (overlaps) {
+          group.push(training)
+          foundGroup = true
+          break
+        }
+      }
+      if (!foundGroup) {
+        groups.push([training])
+      }
+    })
+
+    // Weise Spalten zu
+    groups.forEach(group => {
+      const columns: Training[][] = []
+
+      group.forEach(training => {
+        const [startH, startM] = training.uhrzeit_von.split(':').map(Number)
+        const start = startH * 60 + startM
+
+        // Finde erste freie Spalte
+        let placed = false
+        for (let col = 0; col < columns.length; col++) {
+          const lastInCol = columns[col][columns[col].length - 1]
+          const [lastEndH, lastEndM] = lastInCol.uhrzeit_bis.split(':').map(Number)
+          const lastEnd = lastEndH * 60 + lastEndM
+
+          if (start >= lastEnd) {
+            columns[col].push(training)
+            placed = true
+            break
+          }
+        }
+        if (!placed) {
+          columns.push([training])
+        }
+      })
+
+      // Setze Layout für jedes Training in der Gruppe
+      columns.forEach((col, colIndex) => {
+        col.forEach(training => {
+          layout[training.id] = { column: colIndex, totalColumns: columns.length }
+        })
+      })
+    })
+
+    return layout
+  }
+
   const navigateDay = (direction: number) => {
     const newDate = new Date(currentDate)
     newDate.setDate(newDate.getDate() + direction)
@@ -1009,6 +1087,7 @@ function KalenderView({
                 <div className="calendar-time-cell">{time}</div>
                 {(isDayView ? [currentDate] : weekDates).map((date, dayIndex) => {
                   const dayTrainings = getTrainingsForDay(date)
+                  const overlapLayout = getOverlapLayout(dayTrainings)
                   const slotTrainings = dayTrainings.filter((t) => {
                     const [h] = t.uhrzeit_von.split(':').map(Number)
                     return h === parseInt(time)
@@ -1019,11 +1098,19 @@ function KalenderView({
                       {slotTrainings.map((training) => {
                         const pos = getTrainingPosition(training, isDayView)
                         const tarifName = getTarifName(training.tarif_id)
+                        const layout = overlapLayout[training.id] || { column: 0, totalColumns: 1 }
+                        const width = 100 / layout.totalColumns
+                        const left = layout.column * width
                         return (
                           <div
                             key={training.id}
                             className={`training-block status-${training.status}`}
-                            style={{ top: pos.top % cellHeight, height: pos.height }}
+                            style={{
+                              top: pos.top % cellHeight,
+                              height: pos.height,
+                              left: `${left}%`,
+                              width: `${width}%`
+                            }}
                             onClick={() => setEditingTraining(training)}
                             onDoubleClick={() => handleDoubleClick(training)}
                           >
