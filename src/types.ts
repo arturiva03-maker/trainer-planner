@@ -43,6 +43,13 @@ export interface Tarif {
   created_at: string
 }
 
+// Entfernter Spieler mit Info ob trotzdem bezahlt werden muss
+export interface EntfernterSpieler {
+  spieler_id: string
+  muss_bezahlen: boolean
+  entfernt_am: string
+}
+
 export interface Training {
   id: string
   user_id: string
@@ -50,6 +57,7 @@ export interface Training {
   uhrzeit_von: string
   uhrzeit_bis: string
   spieler_ids: string[]
+  entfernte_spieler?: EntfernterSpieler[] // Entfernte Spieler mit Bezahlpflicht
   tarif_id?: string
   trainer_id?: string
   status: 'geplant' | 'durchgefuehrt' | 'abgesagt'

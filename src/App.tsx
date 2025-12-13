@@ -1101,6 +1101,7 @@ function TrainingModal({
   const [uhrzeitVon, setUhrzeitVon] = useState(training?.uhrzeit_von || '09:00')
   const [uhrzeitBis, setUhrzeitBis] = useState(training?.uhrzeit_bis || '10:00')
   const [selectedSpieler, setSelectedSpieler] = useState<string[]>(training?.spieler_ids || [])
+  const [entfernteSpieler, setEntfernteSpieler] = useState<{spieler_id: string, muss_bezahlen: boolean, entfernt_am: string}[]>(training?.entfernte_spieler || [])
   const [tarifId, setTarifId] = useState(training?.tarif_id || '')
   const [status, setStatus] = useState<Training['status']>(training?.status || 'geplant')
   const [notiz, setNotiz] = useState(training?.notiz || '')
@@ -1112,13 +1113,60 @@ function TrainingModal({
   const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
 
+  // State für Bezahl-Abfrage bei Spieler-Entfernung
+  const [removeDialog, setRemoveDialog] = useState<{spielerId: string, spielerName: string} | null>(null)
+
+  // State für Bezahl-Abfrage bei Löschen/Absagen
+  const [cancelDialog, setCancelDialog] = useState<{type: 'delete' | 'cancel', previousStatus?: Training['status']} | null>(null)
+
   // Prüfen ob Training Teil einer Serie ist
   const istSerie = training?.serie_id != null
 
-  const toggleSpieler = (id: string) => {
-    setSelectedSpieler((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    )
+  // Abrechnungsart ermitteln
+  const selectedTarif = tarife.find(t => t.id === tarifId)
+  const abrechnungsart = selectedTarif?.abrechnung || 'proTraining'
+
+  // Prüft ob Bezahl-Abfrage nötig ist (nur bei proTraining/proSpieler mit Spielern)
+  const brauchtBezahlAbfrage = training &&
+    (abrechnungsart === 'proTraining' || abrechnungsart === 'proSpieler') &&
+    selectedSpieler.length > 0
+
+  const toggleSpieler = async (id: string) => {
+    const isRemoving = selectedSpieler.includes(id)
+
+    // Nur bei existierendem Training und relevanter Abrechnungsart nachfragen
+    if (isRemoving && training && (abrechnungsart === 'proTraining' || abrechnungsart === 'proSpieler')) {
+      const spielerObj = spieler.find(s => s.id === id)
+      setRemoveDialog({ spielerId: id, spielerName: spielerObj?.name || 'Spieler' })
+    } else {
+      // Direkt entfernen/hinzufügen ohne Abfrage
+      setSelectedSpieler((prev) =>
+        prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+      )
+      // Bei Hinzufügen: aus entfernten Spielern wieder entfernen falls vorhanden
+      if (!isRemoving) {
+        setEntfernteSpieler(prev => prev.filter(es => es.spieler_id !== id))
+      }
+    }
+  }
+
+  const handleRemoveWithPayment = (mussBezahlen: boolean) => {
+    if (!removeDialog) return
+
+    // Spieler aus selectedSpieler entfernen
+    setSelectedSpieler(prev => prev.filter(s => s !== removeDialog.spielerId))
+
+    // Zu entfernten Spielern hinzufügen mit Bezahlstatus
+    setEntfernteSpieler(prev => [
+      ...prev.filter(es => es.spieler_id !== removeDialog.spielerId),
+      {
+        spieler_id: removeDialog.spielerId,
+        muss_bezahlen: mussBezahlen,
+        entfernt_am: new Date().toISOString()
+      }
+    ])
+
+    setRemoveDialog(null)
   }
 
   const handleSave = async () => {
@@ -1140,6 +1188,7 @@ function TrainingModal({
         uhrzeit_von: uhrzeitVon,
         uhrzeit_bis: uhrzeitBis,
         spieler_ids: selectedSpieler,
+        entfernte_spieler: entfernteSpieler.length > 0 ? entfernteSpieler : null,
         tarif_id: tarifId || null,
         status,
         notiz: notiz || null,
@@ -1221,6 +1270,19 @@ function TrainingModal({
   const handleDelete = async () => {
     if (!training) return
 
+    // Bei proTraining/proSpieler erst Bezahl-Abfrage zeigen
+    if (brauchtBezahlAbfrage) {
+      setCancelDialog({ type: 'delete' })
+      return
+    }
+
+    // Sonst direkt löschen
+    await executeDelete()
+  }
+
+  const executeDelete = async () => {
+    if (!training) return
+
     if (serienAktion === 'nachfolgende' && training.serie_id) {
       const confirmed = await showConfirm('Serie löschen', 'Dieses und alle nachfolgenden Trainings der Serie wirklich löschen?')
       if (!confirmed) return
@@ -1235,6 +1297,61 @@ function TrainingModal({
       await supabase.from('trainings').delete().eq('id', training.id)
     }
     onSave()
+  }
+
+  // Handler für Status-Änderung auf "abgesagt"
+  const handleStatusChange = (newStatus: Training['status']) => {
+    // Wenn auf "abgesagt" gewechselt wird und Bezahl-Abfrage nötig
+    if (newStatus === 'abgesagt' && status !== 'abgesagt' && brauchtBezahlAbfrage) {
+      setCancelDialog({ type: 'cancel', previousStatus: status })
+      return
+    }
+    setStatus(newStatus)
+  }
+
+  // Handler für Löschen/Absagen mit Bezahl-Info
+  const handleCancelWithPayment = async (mussBezahlen: boolean) => {
+    if (!cancelDialog || !training) return
+
+    if (cancelDialog.type === 'delete') {
+      // Bei Löschen: Erst entfernte Spieler mit Bezahlpflicht speichern, dann löschen
+      if (mussBezahlen) {
+        // Alle aktuellen Spieler als "entfernt mit Bezahlpflicht" markieren
+        const neueEntfernteSpieler = selectedSpieler.map(spielerId => ({
+          spieler_id: spielerId,
+          muss_bezahlen: true,
+          entfernt_am: new Date().toISOString()
+        }))
+
+        // Training auf abgesagt setzen statt löschen (um Abrechnung zu ermöglichen)
+        await supabase.from('trainings').update({
+          status: 'abgesagt',
+          entfernte_spieler: [...entfernteSpieler, ...neueEntfernteSpieler],
+          spieler_ids: [] // Alle Spieler entfernen
+        }).eq('id', training.id)
+
+        setCancelDialog(null)
+        onSave()
+      } else {
+        // Ohne Bezahlung: normal löschen
+        setCancelDialog(null)
+        await executeDelete()
+      }
+    } else if (cancelDialog.type === 'cancel') {
+      // Bei Absagen: Spieler als entfernt markieren wenn Bezahlung nötig
+      if (mussBezahlen) {
+        const neueEntfernteSpieler = selectedSpieler.map(spielerId => ({
+          spieler_id: spielerId,
+          muss_bezahlen: true,
+          entfernt_am: new Date().toISOString()
+        }))
+
+        setEntfernteSpieler(prev => [...prev, ...neueEntfernteSpieler])
+        setSelectedSpieler([]) // Alle Spieler entfernen
+      }
+      setStatus('abgesagt')
+      setCancelDialog(null)
+    }
   }
 
   return (
@@ -1343,7 +1460,7 @@ function TrainingModal({
               <select
                 className="form-control"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as Training['status'])}
+                onChange={(e) => handleStatusChange(e.target.value as Training['status'])}
               >
                 <option value="geplant">Geplant</option>
                 <option value="durchgefuehrt">Durchgeführt</option>
@@ -1458,6 +1575,91 @@ function TrainingModal({
           </button>
         </div>
       </div>
+
+      {/* Dialog für Bezahl-Abfrage bei Spieler-Entfernung */}
+      {removeDialog && (
+        <div className="modal-overlay" onClick={() => setRemoveDialog(null)} style={{ zIndex: 1001 }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <h3>Spieler entfernen</h3>
+              <button className="modal-close" onClick={() => setRemoveDialog(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: 16 }}>
+                <strong>{removeDialog.spielerName}</strong> aus diesem Training entfernen.
+              </p>
+              <p style={{ color: 'var(--gray-600)', marginBottom: 8 }}>
+                Muss der Spieler den Betrag trotzdem bezahlen?
+              </p>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setRemoveDialog(null)}
+              >
+                Abbrechen
+              </button>
+              <button
+                className="btn btn-success"
+                onClick={() => handleRemoveWithPayment(false)}
+              >
+                Nein, nicht bezahlen
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={() => handleRemoveWithPayment(true)}
+              >
+                Ja, muss bezahlen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog für Bezahl-Abfrage bei Löschen/Absagen */}
+      {cancelDialog && (
+        <div className="modal-overlay" onClick={() => setCancelDialog(null)} style={{ zIndex: 1001 }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 450 }}>
+            <div className="modal-header">
+              <h3>{cancelDialog.type === 'delete' ? 'Training löschen' : 'Training absagen'}</h3>
+              <button className="modal-close" onClick={() => setCancelDialog(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: 16 }}>
+                {cancelDialog.type === 'delete'
+                  ? 'Dieses Training wird gelöscht.'
+                  : 'Dieses Training wird auf "Abgesagt" gesetzt.'}
+              </p>
+              <p style={{ color: 'var(--gray-600)', marginBottom: 8 }}>
+                Müssen die Spieler den Betrag trotzdem bezahlen?
+              </p>
+              <p style={{ fontSize: 13, color: 'var(--gray-500)' }}>
+                Betroffene Spieler: {selectedSpieler.map(id => spieler.find(s => s.id === id)?.name).filter(Boolean).join(', ')}
+              </p>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCancelDialog(null)}
+              >
+                Abbrechen
+              </button>
+              <button
+                className="btn btn-success"
+                onClick={() => handleCancelWithPayment(false)}
+              >
+                Nein, nicht bezahlen
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={() => handleCancelWithPayment(true)}
+              >
+                Ja, müssen bezahlen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2362,7 +2564,18 @@ function AbrechnungView({
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
       const tMonth = t.datum.substring(0, 7)
-      return tMonth === selectedMonth && t.status === 'durchgefuehrt'
+      if (tMonth !== selectedMonth) return false
+
+      // Durchgeführte Trainings immer einbeziehen
+      if (t.status === 'durchgefuehrt') return true
+
+      // Abgesagte Trainings nur wenn entfernte Spieler mit Bezahlpflicht vorhanden
+      if (t.status === 'abgesagt') {
+        const hatBezahlpflichtige = (t.entfernte_spieler || []).some(es => es.muss_bezahlen)
+        return hatBezahlpflichtige
+      }
+
+      return false
     })
   }, [trainings, selectedMonth])
 
@@ -2413,6 +2626,10 @@ function AbrechnungView({
       const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
       const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
 
+      // Bei proSpieler: Anzahl zahlungspflichtiger Spieler = aktive + entfernte mit muss_bezahlen
+      const entfernteMitBezahlung = (t.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+      const zahlendeSpielerAnzahl = t.spieler_ids.length + entfernteMitBezahlung.length
+
       t.spieler_ids.forEach((spielerId) => {
         if (!summary[spielerId]) {
           const sp = spieler.find((s) => s.id === spielerId)
@@ -2450,7 +2667,8 @@ function AbrechnungView({
           const totalPreis = preis * duration
           spielerPreis = totalPreis
           if (abrechnungsart === 'proSpieler') {
-            spielerPreis = spielerPreis / t.spieler_ids.length
+            // Teile durch Gesamtzahl zahlungspflichtiger Spieler (inkl. entfernte mit Bezahlpflicht)
+            spielerPreis = spielerPreis / zahlendeSpielerAnzahl
           }
         }
 
@@ -2477,6 +2695,53 @@ function AbrechnungView({
           }
         }
       })
+
+      // Entfernte Spieler mit Bezahlpflicht (nur bei proTraining oder proSpieler)
+      if (abrechnungsart !== 'monatlich') {
+        entfernteMitBezahlung.forEach((entfernter) => {
+          const spielerId = entfernter.spieler_id
+          if (!summary[spielerId]) {
+            const sp = spieler.find((s) => s.id === spielerId)
+            if (!sp) return
+            summary[spielerId] = {
+              spieler: sp,
+              trainings: [],
+              summe: 0,
+              barSumme: 0,
+              bezahltSumme: 0,
+              vorauszahlungSumme: 0,
+              offeneSumme: 0,
+              bezahlt: false,
+              adjustment: 0,
+              monatlicheSerien: new Set()
+            }
+          }
+
+          // Training auch für entfernte Spieler tracken
+          if (!summary[spielerId].trainings.includes(t)) {
+            summary[spielerId].trainings.push(t)
+          }
+
+          // Berechne den Preis
+          const totalPreis = preis * duration
+          let spielerPreis = totalPreis
+          if (abrechnungsart === 'proSpieler') {
+            spielerPreis = spielerPreis / zahlendeSpielerAnzahl
+          }
+
+          summary[spielerId].summe += spielerPreis
+
+          // Entfernte Spieler: immer als offene Summe behandeln (noch nicht bezahlt)
+          const paymentStatus = getSpielerPaymentStatus(spielerId, t)
+          if (paymentStatus.barBezahlt) {
+            summary[spielerId].barSumme += spielerPreis
+          } else if (paymentStatus.bezahlt) {
+            summary[spielerId].bezahltSumme += spielerPreis
+          } else {
+            summary[spielerId].offeneSumme += spielerPreis
+          }
+        })
+      }
     })
 
     // Apply adjustments
@@ -2525,9 +2790,14 @@ function AbrechnungView({
             const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
             const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
             const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+            // Bei proSpieler: Anzahl zahlungspflichtiger Spieler berücksichtigen
+            const entfernteMitBezahlung = (t.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+            const zahlendeSpielerAnzahl = t.spieler_ids.length + entfernteMitBezahlung.length
+
             let betrag = preis * duration
             if (abrechnungsart === 'proSpieler') {
-              betrag = betrag / t.spieler_ids.length
+              betrag = betrag / zahlendeSpielerAnzahl
             }
             // Training-Korrektur anwenden
             betrag += (t.korrektur_betrag || 0)
