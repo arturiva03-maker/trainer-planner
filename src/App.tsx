@@ -3309,6 +3309,94 @@ function AbrechnungView({
     setShowGuthabenModal(spielerId)
   }
 
+  // Mit Guthaben bezahlen - offene Trainings mit verfügbarem Guthaben verrechnen
+  const payWithGuthaben = async (spielerId: string, offeneTrainings: Training[], offeneSumme: number) => {
+    const guthaben = getGuthaben(spielerId)
+    if (!guthaben || guthaben.aktuell <= 0) {
+      alert('Kein Guthaben verfügbar')
+      return
+    }
+
+    // Berechne wie viel wir abbuchen können
+    const abbuchungsBetrag = Math.min(guthaben.aktuell, offeneSumme)
+
+    if (abbuchungsBetrag <= 0) return
+
+    // Guthaben aktualisieren
+    const { error: guthabenError } = await supabase
+      .from('guthaben')
+      .update({
+        aktuell: guthaben.aktuell - abbuchungsBetrag,
+        verbraucht_gesamt: guthaben.verbraucht_gesamt + abbuchungsBetrag,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', guthaben.id)
+
+    if (guthabenError) {
+      alert('Fehler beim Abbuchen: ' + guthabenError.message)
+      return
+    }
+
+    // Transaktion speichern
+    await supabase
+      .from('guthaben_transaktionen')
+      .insert({
+        user_id: userId,
+        spieler_id: spielerId,
+        betrag: -abbuchungsBetrag, // negativ = Abbuchung
+        typ: 'abbuchung',
+        beschreibung: `Bezahlung offener Trainings (${selectedMonth})`,
+        bar: false,
+        datum: formatDate(new Date())
+      })
+
+    // Trainings als bezahlt markieren (so viele wie mit dem Betrag bezahlt werden können)
+    let verbleibendesBudget = abbuchungsBetrag
+    for (const training of offeneTrainings) {
+      if (verbleibendesBudget <= 0) break
+
+      // Berechne Trainings-Betrag für diesen Spieler
+      const tarif = tarife.find(ta => ta.id === training.tarif_id)
+      const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+      const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+      const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+      let betrag = preis * duration
+      if (abrechnungsart === 'proSpieler') {
+        const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+        betrag = betrag / (training.spieler_ids.length + entfernteMitBezahlung.length)
+      }
+      betrag += (training.korrektur_betrag || 0)
+
+      if (verbleibendesBudget >= betrag) {
+        // Training vollständig bezahlen
+        const existingPayment = spielerPayments.find(
+          p => p.training_id === training.id && p.spieler_id === spielerId
+        )
+
+        if (existingPayment) {
+          await supabase
+            .from('spieler_training_payments')
+            .update({ bezahlt: true })
+            .eq('id', existingPayment.id)
+        } else {
+          await supabase
+            .from('spieler_training_payments')
+            .insert({
+              user_id: userId,
+              training_id: training.id,
+              spieler_id: spielerId,
+              bezahlt: true,
+              bar_bezahlt: false
+            })
+        }
+        verbleibendesBudget -= betrag
+      }
+    }
+
+    onUpdate()
+  }
+
   return (
     <div>
       <div className="stats-grid">
@@ -3967,42 +4055,65 @@ function AbrechnungView({
                 )}
 
                 {/* Guthaben Sektion */}
-                {!(filterType === 'tag' && selectedTag) && (
-                  <div style={{
-                    marginTop: 12,
-                    padding: 12,
-                    background: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary-light)' : 'var(--gray-50)',
-                    borderRadius: 8,
-                    border: `1px solid ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : 'var(--gray-200)'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ color: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : undefined }}>
-                          Guthaben
-                        </strong>
-                        {spielerGuthaben && spielerGuthaben.aktuell > 0 ? (
-                          <p style={{ fontSize: 12, color: 'var(--primary)', margin: '4px 0 0', fontWeight: 500 }}>
-                            Aktuell: {spielerGuthaben.aktuell.toFixed(2)} €
-                            {spielerGuthaben.letzte_einzahlung && (
-                              <> · Letzte Einzahlung: {formatDateGerman(spielerGuthaben.letzte_einzahlung)}</>
-                            )}
-                          </p>
-                        ) : (
-                          <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
-                            Kein Guthaben vorhanden
-                          </p>
-                        )}
+                {!(filterType === 'tag' && selectedTag) && (() => {
+                  // Offene Trainings für "Mit Guthaben bezahlen"
+                  const offeneTrainings = trainingsDetail
+                    .filter(t => {
+                      const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
+                      return !ps.bezahlt && !ps.barBezahlt
+                    })
+                    .map(t => t.training)
+                  const kannMitGuthabenBezahlen = spielerGuthaben && spielerGuthaben.aktuell > 0 && gefilterteOffeneSumme > 0
+                  const abbuchungsBetrag = kannMitGuthabenBezahlen ? Math.min(spielerGuthaben.aktuell, gefilterteOffeneSumme) : 0
+
+                  return (
+                    <div style={{
+                      marginTop: 12,
+                      padding: 12,
+                      background: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary-light)' : 'var(--gray-50)',
+                      borderRadius: 8,
+                      border: `1px solid ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : 'var(--gray-200)'}`
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <div>
+                          <strong style={{ color: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : undefined }}>
+                            Guthaben
+                          </strong>
+                          {spielerGuthaben && spielerGuthaben.aktuell > 0 ? (
+                            <p style={{ fontSize: 12, color: 'var(--primary)', margin: '4px 0 0', fontWeight: 500 }}>
+                              Aktuell: {spielerGuthaben.aktuell.toFixed(2)} €
+                              {spielerGuthaben.letzte_einzahlung && (
+                                <> · Letzte Einzahlung: {formatDateGerman(spielerGuthaben.letzte_einzahlung)}</>
+                              )}
+                            </p>
+                          ) : (
+                            <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
+                              Kein Guthaben vorhanden
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {kannMitGuthabenBezahlen && (
+                            <button
+                              className="btn btn-success"
+                              style={{ fontSize: 13 }}
+                              onClick={() => payWithGuthaben(detail.spieler.id, offeneTrainings, gefilterteOffeneSumme)}
+                            >
+                              Mit Guthaben bezahlen ({abbuchungsBetrag.toFixed(2)} €)
+                            </button>
+                          )}
+                          <button
+                            className={`btn ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'btn-primary' : 'btn-secondary'}`}
+                            style={{ fontSize: 13 }}
+                            onClick={() => openGuthabenModal(detail.spieler.id)}
+                          >
+                            Aufladen
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        className={`btn ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ fontSize: 13 }}
-                        onClick={() => openGuthabenModal(detail.spieler.id)}
-                      >
-                        Guthaben aufladen
-                      </button>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
