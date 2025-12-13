@@ -875,6 +875,36 @@ function KalenderView({
       .join(', ')
   }
 
+  // Gibt Spielernamen mit durchgestrichenen entfernten Spielern zurück
+  const getTrainingDisplayTitle = (training: Training, vornameOnly = false) => {
+    const aktiveSpieler = training.spieler_ids.map(id => {
+      const name = spieler.find(s => s.id === id)?.name || 'Unbekannt'
+      return { name: vornameOnly ? name.split(' ')[0] : name, entfernt: false }
+    })
+
+    const entfernteSpieler = (training.entfernte_spieler || []).map(es => {
+      const name = spieler.find(s => s.id === es.spieler_id)?.name || 'Unbekannt'
+      return { name: vornameOnly ? name.split(' ')[0] : name, entfernt: true }
+    })
+
+    const alleSpieler = [...aktiveSpieler, ...entfernteSpieler]
+
+    if (alleSpieler.length === 0) return null
+
+    return (
+      <>
+        {alleSpieler.map((s, i) => (
+          <span key={i}>
+            {i > 0 && ', '}
+            <span style={s.entfernt ? { textDecoration: 'line-through', opacity: 0.7 } : undefined}>
+              {s.name}
+            </span>
+          </span>
+        ))}
+      </>
+    )
+  }
+
   const getTarifName = (tarifId?: string) => {
     if (!tarifId) return null
     return tarife.find((t) => t.id === tarifId)?.name
@@ -1114,7 +1144,7 @@ function KalenderView({
                             onClick={() => setEditingTraining(training)}
                             onDoubleClick={() => handleDoubleClick(training)}
                           >
-                            <div className="training-title">{training.name || getSpielerNames(training.spieler_ids, true)}</div>
+                            <div className="training-title">{training.name || getTrainingDisplayTitle(training, true)}</div>
                             <div className="training-time">
                               {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
                             </div>
