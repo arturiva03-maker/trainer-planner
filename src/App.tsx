@@ -1257,9 +1257,9 @@ function TrainingModal({
   }
 
   const handleSave = async () => {
-    // Bei abgesagten Trainings mit Bezahlpflicht sind keine aktiven Spieler nötig
-    const hatBezahlpflichtigeEntfernte = entfernteSpieler.some(es => es.muss_bezahlen)
-    if (selectedSpieler.length === 0 && !(status === 'abgesagt' && hatBezahlpflichtigeEntfernte)) {
+    // Bei abgesagten Trainings mit entfernten Spielern sind keine aktiven Spieler nötig
+    const hatEntfernteSpieler = entfernteSpieler.length > 0
+    if (selectedSpieler.length === 0 && !(status === 'abgesagt' && hatEntfernteSpieler)) {
       alert('Bitte mindestens einen Spieler auswählen')
       return
     }
