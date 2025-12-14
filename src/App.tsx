@@ -1003,7 +1003,83 @@ function KalenderView({
   const handleDoubleClick = async (training: Training) => {
     const newStatus = training.status === 'geplant' ? 'durchgefuehrt' : 'geplant'
     await supabase.from('trainings').update({ status: newStatus }).eq('id', training.id)
-    // Guthaben-Verrechnung erfolgt jetzt über das TrainingModal beim Speichern
+
+    // Bei Wechsel auf "durchgeführt": Automatisch Guthaben verrechnen
+    if (newStatus === 'durchgefuehrt' && training.spieler_ids.length > 0) {
+      const tarif = tarife.find(ta => ta.id === training.tarif_id)
+      const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+      const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+      const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+      // Berechne Betrag pro Spieler
+      let betragProSpieler = preis * duration
+      if (abrechnungsart === 'proSpieler') {
+        const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+        betragProSpieler = betragProSpieler / (training.spieler_ids.length + entfernteMitBezahlung.length)
+      }
+
+      // Für jeden Spieler prüfen ob Guthaben vorhanden
+      for (const spielerId of training.spieler_ids) {
+        const { data: guthaben } = await supabase
+          .from('guthaben')
+          .select('*')
+          .eq('spieler_id', spielerId)
+          .eq('user_id', userId)
+          .single()
+
+        if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
+          // Guthaben abbuchen
+          await supabase
+            .from('guthaben')
+            .update({
+              aktuell: guthaben.aktuell - betragProSpieler,
+              verbraucht_gesamt: guthaben.verbraucht_gesamt + betragProSpieler,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', guthaben.id)
+
+          // Transaktion speichern
+          await supabase
+            .from('guthaben_transaktionen')
+            .insert({
+              user_id: userId,
+              spieler_id: spielerId,
+              betrag: -betragProSpieler,
+              typ: 'abbuchung',
+              training_id: training.id,
+              beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
+              bar: false,
+              datum: formatDate(new Date())
+            })
+
+          // Training als bezahlt markieren für diesen Spieler
+          const { data: existingPayment } = await supabase
+            .from('spieler_training_payments')
+            .select('id')
+            .eq('training_id', training.id)
+            .eq('spieler_id', spielerId)
+            .single()
+
+          if (existingPayment) {
+            await supabase
+              .from('spieler_training_payments')
+              .update({ bezahlt: true })
+              .eq('id', existingPayment.id)
+          } else {
+            await supabase
+              .from('spieler_training_payments')
+              .insert({
+                user_id: userId,
+                training_id: training.id,
+                spieler_id: spielerId,
+                bezahlt: true,
+                bar_bezahlt: false
+              })
+          }
+        }
+      }
+    }
+
     onUpdate()
   }
 
