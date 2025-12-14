@@ -2319,6 +2319,9 @@ function SpielerModal({
   const [rechnungsEmpfaenger, setRechnungsEmpfaenger] = useState(spieler?.rechnungs_empfaenger || '')
   const [rechnungsSpielerId, setRechnungsSpielerId] = useState(spieler?.rechnungs_spieler_id || '')
   const [notizen, setNotizen] = useState(spieler?.notizen || '')
+  const [iban, setIban] = useState(spieler?.iban || '')
+  const [mandatsreferenz, setMandatsreferenz] = useState(spieler?.mandatsreferenz || '')
+  const [unterschriftsdatum, setUnterschriftsdatum] = useState(spieler?.unterschriftsdatum || '')
   const [saving, setSaving] = useState(false)
 
   // Spieler die als Rechnungsempfänger verfügbar sind (nicht der aktuelle Spieler selbst)
@@ -2340,7 +2343,10 @@ function SpielerModal({
         kontakt_email: email || null,
         kontakt_telefon: telefon || null,
         rechnungs_adresse: adresse || null,
-        notizen: notizen || null
+        notizen: notizen || null,
+        iban: iban || null,
+        mandatsreferenz: mandatsreferenz || null,
+        unterschriftsdatum: unterschriftsdatum || null
       }
 
       // Rechnungsempfänger-Logik
@@ -2493,6 +2499,42 @@ function SpielerModal({
               )}
             </>
           )}
+          {/* SEPA-Lastschrift Daten */}
+          <div style={{ marginTop: 16, padding: 12, background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
+            <label style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>SEPA-Lastschrift (optional)</label>
+            <div className="form-group" style={{ marginBottom: 8 }}>
+              <label>IBAN</label>
+              <input
+                type="text"
+                className="form-control"
+                value={iban}
+                onChange={(e) => setIban(e.target.value.toUpperCase())}
+                placeholder="DE89 3704 0044 0532 0130 00"
+              />
+            </div>
+            <div className="form-row" style={{ gap: 12 }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Mandatsreferenz</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={mandatsreferenz}
+                  onChange={(e) => setMandatsreferenz(e.target.value)}
+                  placeholder="z.B. MANDAT-001"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Unterschriftsdatum</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={unterschriftsdatum}
+                  onChange={(e) => setUnterschriftsdatum(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="form-group">
             <label>Notizen</label>
             <textarea

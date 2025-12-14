@@ -28,6 +28,9 @@ export interface Spieler {
   rechnungs_spieler_id?: string
   abweichende_rechnung: boolean
   notizen?: string
+  iban?: string
+  mandatsreferenz?: string
+  unterschriftsdatum?: string
   created_at: string
 }
 
