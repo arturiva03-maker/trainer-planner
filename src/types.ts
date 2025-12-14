@@ -290,6 +290,9 @@ export const EMAIL_PLATZHALTER = [
   { key: '{{empfaenger_adresse}}', beschreibung: 'Adresse des Rechnungsempfängers' },
   { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis (falls zutreffend)' },
   { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
+  { key: '{{spieler_iban}}', beschreibung: 'IBAN des Spielers (maskiert: DE12****5678)' },
+  { key: '{{spieler_mandatsreferenz}}', beschreibung: 'Mandatsreferenz des Spielers' },
+  { key: '{{spieler_unterschriftsdatum}}', beschreibung: 'Unterschriftsdatum SEPA-Mandat' },
 ]
 
 // Verfügbare Platzhalter für PDF-Vorlagen (mit HTML)
