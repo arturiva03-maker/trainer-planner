@@ -6570,6 +6570,13 @@ function BuchhaltungView({
 
   // Einnahmen aus bezahlten Trainings berechnen
   const einnahmenPositionen = useMemo(() => {
+    // Set von Training-IDs die mit Guthaben bezahlt wurden (diese nicht als separate Einnahme zählen)
+    const mitGuthabenBezahlt = new Set(
+      guthabenTransaktionen
+        .filter(t => t.typ === 'abbuchung' && t.training_id)
+        .map(t => `${t.training_id}|${t.spieler_id}`)
+    )
+
     // Alle durchgeführten Trainings des Jahres (Bezahlstatus wird pro Spieler geprüft)
     const jahresTrainings = trainings.filter(t => {
       if (t.status !== 'durchgefuehrt') return false
@@ -6588,6 +6595,12 @@ function BuchhaltungView({
       const monat = t.datum.substring(0, 7) // YYYY-MM
 
       return t.spieler_ids.map(spielerId => {
+        // Prüfe ob dieses Training mit Guthaben bezahlt wurde - dann nicht als separate Einnahme zählen
+        // (das Geld wurde bereits bei der Guthaben-Einzahlung gezählt)
+        if (mitGuthabenBezahlt.has(`${t.id}|${spielerId}`)) {
+          return null
+        }
+
         // Prüfe spieler-spezifischen Bezahlstatus
         const paymentStatus = getSpielerPaymentStatus(spielerId, t)
 
@@ -6674,7 +6687,7 @@ function BuchhaltungView({
         istMonatlich: boolean
       }[]
     }).sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen])
+  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen, guthabenTransaktionen])
 
   // Einnahmen aus bezahlten manuellen Rechnungen
   const manuelleEinnahmen = useMemo(() => {
