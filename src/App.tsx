@@ -7900,7 +7900,7 @@ function BuchhaltungView({
         </div>
       )}
 
-{/* Ausgabe Modal */}
+      {/* Ausgabe Modal */}
       {showAusgabeModal && (
         <AusgabeModal
           ausgabe={editingAusgabe}

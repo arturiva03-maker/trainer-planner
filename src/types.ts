@@ -318,3 +318,41 @@ export const PDF_PLATZHALTER = [
   { key: '{{spieler_mandatsreferenz}}', beschreibung: 'Mandatsreferenz des Spielers' },
   { key: '{{spieler_unterschriftsdatum}}', beschreibung: 'Unterschriftsdatum SEPA-Mandat' },
 ]
+
+// Banking / Bankumsätze
+export interface BankConnection {
+  id: string
+  user_id: string
+  institution_id: string // GoCardless Institution ID (z.B. COMMERZBANK_COBADEFFXXX)
+  institution_name: string
+  requisition_id: string // GoCardless Requisition ID
+  account_id: string // GoCardless Account ID
+  iban?: string
+  status: 'pending' | 'active' | 'expired' | 'error'
+  last_sync?: string
+  created_at: string
+}
+
+export interface BankTransaction {
+  id: string
+  user_id: string
+  bank_connection_id: string
+  transaction_id: string // GoCardless Transaction ID (für Deduplizierung)
+  booking_date: string
+  value_date?: string
+  amount: number // Positiv = Eingang, Negativ = Ausgang
+  currency: string
+  debtor_name?: string // Wer hat gezahlt
+  creditor_name?: string // An wen wurde gezahlt
+  remittance_info?: string // Verwendungszweck
+  // Matching
+  match_status: 'unmatched' | 'auto_matched' | 'manual_matched' | 'ignored'
+  matched_training_id?: string
+  matched_spieler_id?: string
+  matched_rechnung_id?: string
+  matched_ausgabe_id?: string
+  match_confidence?: number // 0-100 bei auto_match
+  created_at: string
+}
+
+export type BankTransactionMatchType = 'training' | 'rechnung' | 'ausgabe' | 'guthaben'
