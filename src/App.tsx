@@ -5081,6 +5081,21 @@ function InvoiceModal({
       ? `\nKorrektur: ${korrekturNum > 0 ? '+' : ''}${korrekturNum.toFixed(2)} €`
       : ''
 
+    // IBAN maskieren (nur erste 4 und letzte 4 Zeichen zeigen)
+    const maskiereIban = (ibanStr: string | undefined): string => {
+      if (!ibanStr) return ''
+      const cleaned = ibanStr.replace(/\s/g, '')
+      if (cleaned.length <= 8) return cleaned
+      return `${cleaned.slice(0, 4)}${'*'.repeat(cleaned.length - 8)}${cleaned.slice(-4)}`
+    }
+
+    // Spieler-SEPA-Daten
+    const spielerIban = selectedSummary?.spieler.iban || ''
+    const spielerMandatsreferenz = selectedSummary?.spieler.mandatsreferenz || ''
+    const spielerUnterschriftsdatum = selectedSummary?.spieler.unterschriftsdatum
+      ? formatDateGerman(selectedSummary.spieler.unterschriftsdatum)
+      : ''
+
     // Platzhalter-Werte für PDF
     const platzhalterWerte: Record<string, string> = {
       '{{spieler_name}}': selectedSummary?.spieler.name || '',
@@ -5103,6 +5118,9 @@ function InvoiceModal({
       '{{kleinunternehmer_hinweis}}': kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : '',
       '{{ust_zeile}}': !kleinunternehmer ? `Nettobetrag: ${summen.gesamtNetto.toFixed(2)} €<br>USt (19%): ${summen.gesamtUst.toFixed(2)} €` : '',
       '{{summen_block}}': summenBlock,
+      '{{spieler_iban}}': maskiereIban(spielerIban),
+      '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
+      '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
     }
 
     // Funktion zum Ersetzen der Platzhalter

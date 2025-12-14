@@ -314,4 +314,7 @@ export const PDF_PLATZHALTER = [
   { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis' },
   { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
   { key: '{{summen_block}}', beschreibung: 'Summen-Block als HTML' },
+  { key: '{{spieler_iban}}', beschreibung: 'IBAN des Spielers (maskiert: DE12****5678)' },
+  { key: '{{spieler_mandatsreferenz}}', beschreibung: 'Mandatsreferenz des Spielers' },
+  { key: '{{spieler_unterschriftsdatum}}', beschreibung: 'Unterschriftsdatum SEPA-Mandat' },
 ]
