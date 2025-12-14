@@ -3260,6 +3260,107 @@ function AbrechnungView({
     onUpdate()
   }
 
+  // Automatische Guthaben-Verrechnung beim Öffnen der Spieler-Detailansicht
+  const openSpielerDetailMitAutoVerrechnung = async (spielerId: string) => {
+    // Guthaben frisch aus DB laden
+    const { data: guthaben } = await supabase
+      .from('guthaben')
+      .select('*')
+      .eq('spieler_id', spielerId)
+      .eq('user_id', userId)
+      .single()
+
+    if (guthaben && guthaben.aktuell > 0) {
+      // Finde alle offenen durchgeführten Trainings des Spielers im aktuellen Monat
+      const offeneTrainings = monthTrainings.filter(t => {
+        if (!t.spieler_ids.includes(spielerId)) return false
+        if (t.status !== 'durchgefuehrt') return false
+        const ps = getSpielerPaymentStatus(spielerId, t)
+        return !ps.bezahlt && !ps.barBezahlt
+      })
+
+      let verfuegbaresGuthaben = guthaben.aktuell
+      let verbrauchtesGuthaben = 0
+
+      for (const training of offeneTrainings) {
+        if (verfuegbaresGuthaben <= 0) break
+
+        // Berechne Betrag für dieses Training
+        const tarif = tarife.find(ta => ta.id === training.tarif_id)
+        const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+        const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+        const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+        let betrag = preis * duration
+        if (abrechnungsart === 'proSpieler') {
+          const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+          betrag = betrag / (training.spieler_ids.length + entfernteMitBezahlung.length)
+        }
+
+        if (verfuegbaresGuthaben >= betrag && betrag > 0) {
+          // Training als bezahlt markieren
+          const { data: existingPayment } = await supabase
+            .from('spieler_training_payments')
+            .select('id')
+            .eq('training_id', training.id)
+            .eq('spieler_id', spielerId)
+            .single()
+
+          if (existingPayment) {
+            await supabase
+              .from('spieler_training_payments')
+              .update({ bezahlt: true })
+              .eq('id', existingPayment.id)
+          } else {
+            await supabase
+              .from('spieler_training_payments')
+              .insert({
+                user_id: userId,
+                training_id: training.id,
+                spieler_id: spielerId,
+                bezahlt: true,
+                bar_bezahlt: false
+              })
+          }
+
+          // Transaktion speichern
+          await supabase
+            .from('guthaben_transaktionen')
+            .insert({
+              user_id: userId,
+              spieler_id: spielerId,
+              betrag: -betrag,
+              typ: 'abbuchung',
+              training_id: training.id,
+              beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
+              bar: false,
+              datum: formatDate(new Date())
+            })
+
+          verfuegbaresGuthaben -= betrag
+          verbrauchtesGuthaben += betrag
+        }
+      }
+
+      // Guthaben aktualisieren wenn etwas verrechnet wurde
+      if (verbrauchtesGuthaben > 0) {
+        await supabase
+          .from('guthaben')
+          .update({
+            aktuell: guthaben.aktuell - verbrauchtesGuthaben,
+            verbraucht_gesamt: guthaben.verbraucht_gesamt + verbrauchtesGuthaben,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', guthaben.id)
+
+        // Daten neu laden damit UI aktualisiert wird
+        onUpdate()
+      }
+    }
+
+    setSelectedSpielerDetail(spielerId)
+  }
+
   // Manuelle Rechnung als bezahlt/offen markieren
   const toggleManuelleRechnungBezahlt = async (rechnungId: string, currentBezahlt: boolean, barBezahlt?: boolean) => {
     if (barBezahlt !== undefined) {
@@ -3875,7 +3976,7 @@ function AbrechnungView({
               {filteredSummary.map((item) => (
                 <tr
                   key={item.spieler.id}
-                  onClick={() => setSelectedSpielerDetail(item.spieler.id)}
+                  onClick={() => openSpielerDetailMitAutoVerrechnung(item.spieler.id)}
                   style={{ cursor: 'pointer' }}
                 >
                   <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{item.spieler.name}</td>
@@ -3923,7 +4024,7 @@ function AbrechnungView({
             <div
               key={item.spieler.id}
               className="mobile-card"
-              onClick={() => setSelectedSpielerDetail(item.spieler.id)}
+              onClick={() => openSpielerDetailMitAutoVerrechnung(item.spieler.id)}
               style={{ cursor: 'pointer' }}
             >
               <div className="mobile-card-header">
