@@ -8074,6 +8074,7 @@ function BuchhaltungView({
           spielerId={editingTrainingEinnahme.spielerId}
           spieler={spieler}
           spielerPayments={spielerPayments}
+          tarife={tarife}
           onClose={() => {
             setShowEinnahmenEditModal(null)
             setEditingTrainingEinnahme(null)
@@ -8979,6 +8980,7 @@ function TrainingEinnahmeEditModal({
   spielerId,
   spieler,
   spielerPayments,
+  tarife,
   onClose,
   onSave
 }: {
@@ -8986,30 +8988,58 @@ function TrainingEinnahmeEditModal({
   spielerId: string
   spieler: Spieler[]
   spielerPayments: SpielerTrainingPayment[]
+  tarife: Tarif[]
   onClose: () => void
   onSave: () => void
 }) {
   // Aktuellen Payment-Status ermitteln
   const existingPayment = spielerPayments.find(p => p.training_id === training.id && p.spieler_id === spielerId)
   const isEinzeltraining = training.spieler_ids.length === 1
+  const tarif = tarife.find(t => t.id === training.tarif_id)
+
+  // Dauer berechnen
+  const duration = (() => {
+    const [startH, startM] = training.uhrzeit_von.split(':').map(Number)
+    const [endH, endM] = training.uhrzeit_bis.split(':').map(Number)
+    return (endH * 60 + endM - startH * 60 - startM) / 60
+  })()
+
+  // Aktueller Preis pro Stunde (custom oder vom Tarif)
+  const aktuellerPreis = training.custom_preis_pro_stunde ?? tarif?.preis_pro_stunde ?? 0
 
   const [bezahlt, setBezahlt] = useState(existingPayment?.bezahlt ?? (isEinzeltraining ? training.bezahlt : false))
   const [barBezahlt, setBarBezahlt] = useState(existingPayment?.bar_bezahlt ?? (isEinzeltraining ? training.bar_bezahlt : false))
+  const [preisProStunde, setPreisProStunde] = useState(aktuellerPreis.toString())
   const [korrekturBetrag, setKorrekturBetrag] = useState((training.korrektur_betrag || 0).toString())
   const [korrekturGrund, setKorrekturGrund] = useState(training.korrektur_grund || '')
   const [saving, setSaving] = useState(false)
 
   const sp = spieler.find(s => s.id === spielerId)
 
+  // Berechneter Gesamtbetrag
+  const preisNum = parseFloat(preisProStunde) || 0
+  const korrekturNum = parseFloat(korrekturBetrag) || 0
+  const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+  let gesamtBetrag = abrechnungsart === 'monatlich'
+    ? preisNum
+    : preisNum * duration
+  if (abrechnungsart === 'proSpieler') {
+    gesamtBetrag = gesamtBetrag / training.spieler_ids.length
+  }
+  gesamtBetrag += korrekturNum
+
   const handleSave = async () => {
     setSaving(true)
     try {
       const korrektur = parseFloat(korrekturBetrag) || 0
+      const neuerPreis = parseFloat(preisProStunde) || 0
 
-      // Training-Korrektur aktualisieren
+      // Training aktualisieren (Preis und Korrektur)
       await supabase
         .from('trainings')
         .update({
+          custom_preis_pro_stunde: neuerPreis,
           korrektur_betrag: korrektur,
           korrektur_grund: korrekturGrund || null
         })
@@ -9065,23 +9095,70 @@ function TrainingEinnahmeEditModal({
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          <div className="form-group">
-            <label>Spieler</label>
-            <input
-              type="text"
-              className="form-control"
-              value={sp?.name || 'Unbekannt'}
-              disabled
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Spieler</label>
+              <input
+                type="text"
+                className="form-control"
+                value={sp?.name || 'Unbekannt'}
+                disabled
+              />
+            </div>
+            <div className="form-group">
+              <label>Datum</label>
+              <input
+                type="text"
+                className="form-control"
+                value={formatDateGerman(training.datum)}
+                disabled
+              />
+            </div>
           </div>
           <div className="form-group">
-            <label>Datum</label>
+            <label>Tarif: {tarif?.name || 'Standard'} ({abrechnungsart === 'monatlich' ? 'monatlich' : `${duration}h`})</label>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>{abrechnungsart === 'monatlich' ? 'Monatsbetrag (€)' : 'Preis pro Stunde (€)'}</label>
+              <input
+                type="number"
+                className="form-control"
+                value={preisProStunde}
+                onChange={e => setPreisProStunde(e.target.value)}
+                step="0.01"
+                min="0"
+              />
+            </div>
+            <div className="form-group">
+              <label>Korrektur (€)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={korrekturBetrag}
+                onChange={e => setKorrekturBetrag(e.target.value)}
+                step="0.01"
+                placeholder="-0.70"
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Korrektur-Grund</label>
             <input
               type="text"
               className="form-control"
-              value={formatDateGerman(training.datum)}
-              disabled
+              value={korrekturGrund}
+              onChange={e => setKorrekturGrund(e.target.value)}
+              placeholder="z.B. Kartenlesergebühr"
             />
+          </div>
+          <div style={{ padding: 12, background: 'var(--gray-100)', borderRadius: 8, marginBottom: 16 }}>
+            <strong>Gesamtbetrag: {gesamtBetrag.toFixed(2)} €</strong>
+            {abrechnungsart === 'proSpieler' && training.spieler_ids.length > 1 && (
+              <small style={{ display: 'block', color: 'var(--gray-500)' }}>
+                (geteilt durch {training.spieler_ids.length} Spieler)
+              </small>
+            )}
           </div>
           <div className="form-group">
             <label>Bezahlstatus</label>
@@ -9108,30 +9185,6 @@ function TrainingEinnahmeEditModal({
                 </label>
               )}
             </div>
-          </div>
-          <div className="form-group">
-            <label>Korrektur-Betrag (€)</label>
-            <input
-              type="number"
-              className="form-control"
-              value={korrekturBetrag}
-              onChange={e => setKorrekturBetrag(e.target.value)}
-              step="0.01"
-              placeholder="z.B. -0.70 für Kartenlesergebühr"
-            />
-            <small style={{ color: 'var(--gray-500)' }}>
-              Negativ = Abzug (z.B. Kartenlesergebühr), Positiv = Zuschlag
-            </small>
-          </div>
-          <div className="form-group">
-            <label>Korrektur-Grund</label>
-            <input
-              type="text"
-              className="form-control"
-              value={korrekturGrund}
-              onChange={e => setKorrekturGrund(e.target.value)}
-              placeholder="z.B. Kartenlesergebühr SumUp"
-            />
           </div>
         </div>
         <div className="modal-footer">
