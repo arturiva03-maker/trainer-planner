@@ -6616,6 +6616,12 @@ function BuchhaltungView({
   const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
   const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
 
+  // Einnahmen-Bearbeitung States
+  const [editingManuelleRechnung, setEditingManuelleRechnung] = useState<ManuelleRechnung | null>(null)
+  const [editingKorrektur, setEditingKorrektur] = useState<MonthlyAdjustment | null>(null)
+  const [editingGuthaben, setEditingGuthaben] = useState<GuthabenTransaktion | null>(null)
+  const [showEinnahmenEditModal, setShowEinnahmenEditModal] = useState<'rechnung' | 'korrektur' | 'guthaben' | null>(null)
+
   // Reset detailPeriode wenn Zeitraum-Typ geändert wird
   useEffect(() => {
     setDetailPeriode(null)
@@ -7118,11 +7124,17 @@ function BuchhaltungView({
                         {!kleinunternehmer && <th style={{ textAlign: 'right' }}>USt</th>}
                         <th style={{ textAlign: 'right' }}>Brutto</th>
                         <th>Zahlart</th>
+                        <th>Aktionen</th>
                       </tr>
                     </thead>
                     <tbody>
                       {positionen.map((p, i) => {
                         const hatKorrektur = !p.istKorrektur && (p as typeof einnahmenPositionen[0]).korrektur !== 0
+                        // IDs für Bearbeitung
+                        const rechnungId = (p as typeof manuelleEinnahmen[0]).rechnungId
+                        const korrekturId = (p as typeof korrekturEinnahmen[0]).korrekturId
+                        const guthabenId = (p as typeof guthabenEinzahlungen[0]).guthabenId
+                        const canEdit = p.istManuelleRechnung || p.istKorrektur || p.istGuthabenEinzahlung
                         return (
                           <tr key={i} style={
                             p.istKorrektur
@@ -7144,6 +7156,18 @@ function BuchhaltungView({
                                   marginRight: 6
                                 }}>
                                   {p.brutto < 0 ? 'Gutschrift' : 'Zuschlag'}
+                                </span>
+                              )}
+                              {p.istGuthabenEinzahlung && (
+                                <span style={{
+                                  background: 'var(--primary)',
+                                  color: '#fff',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 10,
+                                  marginRight: 6
+                                }}>
+                                  Guthaben
                                 </span>
                               )}
                               {hatKorrektur && (
@@ -7182,6 +7206,67 @@ function BuchhaltungView({
                                 </span>
                               )}
                             </td>
+                            <td>
+                              {canEdit ? (
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <button
+                                    className="btn btn-sm btn-secondary"
+                                    onClick={() => {
+                                      if (p.istManuelleRechnung && rechnungId) {
+                                        const rechnung = manuelleRechnungen.find(r => r.id === rechnungId)
+                                        if (rechnung) {
+                                          setEditingManuelleRechnung(rechnung)
+                                          setShowEinnahmenEditModal('rechnung')
+                                        }
+                                      } else if (p.istKorrektur && korrekturId) {
+                                        const korrektur = adjustments.find(a => a.id === korrekturId)
+                                        if (korrektur) {
+                                          setEditingKorrektur(korrektur)
+                                          setShowEinnahmenEditModal('korrektur')
+                                        }
+                                      } else if (p.istGuthabenEinzahlung && guthabenId) {
+                                        const guthaben = guthabenTransaktionen.find(g => g.id === guthabenId)
+                                        if (guthaben) {
+                                          setEditingGuthaben(guthaben)
+                                          setShowEinnahmenEditModal('guthaben')
+                                        }
+                                      }
+                                    }}
+                                    title="Bearbeiten"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-danger"
+                                    onClick={async () => {
+                                      const confirmed = await showConfirm(
+                                        'Eintrag löschen',
+                                        'Diesen Eintrag wirklich löschen?'
+                                      )
+                                      if (!confirmed) return
+                                      try {
+                                        if (p.istManuelleRechnung && rechnungId) {
+                                          await supabase.from('manuelle_rechnungen').delete().eq('id', rechnungId)
+                                        } else if (p.istKorrektur && korrekturId) {
+                                          await supabase.from('monthly_adjustments').delete().eq('id', korrekturId)
+                                        } else if (p.istGuthabenEinzahlung && guthabenId) {
+                                          await supabase.from('guthaben_transaktionen').delete().eq('id', guthabenId)
+                                        }
+                                        onUpdate()
+                                      } catch (err) {
+                                        console.error('Error deleting:', err)
+                                        alert('Fehler beim Löschen')
+                                      }
+                                    }}
+                                    title="Löschen"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: 10, color: 'var(--gray-400)' }}>—</span>
+                              )}
+                            </td>
                           </tr>
                         )
                       })}
@@ -7192,7 +7277,7 @@ function BuchhaltungView({
                         <td style={{ textAlign: 'right' }}>{(summeNetto || 0).toFixed(2)} €</td>
                         {!kleinunternehmer && <td style={{ textAlign: 'right' }}>{(summeUst || 0).toFixed(2)} €</td>}
                         <td style={{ textAlign: 'right' }}>{(summeBrutto || 0).toFixed(2)} €</td>
-                        <td></td>
+                        <td colSpan={2}></td>
                       </tr>
                     </tfoot>
                   </table>
@@ -7916,6 +8001,57 @@ function BuchhaltungView({
           userId={userId}
         />
       )}
+
+      {/* Manuelle Rechnung bearbeiten */}
+      {showEinnahmenEditModal === 'rechnung' && editingManuelleRechnung && (
+        <ManuelleRechnungEditModal
+          rechnung={editingManuelleRechnung}
+          spieler={spieler}
+          onClose={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingManuelleRechnung(null)
+          }}
+          onSave={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingManuelleRechnung(null)
+            onUpdate()
+          }}
+        />
+      )}
+
+      {/* Korrektur bearbeiten */}
+      {showEinnahmenEditModal === 'korrektur' && editingKorrektur && (
+        <KorrekturEditModal
+          korrektur={editingKorrektur}
+          spieler={spieler}
+          onClose={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingKorrektur(null)
+          }}
+          onSave={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingKorrektur(null)
+            onUpdate()
+          }}
+        />
+      )}
+
+      {/* Guthaben-Einzahlung bearbeiten */}
+      {showEinnahmenEditModal === 'guthaben' && editingGuthaben && (
+        <GuthabenEditModal
+          transaktion={editingGuthaben}
+          spieler={spieler}
+          onClose={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingGuthaben(null)
+          }}
+          onSave={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingGuthaben(null)
+            onUpdate()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -8417,6 +8553,386 @@ function AusgabeModal({
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || uploading}>
             {uploading ? 'Hochladen...' : saving ? 'Speichern...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ MANUELLE RECHNUNG EDIT MODAL ============
+function ManuelleRechnungEditModal({
+  rechnung,
+  spieler,
+  onClose,
+  onSave
+}: {
+  rechnung: ManuelleRechnung
+  spieler: Spieler[]
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [rechnungsdatum, setRechnungsdatum] = useState(rechnung.rechnungsdatum)
+  const [empfaengerName, setEmpfaengerName] = useState(rechnung.empfaenger_name)
+  const [beschreibung, setBeschreibung] = useState(rechnung.beschreibung || '')
+  const [bruttoGesamt, setBruttoGesamt] = useState(rechnung.brutto_gesamt.toString())
+  const [ustSatz, setUstSatz] = useState(rechnung.ust_satz)
+  const [bezahlt, setBezahlt] = useState(rechnung.bezahlt)
+  const [barBezahlt, setBarBezahlt] = useState(rechnung.bar_bezahlt)
+  const [saving, setSaving] = useState(false)
+
+  const bruttoNum = parseFloat(bruttoGesamt) || 0
+  const nettoGesamt = bruttoNum / (1 + ustSatz / 100)
+  const ustBetrag = bruttoNum - nettoGesamt
+
+  const handleSave = async () => {
+    if (!empfaengerName || bruttoNum <= 0) {
+      alert('Bitte Empfänger und Betrag angeben')
+      return
+    }
+    setSaving(true)
+    try {
+      await supabase
+        .from('manuelle_rechnungen')
+        .update({
+          rechnungsdatum,
+          empfaenger_name: empfaengerName,
+          beschreibung: beschreibung || null,
+          brutto_gesamt: bruttoNum,
+          netto_gesamt: nettoGesamt,
+          ust_betrag: ustBetrag,
+          ust_satz: ustSatz,
+          bezahlt,
+          bar_bezahlt: barBezahlt
+        })
+        .eq('id', rechnung.id)
+      onSave()
+    } catch (err) {
+      console.error('Error updating rechnung:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Manuelle Rechnung bearbeiten</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Rechnungsdatum</label>
+            <input
+              type="date"
+              className="form-control"
+              value={rechnungsdatum}
+              onChange={e => setRechnungsdatum(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Empfänger</label>
+            <input
+              type="text"
+              className="form-control"
+              value={empfaengerName}
+              onChange={e => setEmpfaengerName(e.target.value)}
+              list="spieler-list"
+            />
+            <datalist id="spieler-list">
+              {spieler.map(s => <option key={s.id} value={s.name} />)}
+            </datalist>
+          </div>
+          <div className="form-group">
+            <label>Beschreibung</label>
+            <input
+              type="text"
+              className="form-control"
+              value={beschreibung}
+              onChange={e => setBeschreibung(e.target.value)}
+            />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Brutto-Betrag (€)</label>
+              <input
+                type="number"
+                className="form-control"
+                value={bruttoGesamt}
+                onChange={e => setBruttoGesamt(e.target.value)}
+                step="0.01"
+              />
+            </div>
+            <div className="form-group">
+              <label>USt-Satz (%)</label>
+              <select
+                className="form-control"
+                value={ustSatz}
+                onChange={e => setUstSatz(parseInt(e.target.value))}
+              >
+                <option value={0}>0%</option>
+                <option value={7}>7%</option>
+                <option value={19}>19%</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 16, padding: 12, background: 'var(--gray-100)', borderRadius: 8 }}>
+            <div>Netto: {nettoGesamt.toFixed(2)} €</div>
+            <div>USt: {ustBetrag.toFixed(2)} €</div>
+          </div>
+          <div className="form-row">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={bezahlt}
+                onChange={e => {
+                  setBezahlt(e.target.checked)
+                  if (!e.target.checked) setBarBezahlt(false)
+                }}
+              />
+              Bezahlt
+            </label>
+            {bezahlt && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={barBezahlt}
+                  onChange={e => setBarBezahlt(e.target.checked)}
+                />
+                Bar bezahlt
+              </label>
+            )}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichern...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ KORREKTUR EDIT MODAL ============
+function KorrekturEditModal({
+  korrektur,
+  spieler,
+  onClose,
+  onSave
+}: {
+  korrektur: MonthlyAdjustment
+  spieler: Spieler[]
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [monat, setMonat] = useState(korrektur.monat)
+  const [betrag, setBetrag] = useState(korrektur.betrag.toString())
+  const [grund, setGrund] = useState(korrektur.grund || '')
+  const [spielerId, setSpielerId] = useState(korrektur.spieler_id)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    const betragNum = parseFloat(betrag)
+    if (isNaN(betragNum) || betragNum === 0) {
+      alert('Bitte einen gültigen Betrag eingeben')
+      return
+    }
+    setSaving(true)
+    try {
+      await supabase
+        .from('monthly_adjustments')
+        .update({
+          monat,
+          betrag: betragNum,
+          grund: grund || null,
+          spieler_id: spielerId
+        })
+        .eq('id', korrektur.id)
+      onSave()
+    } catch (err) {
+      console.error('Error updating korrektur:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Korrektur bearbeiten</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Spieler</label>
+            <select
+              className="form-control"
+              value={spielerId}
+              onChange={e => setSpielerId(e.target.value)}
+            >
+              {spieler.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Monat</label>
+            <input
+              type="month"
+              className="form-control"
+              value={monat}
+              onChange={e => setMonat(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Betrag (€) - negativ für Gutschrift</label>
+            <input
+              type="number"
+              className="form-control"
+              value={betrag}
+              onChange={e => setBetrag(e.target.value)}
+              step="0.01"
+            />
+            <small style={{ color: 'var(--gray-500)' }}>
+              Positiv = Zuschlag, Negativ = Gutschrift
+            </small>
+          </div>
+          <div className="form-group">
+            <label>Grund</label>
+            <input
+              type="text"
+              className="form-control"
+              value={grund}
+              onChange={e => setGrund(e.target.value)}
+              placeholder="z.B. Rabatt, Kartenlesergebühr..."
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichern...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ GUTHABEN EDIT MODAL ============
+function GuthabenEditModal({
+  transaktion,
+  spieler,
+  onClose,
+  onSave
+}: {
+  transaktion: GuthabenTransaktion
+  spieler: Spieler[]
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [datum, setDatum] = useState(transaktion.datum)
+  const [betrag, setBetrag] = useState(transaktion.betrag.toString())
+  const [beschreibung, setBeschreibung] = useState(transaktion.beschreibung || '')
+  const [bar, setBar] = useState(transaktion.bar)
+  const [saving, setSaving] = useState(false)
+
+  const sp = spieler.find(s => s.id === transaktion.spieler_id)
+
+  const handleSave = async () => {
+    const betragNum = parseFloat(betrag)
+    if (isNaN(betragNum) || betragNum <= 0) {
+      alert('Bitte einen gültigen Betrag eingeben')
+      return
+    }
+    setSaving(true)
+    try {
+      await supabase
+        .from('guthaben_transaktionen')
+        .update({
+          datum,
+          betrag: betragNum,
+          beschreibung: beschreibung || null,
+          bar
+        })
+        .eq('id', transaktion.id)
+      onSave()
+    } catch (err) {
+      console.error('Error updating guthaben:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Guthaben-Einzahlung bearbeiten</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Spieler</label>
+            <input
+              type="text"
+              className="form-control"
+              value={sp?.name || 'Unbekannt'}
+              disabled
+            />
+          </div>
+          <div className="form-group">
+            <label>Datum</label>
+            <input
+              type="date"
+              className="form-control"
+              value={datum}
+              onChange={e => setDatum(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Betrag (€)</label>
+            <input
+              type="number"
+              className="form-control"
+              value={betrag}
+              onChange={e => setBetrag(e.target.value)}
+              step="0.01"
+              min="0"
+            />
+          </div>
+          <div className="form-group">
+            <label>Beschreibung</label>
+            <input
+              type="text"
+              className="form-control"
+              value={beschreibung}
+              onChange={e => setBeschreibung(e.target.value)}
+              placeholder="z.B. Guthaben-Aufladung"
+            />
+          </div>
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={bar}
+                onChange={e => setBar(e.target.checked)}
+              />
+              Bar bezahlt
+            </label>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichern...' : 'Speichern'}
           </button>
         </div>
       </div>
