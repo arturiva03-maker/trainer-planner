@@ -6860,10 +6860,10 @@ function BuchhaltungView({
 
   // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen + Guthaben-Einzahlungen)
   const alleEinnahmen = useMemo(() => {
-    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: false }))
-    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istKorrektur: false, istGuthabenEinzahlung: false }))
-    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istManuelleRechnung: false, istGuthabenEinzahlung: false }))
-    const guthabenMapped = guthabenEinzahlungen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false }))
+    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: false, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
+    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istManuelleRechnung: true, istKorrektur: false, istGuthabenEinzahlung: false, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
+    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: true, istGuthabenEinzahlung: false, rechnungId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
+    const guthabenMapped = guthabenEinzahlungen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: true, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined }))
     return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped, ...guthabenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
   }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen, guthabenEinzahlungen])
 
@@ -7130,10 +7130,7 @@ function BuchhaltungView({
                     <tbody>
                       {positionen.map((p, i) => {
                         const hatKorrektur = !p.istKorrektur && (p as typeof einnahmenPositionen[0]).korrektur !== 0
-                        // IDs für Bearbeitung
-                        const rechnungId = (p as typeof manuelleEinnahmen[0]).rechnungId
-                        const korrekturId = (p as typeof korrekturEinnahmen[0]).korrekturId
-                        const guthabenId = (p as typeof guthabenEinzahlungen[0]).guthabenId
+                        // IDs für Bearbeitung - direkt aus dem Eintrag lesen
                         const canEdit = p.istManuelleRechnung || p.istKorrektur || p.istGuthabenEinzahlung
                         return (
                           <tr key={i} style={
@@ -7212,20 +7209,20 @@ function BuchhaltungView({
                                   <button
                                     className="btn btn-sm btn-secondary"
                                     onClick={() => {
-                                      if (p.istManuelleRechnung && rechnungId) {
-                                        const rechnung = manuelleRechnungen.find(r => r.id === rechnungId)
+                                      if (p.istManuelleRechnung && p.rechnungId) {
+                                        const rechnung = manuelleRechnungen.find(r => r.id === p.rechnungId)
                                         if (rechnung) {
                                           setEditingManuelleRechnung(rechnung)
                                           setShowEinnahmenEditModal('rechnung')
                                         }
-                                      } else if (p.istKorrektur && korrekturId) {
-                                        const korrektur = adjustments.find(a => a.id === korrekturId)
+                                      } else if (p.istKorrektur && p.korrekturId) {
+                                        const korrektur = adjustments.find(a => a.id === p.korrekturId)
                                         if (korrektur) {
                                           setEditingKorrektur(korrektur)
                                           setShowEinnahmenEditModal('korrektur')
                                         }
-                                      } else if (p.istGuthabenEinzahlung && guthabenId) {
-                                        const guthaben = guthabenTransaktionen.find(g => g.id === guthabenId)
+                                      } else if (p.istGuthabenEinzahlung && p.guthabenId) {
+                                        const guthaben = guthabenTransaktionen.find(g => g.id === p.guthabenId)
                                         if (guthaben) {
                                           setEditingGuthaben(guthaben)
                                           setShowEinnahmenEditModal('guthaben')
@@ -7245,12 +7242,12 @@ function BuchhaltungView({
                                       )
                                       if (!confirmed) return
                                       try {
-                                        if (p.istManuelleRechnung && rechnungId) {
-                                          await supabase.from('manuelle_rechnungen').delete().eq('id', rechnungId)
-                                        } else if (p.istKorrektur && korrekturId) {
-                                          await supabase.from('monthly_adjustments').delete().eq('id', korrekturId)
-                                        } else if (p.istGuthabenEinzahlung && guthabenId) {
-                                          await supabase.from('guthaben_transaktionen').delete().eq('id', guthabenId)
+                                        if (p.istManuelleRechnung && p.rechnungId) {
+                                          await supabase.from('manuelle_rechnungen').delete().eq('id', p.rechnungId)
+                                        } else if (p.istKorrektur && p.korrekturId) {
+                                          await supabase.from('monthly_adjustments').delete().eq('id', p.korrekturId)
+                                        } else if (p.istGuthabenEinzahlung && p.guthabenId) {
+                                          await supabase.from('guthaben_transaktionen').delete().eq('id', p.guthabenId)
                                         }
                                         onUpdate()
                                       } catch (err) {
