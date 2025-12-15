@@ -6620,7 +6620,8 @@ function BuchhaltungView({
   const [editingManuelleRechnung, setEditingManuelleRechnung] = useState<ManuelleRechnung | null>(null)
   const [editingKorrektur, setEditingKorrektur] = useState<MonthlyAdjustment | null>(null)
   const [editingGuthaben, setEditingGuthaben] = useState<GuthabenTransaktion | null>(null)
-  const [showEinnahmenEditModal, setShowEinnahmenEditModal] = useState<'rechnung' | 'korrektur' | 'guthaben' | null>(null)
+  const [editingTrainingEinnahme, setEditingTrainingEinnahme] = useState<{ training: Training, spielerId: string } | null>(null)
+  const [showEinnahmenEditModal, setShowEinnahmenEditModal] = useState<'rechnung' | 'korrektur' | 'guthaben' | 'training' | null>(null)
 
   // Reset detailPeriode wenn Zeitraum-Typ geändert wird
   useEffect(() => {
@@ -6744,6 +6745,7 @@ function BuchhaltungView({
 
         return {
           trainingId: t.id,
+          spielerId,
           datum: t.datum,
           spielerName: sp?.name || 'Unbekannt',
           tarifName: tarif?.name || 'Standard',
@@ -6751,6 +6753,7 @@ function BuchhaltungView({
           netto,
           ust,
           ustSatz,
+          bezahlt: paymentStatus.bezahlt,
           barBezahlt: paymentStatus.barBezahlt,
           korrektur: t.korrektur_betrag || 0,
           korrekturGrund: t.korrektur_grund,
@@ -6758,6 +6761,7 @@ function BuchhaltungView({
         }
       }).filter(Boolean) as {
         trainingId: string
+        spielerId: string
         datum: string
         spielerName: string
         tarifName: string
@@ -6765,6 +6769,7 @@ function BuchhaltungView({
         netto: number
         ust: number
         ustSatz: number
+        bezahlt: boolean
         barBezahlt: boolean
         korrektur: number
         korrekturGrund?: string
@@ -6860,10 +6865,10 @@ function BuchhaltungView({
 
   // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen + Guthaben-Einzahlungen)
   const alleEinnahmen = useMemo(() => {
-    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: false, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
-    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istManuelleRechnung: true, istKorrektur: false, istGuthabenEinzahlung: false, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
-    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: true, istGuthabenEinzahlung: false, rechnungId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
-    const guthabenMapped = guthabenEinzahlungen.map(e => ({ ...e, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: true, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined }))
+    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istTraining: true, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: false, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
+    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istTraining: false, istManuelleRechnung: true, istKorrektur: false, istGuthabenEinzahlung: false, trainingId: undefined as string | undefined, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
+    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istTraining: false, istManuelleRechnung: false, istKorrektur: true, istGuthabenEinzahlung: false, trainingId: undefined as string | undefined, rechnungId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
+    const guthabenMapped = guthabenEinzahlungen.map(e => ({ ...e, istTraining: false, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: true, trainingId: undefined as string | undefined, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined }))
     return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped, ...guthabenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
   }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen, guthabenEinzahlungen])
 
@@ -7130,8 +7135,8 @@ function BuchhaltungView({
                     <tbody>
                       {positionen.map((p, i) => {
                         const hatKorrektur = !p.istKorrektur && (p as typeof einnahmenPositionen[0]).korrektur !== 0
-                        // IDs für Bearbeitung - direkt aus dem Eintrag lesen
-                        const canEdit = p.istManuelleRechnung || p.istKorrektur || p.istGuthabenEinzahlung
+                        // Alle Einträge sind bearbeitbar
+                        const canEdit = true
                         return (
                           <tr key={i} style={
                             p.istKorrektur
@@ -7209,7 +7214,14 @@ function BuchhaltungView({
                                   <button
                                     className="btn btn-sm btn-secondary"
                                     onClick={() => {
-                                      if (p.istManuelleRechnung && p.rechnungId) {
+                                      if (p.istTraining && p.trainingId) {
+                                        const training = trainings.find(t => t.id === p.trainingId)
+                                        const spielerId = (p as typeof einnahmenPositionen[0]).spielerId
+                                        if (training && spielerId) {
+                                          setEditingTrainingEinnahme({ training, spielerId })
+                                          setShowEinnahmenEditModal('training')
+                                        }
+                                      } else if (p.istManuelleRechnung && p.rechnungId) {
                                         const rechnung = manuelleRechnungen.find(r => r.id === p.rechnungId)
                                         if (rechnung) {
                                           setEditingManuelleRechnung(rechnung)
@@ -7236,6 +7248,11 @@ function BuchhaltungView({
                                   <button
                                     className="btn btn-sm btn-danger"
                                     onClick={async () => {
+                                      // Trainings können nicht gelöscht werden (nur über Kalender)
+                                      if (p.istTraining) {
+                                        alert('Trainings können nur über den Kalender gelöscht werden.')
+                                        return
+                                      }
                                       const confirmed = await showConfirm(
                                         'Eintrag löschen',
                                         'Diesen Eintrag wirklich löschen?'
@@ -8045,6 +8062,25 @@ function BuchhaltungView({
           onSave={() => {
             setShowEinnahmenEditModal(null)
             setEditingGuthaben(null)
+            onUpdate()
+          }}
+        />
+      )}
+
+      {/* Training-Einnahme bearbeiten */}
+      {showEinnahmenEditModal === 'training' && editingTrainingEinnahme && (
+        <TrainingEinnahmeEditModal
+          training={editingTrainingEinnahme.training}
+          spielerId={editingTrainingEinnahme.spielerId}
+          spieler={spieler}
+          spielerPayments={spielerPayments}
+          onClose={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingTrainingEinnahme(null)
+          }}
+          onSave={() => {
+            setShowEinnahmenEditModal(null)
+            setEditingTrainingEinnahme(null)
             onUpdate()
           }}
         />
@@ -8924,6 +8960,178 @@ function GuthabenEditModal({
               />
               Bar bezahlt
             </label>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichern...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ TRAINING EINNAHME EDIT MODAL ============
+function TrainingEinnahmeEditModal({
+  training,
+  spielerId,
+  spieler,
+  spielerPayments,
+  onClose,
+  onSave
+}: {
+  training: Training
+  spielerId: string
+  spieler: Spieler[]
+  spielerPayments: SpielerTrainingPayment[]
+  onClose: () => void
+  onSave: () => void
+}) {
+  // Aktuellen Payment-Status ermitteln
+  const existingPayment = spielerPayments.find(p => p.training_id === training.id && p.spieler_id === spielerId)
+  const isEinzeltraining = training.spieler_ids.length === 1
+
+  const [bezahlt, setBezahlt] = useState(existingPayment?.bezahlt ?? (isEinzeltraining ? training.bezahlt : false))
+  const [barBezahlt, setBarBezahlt] = useState(existingPayment?.bar_bezahlt ?? (isEinzeltraining ? training.bar_bezahlt : false))
+  const [korrekturBetrag, setKorrekturBetrag] = useState((training.korrektur_betrag || 0).toString())
+  const [korrekturGrund, setKorrekturGrund] = useState(training.korrektur_grund || '')
+  const [saving, setSaving] = useState(false)
+
+  const sp = spieler.find(s => s.id === spielerId)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const korrektur = parseFloat(korrekturBetrag) || 0
+
+      // Training-Korrektur aktualisieren
+      await supabase
+        .from('trainings')
+        .update({
+          korrektur_betrag: korrektur,
+          korrektur_grund: korrekturGrund || null
+        })
+        .eq('id', training.id)
+
+      // Bezahlstatus aktualisieren
+      if (isEinzeltraining) {
+        // Bei Einzeltraining: direkt auf dem Training speichern
+        await supabase
+          .from('trainings')
+          .update({
+            bezahlt,
+            bar_bezahlt: barBezahlt
+          })
+          .eq('id', training.id)
+      } else {
+        // Bei Gruppentraining: spieler_training_payments verwenden
+        if (existingPayment) {
+          await supabase
+            .from('spieler_training_payments')
+            .update({
+              bezahlt,
+              bar_bezahlt: barBezahlt
+            })
+            .eq('id', existingPayment.id)
+        } else {
+          await supabase
+            .from('spieler_training_payments')
+            .insert({
+              training_id: training.id,
+              spieler_id: spielerId,
+              bezahlt,
+              bar_bezahlt: barBezahlt,
+              user_id: training.user_id
+            })
+        }
+      }
+
+      onSave()
+    } catch (err) {
+      console.error('Error updating training:', err)
+      alert('Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Training-Einnahme bearbeiten</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Spieler</label>
+            <input
+              type="text"
+              className="form-control"
+              value={sp?.name || 'Unbekannt'}
+              disabled
+            />
+          </div>
+          <div className="form-group">
+            <label>Datum</label>
+            <input
+              type="text"
+              className="form-control"
+              value={formatDateGerman(training.datum)}
+              disabled
+            />
+          </div>
+          <div className="form-group">
+            <label>Bezahlstatus</label>
+            <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={bezahlt}
+                  onChange={e => {
+                    setBezahlt(e.target.checked)
+                    if (!e.target.checked) setBarBezahlt(false)
+                  }}
+                />
+                Bezahlt
+              </label>
+              {bezahlt && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={barBezahlt}
+                    onChange={e => setBarBezahlt(e.target.checked)}
+                  />
+                  Bar bezahlt
+                </label>
+              )}
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Korrektur-Betrag (€)</label>
+            <input
+              type="number"
+              className="form-control"
+              value={korrekturBetrag}
+              onChange={e => setKorrekturBetrag(e.target.value)}
+              step="0.01"
+              placeholder="z.B. -0.70 für Kartenlesergebühr"
+            />
+            <small style={{ color: 'var(--gray-500)' }}>
+              Negativ = Abzug (z.B. Kartenlesergebühr), Positiv = Zuschlag
+            </small>
+          </div>
+          <div className="form-group">
+            <label>Korrektur-Grund</label>
+            <input
+              type="text"
+              className="form-control"
+              value={korrekturGrund}
+              onChange={e => setKorrekturGrund(e.target.value)}
+              placeholder="z.B. Kartenlesergebühr SumUp"
+            />
           </div>
         </div>
         <div className="modal-footer">
