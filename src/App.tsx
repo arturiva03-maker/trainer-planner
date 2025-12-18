@@ -24,9 +24,10 @@ import type {
   FormularFeld,
   FormularAnmeldung,
   BankTransaction,
-  OffenerPosten
+  OffenerPosten,
+  Buchungskonto
 } from './types'
-import { AUSGABE_KATEGORIEN, PDF_PLATZHALTER } from './types'
+import { AUSGABE_KATEGORIEN, PDF_PLATZHALTER, STANDARD_KONTEN } from './types'
 import {
   formatDate,
   formatDateGerman,
@@ -6985,6 +6986,7 @@ function BuchhaltungView({
   const [showCsvImportModal, setShowCsvImportModal] = useState(false)
   const [csvData, setCsvData] = useState<string[][]>([])
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [buchungskonten, setBuchungskonten] = useState<Buchungskonto[]>([])
   const [csvMapping, setCsvMapping] = useState<{
     datum: string
     betrag: string
@@ -7596,11 +7598,14 @@ function BuchhaltungView({
     }
 
     // In Supabase speichern (Duplikate ignorieren)
+    let importedCount = 0
     for (const tx of transactions) {
-      await supabase.from('bank_transactions').upsert(tx, {
-        onConflict: 'transaction_id',
-        ignoreDuplicates: true
-      })
+      const { error } = await supabase.from('bank_transactions').insert(tx)
+      if (!error) {
+        importedCount++
+      } else if (!error.message.includes('duplicate')) {
+        console.error('Import error:', error)
+      }
     }
 
     // Transaktionen neu laden
@@ -7617,7 +7622,7 @@ function BuchhaltungView({
     setShowCsvImportModal(false)
     setCsvData([])
     setCsvHeaders([])
-    alert(`${transactions.length} Transaktionen importiert`)
+    alert(`${importedCount} von ${transactions.length} Transaktionen importiert`)
   }
 
   // AI-Matching durchführen
@@ -7825,7 +7830,48 @@ function BuchhaltungView({
     }
   }
 
-  // Bank-Transaktionen laden beim ersten Render
+  // Buchungskonto für Transaktion setzen und als gebucht markieren
+  const handleSetKonto = async (tx: BankTransaction, kontoId: string) => {
+    // Transaktion mit Konto verknüpfen und als manuell gematcht markieren
+    await supabase
+      .from('bank_transactions')
+      .update({
+        buchungskonto_id: kontoId,
+        match_status: 'manual_matched'
+      })
+      .eq('id', tx.id)
+
+    // Wenn es eine Ausgabe ist (negativer Betrag), auch in Ausgaben-Tabelle eintragen
+    const konto = buchungskonten.find(k => k.id === kontoId)
+    if (tx.amount < 0 && konto && konto.typ === 'ausgabe') {
+      await supabase.from('ausgaben').insert({
+        user_id: userId,
+        datum: tx.booking_date,
+        betrag: Math.abs(tx.amount),
+        kategorie: 'sonstiges',
+        beschreibung: tx.remittance_info || tx.creditor_name || konto.name,
+        hat_vorsteuer: false,
+        vorsteuer_satz: 0,
+        bezahlt: true,
+        buchungskonto_id: kontoId
+      })
+    }
+
+    // Transaktionen neu laden
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+
+    onUpdate() // Ausgaben neu laden
+  }
+
+  // Bank-Transaktionen und Buchungskonten laden beim ersten Render
   useEffect(() => {
     const loadBankTransactions = async () => {
       const { data } = await supabase
@@ -7838,7 +7884,36 @@ function BuchhaltungView({
         setBankTransactions(data)
       }
     }
+
+    const loadBuchungskonten = async () => {
+      // Erst prüfen ob Konten existieren
+      const { data: existingKonten } = await supabase
+        .from('buchungskonten')
+        .select('*')
+        .eq('user_id', userId)
+        .order('sortierung', { ascending: true })
+
+      if (existingKonten && existingKonten.length > 0) {
+        setBuchungskonten(existingKonten)
+      } else {
+        // Standard-Konten anlegen
+        const kontenToInsert = STANDARD_KONTEN.map(k => ({
+          ...k,
+          user_id: userId
+        }))
+        const { data: newKonten, error } = await supabase
+          .from('buchungskonten')
+          .insert(kontenToInsert)
+          .select()
+
+        if (newKonten && !error) {
+          setBuchungskonten(newKonten)
+        }
+      }
+    }
+
     loadBankTransactions()
+    loadBuchungskonten()
   }, [userId])
 
   return (
@@ -8954,93 +9029,109 @@ function BuchhaltungView({
                     <th>Verwendungszweck</th>
                     <th style={{ textAlign: 'right' }}>Betrag</th>
                     <th>Status</th>
-                    <th>AI-Vorschlag</th>
+                    <th>Konto</th>
                     <th>Aktionen</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bankTransactions.map(tx => (
-                    <tr key={tx.id} style={{
-                      background: tx.ai_suggestion_status === 'pending' ? 'var(--blue-50)' : undefined
-                    }}>
-                      <td>{formatDateGerman(tx.booking_date)}</td>
-                      <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {tx.amount >= 0 ? tx.debtor_name : tx.creditor_name || '-'}
-                      </td>
-                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {tx.remittance_info || '-'}
-                      </td>
-                      <td style={{
-                        textAlign: 'right',
-                        fontWeight: 500,
-                        color: tx.amount >= 0 ? 'var(--success)' : 'var(--danger)'
+                  {bankTransactions.map(tx => {
+                    const zugeordnetesKonto = buchungskonten.find(k => k.id === tx.buchungskonto_id)
+                    return (
+                      <tr key={tx.id} style={{
+                        background: tx.ai_suggestion_status === 'pending' ? 'var(--blue-50)' : undefined
                       }}>
-                        {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)} €
-                      </td>
-                      <td>
-                        <span className={`badge ${
-                          tx.match_status === 'unmatched' ? 'badge-warning' :
-                          tx.match_status === 'ignored' ? 'badge-secondary' :
-                          'badge-success'
-                        }`}>
-                          {tx.match_status === 'unmatched' ? 'Offen' :
-                           tx.match_status === 'ignored' ? 'Ignoriert' : 'Zugeordnet'}
-                        </span>
-                      </td>
-                      <td>
-                        {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
-                          <div style={{ fontSize: 12 }}>
-                            <div>
-                              <strong>{tx.ai_suggestion.type}</strong>
-                              <span style={{ marginLeft: 4, color: 'var(--gray-500)' }}>
-                                ({tx.ai_suggestion.confidence}%)
-                              </span>
-                            </div>
-                            <div style={{ color: 'var(--gray-600)' }}>
-                              {tx.ai_suggestion.reason}
-                            </div>
-                          </div>
-                        )}
-                        {tx.ai_suggestion_status === 'accepted' && (
-                          <span style={{ color: 'var(--success)', fontSize: 12 }}>Akzeptiert</span>
-                        )}
-                        {tx.ai_suggestion_status === 'rejected' && (
-                          <span style={{ color: 'var(--gray-500)', fontSize: 12 }}>Abgelehnt</span>
-                        )}
-                      </td>
-                      <td>
-                        {tx.match_status === 'unmatched' && (
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
-                              <>
-                                <button
-                                  className="btn btn-sm btn-success"
-                                  onClick={() => handleAcceptSuggestion(tx)}
-                                  title="Vorschlag akzeptieren"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  onClick={() => handleRejectSuggestion(tx)}
-                                  title="Vorschlag ablehnen"
-                                >
-                                  ✕
-                                </button>
-                              </>
-                            )}
-                            <button
-                              className="btn btn-sm btn-secondary"
-                              onClick={() => handleIgnoreTransaction(tx)}
-                              title="Transaktion ignorieren"
+                        <td>{formatDateGerman(tx.booking_date)}</td>
+                        <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {tx.amount >= 0 ? tx.debtor_name : tx.creditor_name || '-'}
+                        </td>
+                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {tx.remittance_info || '-'}
+                        </td>
+                        <td style={{
+                          textAlign: 'right',
+                          fontWeight: 500,
+                          color: tx.amount >= 0 ? 'var(--success)' : 'var(--danger)'
+                        }}>
+                          {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)} €
+                        </td>
+                        <td>
+                          <span className={`badge ${
+                            tx.match_status === 'unmatched' ? 'badge-warning' :
+                            tx.match_status === 'ignored' ? 'badge-secondary' :
+                            'badge-success'
+                          }`}>
+                            {tx.match_status === 'unmatched' ? 'Offen' :
+                             tx.match_status === 'ignored' ? 'Ignoriert' : 'Gebucht'}
+                          </span>
+                        </td>
+                        <td>
+                          {tx.match_status === 'unmatched' ? (
+                            <select
+                              className="form-control"
+                              style={{ minWidth: 120, fontSize: 12, padding: '4px 8px' }}
+                              value=""
+                              onChange={e => {
+                                if (e.target.value) {
+                                  handleSetKonto(tx, e.target.value)
+                                }
+                              }}
                             >
-                              ⊘
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                              <option value="">Konto wählen...</option>
+                              {buchungskonten
+                                .filter(k => tx.amount >= 0 ? k.typ === 'einnahme' : k.typ !== 'einnahme')
+                                .map(k => (
+                                  <option key={k.id} value={k.id}>
+                                    {k.kontonummer} - {k.name}
+                                  </option>
+                                ))
+                              }
+                            </select>
+                          ) : zugeordnetesKonto ? (
+                            <span style={{ fontSize: 12 }}>
+                              {zugeordnetesKonto.kontonummer} - {zugeordnetesKonto.name}
+                            </span>
+                          ) : tx.ai_suggestion_status === 'accepted' ? (
+                            <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>
+                              via AI-Match
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>-</span>
+                          )}
+                        </td>
+                        <td>
+                          {tx.match_status === 'unmatched' && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
+                                <>
+                                  <button
+                                    className="btn btn-sm btn-success"
+                                    onClick={() => handleAcceptSuggestion(tx)}
+                                    title="Vorschlag akzeptieren"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-danger"
+                                    onClick={() => handleRejectSuggestion(tx)}
+                                    title="Vorschlag ablehnen"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                className="btn btn-sm btn-secondary"
+                                onClick={() => handleIgnoreTransaction(tx)}
+                                title="Transaktion ignorieren"
+                              >
+                                ⊘
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

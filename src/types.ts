@@ -199,6 +199,7 @@ export interface Ausgabe {
   rechnungsnummer?: string
   rechnungsdatum?: string
   bezahlt: boolean
+  buchungskonto_id?: string // Zuordnung zu Buchungskonto
   created_at: string
 }
 
@@ -364,6 +365,8 @@ export interface BankTransaction {
   import_source?: 'csv' | 'api' | 'manual'
   ai_suggestion?: AISuggestion
   ai_suggestion_status?: 'pending' | 'accepted' | 'rejected' | 'none'
+  // Buchungskonto-Zuordnung
+  buchungskonto_id?: string
   created_at: string
 }
 
@@ -400,3 +403,25 @@ export interface CSVImportMapping {
   dezimalTrennzeichen: ',' | '.' // Deutsches Format: Komma
   tausenderTrennzeichen?: '.' | ',' | '' // Deutsches Format: Punkt
 }
+
+// Buchungskonten (angelehnt an SKR03)
+export interface Buchungskonto {
+  id: string
+  user_id: string
+  kontonummer: string // z.B. "4600"
+  name: string // z.B. "Werbekosten"
+  typ: 'einnahme' | 'ausgabe' | 'neutral' // neutral = Privatentnahmen etc.
+  beschreibung?: string
+  ist_standard: boolean
+  sortierung: number
+  created_at: string
+}
+
+// Standard-Konten die beim ersten Start angelegt werden
+export const STANDARD_KONTEN: Omit<Buchungskonto, 'id' | 'user_id' | 'created_at'>[] = [
+  { kontonummer: '1800', name: 'Privatentnahmen', typ: 'neutral', beschreibung: 'Private Entnahmen aus dem Betriebsvermögen', ist_standard: true, sortierung: 1 },
+  { kontonummer: '3100', name: 'Fremdleistungen', typ: 'ausgabe', beschreibung: 'Kosten für externe Dienstleister', ist_standard: true, sortierung: 2 },
+  { kontonummer: '4600', name: 'Werbekosten', typ: 'ausgabe', beschreibung: 'Werbung, Marketing, Flyer etc.', ist_standard: true, sortierung: 3 },
+  { kontonummer: '4980', name: 'Anschaffungen', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter, Arbeitsmittel', ist_standard: true, sortierung: 4 },
+  { kontonummer: '8400', name: 'Erlöse', typ: 'einnahme', beschreibung: 'Einnahmen aus Trainertätigkeit', ist_standard: true, sortierung: 5 },
+]
