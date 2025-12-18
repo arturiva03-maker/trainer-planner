@@ -2289,54 +2289,60 @@ tbody tr:last-child td {
     padding: 14px 20px;
   }
 
-  /* Swipe Hint */
+  /* Swipe Hint - versteckt da kein Scrollen mehr nötig */
   .swipe-hint {
-    text-align: center;
-    color: #64748b;
-    font-size: 12px;
-    margin: 12px 0;
-    padding: 8px;
-    background: linear-gradient(90deg, transparent, rgba(30, 58, 95, 0.05), transparent);
-    border-radius: 8px;
-  }
-
-  .swipe-hint::before {
-    content: "← wischen zum navigieren →";
+    display: none;
   }
 
   /* ===== 5. KALENDER-GRID LAYOUT ===== */
   .calendar-scroll-container {
-    overflow-x: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     margin: 0;
-    padding: 0 16px 16px;
+    padding: 0 8px 16px;
   }
 
   .calendar-grid {
     background: white;
-    border-radius: 16px;
-    min-width: 600px;
-    grid-template-columns: 50px repeat(7, 1fr);
+    border-radius: 12px;
+    min-width: 100%;
+    width: 100%;
+    grid-template-columns: 32px repeat(7, 1fr);
     border-collapse: separate;
     border-spacing: 0;
     overflow: hidden;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    table-layout: fixed;
   }
 
   .calendar-grid.day-view {
-    grid-template-columns: 50px 1fr;
+    grid-template-columns: 40px 1fr;
     min-width: 100%;
   }
 
   .calendar-header-cell {
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-    padding: 10px 4px;
-    font-size: 11px;
+    padding: 6px 2px;
+    font-size: 10px;
     font-weight: 600;
     border-bottom: 2px solid #e2e8f0;
     position: sticky;
     top: 0;
     z-index: 10;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* Wochenansicht: Nur Kürzel anzeigen (Mo, Di, etc.) */
+  .calendar-header-cell .day-name {
+    font-size: 9px;
+    display: block;
+  }
+
+  .calendar-header-cell .day-date {
+    font-size: 11px;
+    font-weight: 700;
   }
 
   /* Day view mobile optimizations */
@@ -2366,40 +2372,59 @@ tbody tr:last-child td {
     left: 0;
     background: var(--gray-50);
     z-index: 5;
-    font-size: 11px;
-    padding: 4px;
-    height: 50px;
+    font-size: 9px;
+    padding: 2px;
+    height: 40px;
+    text-align: center;
+    color: #64748b;
   }
 
   .calendar-day-cell {
     border: 1px solid var(--gray-200);
     border-top: none;
-    padding: 2px;
-    min-height: 50px;
+    padding: 1px;
+    min-height: 40px;
     vertical-align: top;
   }
 
-  /* Training-Blocks im Kalender */
+  /* Training-Blocks im Kalender - Kompakt für Wochenansicht */
   .training-block {
     background: var(--primary);
     color: white;
-    border-radius: 4px;
-    padding: 4px 6px;
-    font-size: 11px;
-    line-height: 1.3;
+    border-radius: 3px;
+    padding: 2px 3px;
+    font-size: 9px;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
+    white-space: nowrap;
   }
 
   .training-block .training-title {
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .training-block .training-time {
-    font-size: 10px;
+    font-size: 8px;
     opacity: 0.9;
+    display: none; /* Zeit verstecken in kompakter Wochenansicht */
+  }
+
+  .training-block .training-tarif {
+    display: none; /* Tarif verstecken in kompakter Wochenansicht */
+  }
+
+  /* In Tagesansicht alles anzeigen */
+  .calendar-grid.day-view .training-block .training-time {
+    display: block;
+  }
+
+  .calendar-grid.day-view .training-block .training-tarif {
+    display: inline-block;
   }
 
   /* ===== 8. SIDEBAR - AUF MOBILE VERSTECKEN ===== */
