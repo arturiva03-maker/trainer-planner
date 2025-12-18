@@ -4430,6 +4430,8 @@ function AbrechnungView({
           profile={profile}
           selectedMonth={selectedMonth}
           pdfVorlagen={pdfVorlagen}
+          userId={userId}
+          onUpdate={onUpdate}
           onClose={() => {
             setShowInvoiceModal(false)
           }}
@@ -4775,7 +4777,9 @@ function InvoiceModal({
   profile,
   selectedMonth,
   pdfVorlagen,
-  onClose
+  onClose,
+  userId,
+  onUpdate
 }: {
   spieler: Spieler[]
   spielerSummary: {
@@ -4792,6 +4796,8 @@ function InvoiceModal({
   selectedMonth: string
   pdfVorlagen: PdfVorlage[]
   onClose: () => void
+  userId: string
+  onUpdate: () => void
 }) {
   const [step, setStep] = useState(1)
   const [selectedSpielerId, setSelectedSpielerId] = useState('')
@@ -4934,6 +4940,7 @@ function InvoiceModal({
       }
 
       return {
+        trainingId: t.id,
         datum: anzeigedatum,
         zeit: anzeigezeit,
         dauer: duration,
@@ -5754,7 +5761,43 @@ ${rechnungsstellerName}`
       const result = await response.json()
 
       if (response.ok) {
+        // Rechnung in Datenbank speichern
+        const trainingIds = rechnungsPositionen.map(p => p.trainingId).filter(Boolean) as string[]
+        const alleSpielerIds = [selectedSpielerId, ...verknuepfteSpieler.map(v => v.id)]
+
+        const { error: saveError } = await supabase
+          .from('manuelle_rechnungen')
+          .insert({
+            user_id: userId,
+            rechnungsnummer,
+            rechnungsdatum,
+            monat: selectedMonth,
+            empfaenger_name: rechnungsempfaengerName,
+            empfaenger_adresse: rechnungsempfaengerAdresse,
+            leistungszeitraum: monatFormatiert,
+            beschreibung: `Trainingsrechnung für ${alleSpielerIds.length > 1 ? alleSpielerIds.length + ' Spieler' : selectedSummary?.spieler.name}`,
+            positionen: rechnungsPositionen.map(p => ({
+              beschreibung: `${p.spielerName}: ${p.tarifName} (${p.datum})`,
+              menge: 1,
+              einzelpreis: p.brutto
+            })),
+            ust_satz: kleinunternehmer ? 0 : 19,
+            netto_gesamt: summen.gesamtNetto,
+            ust_betrag: summen.gesamtUst,
+            brutto_gesamt: summen.gesamtBrutto,
+            zahlungsziel: 14,
+            bezahlt: false,
+            bar_bezahlt: false,
+            training_ids: trainingIds,
+            spieler_id: selectedSpielerId
+          })
+
+        if (saveError) {
+          console.error('Fehler beim Speichern der Rechnung:', saveError)
+        }
+
         alert(`Rechnung erfolgreich an ${spielerEmail} gesendet!`)
+        onUpdate() // Daten neu laden damit Rechnung in offenen Posten erscheint
       } else {
         alert('Fehler beim E-Mail-Versand: ' + result.error)
       }
@@ -6943,7 +6986,7 @@ function BuchhaltungView({
   spieler,
   ausgaben,
   manuelleRechnungen,
-  adjustments,
+  adjustments: _adjustments,
   spielerPayments,
   guthabenTransaktionen,
   profile,
@@ -7042,6 +7085,14 @@ function BuchhaltungView({
         .map(t => `${t.training_id}|${t.spieler_id}`)
     )
 
+    // Set von Training-IDs die zu einer Rechnung gehören (diese nicht als separate Einnahme zählen)
+    // Die Einnahme kommt dann über die Rechnung, nicht über das Training
+    const inRechnungGestellt = new Set(
+      manuelleRechnungen
+        .filter(r => r.training_ids && r.training_ids.length > 0)
+        .flatMap(r => r.training_ids || [])
+    )
+
     // Alle durchgeführten Trainings des Jahres (Bezahlstatus wird pro Spieler geprüft)
     const jahresTrainings = trainings.filter(t => {
       if (t.status !== 'durchgefuehrt') return false
@@ -7063,6 +7114,12 @@ function BuchhaltungView({
         // Prüfe ob dieses Training mit Guthaben bezahlt wurde - dann nicht als separate Einnahme zählen
         // (das Geld wurde bereits bei der Guthaben-Einzahlung gezählt)
         if (mitGuthabenBezahlt.has(`${t.id}|${spielerId}`)) {
+          return null
+        }
+
+        // Prüfe ob dieses Training zu einer Rechnung gehört - dann nicht als separate Einnahme zählen
+        // (die Einnahme kommt dann über die Rechnung, nicht über das Training)
+        if (inRechnungGestellt.has(t.id)) {
           return null
         }
 
@@ -7156,101 +7213,80 @@ function BuchhaltungView({
         istMonatlich: boolean
       }[]
     }).sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen, guthabenTransaktionen])
+  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen, guthabenTransaktionen, manuelleRechnungen])
 
-  // Einnahmen aus bezahlten manuellen Rechnungen
-  const manuelleEinnahmen = useMemo(() => {
-    return manuelleRechnungen
-      .filter(r => {
-        if (!r.rechnungsdatum.startsWith(selectedYear.toString())) return false
-        // Nur bezahlte Rechnungen
-        if (inclBarEinnahmen) {
-          return r.bezahlt || r.bar_bezahlt
-        } else {
-          return r.bezahlt && !r.bar_bezahlt
+
+  // Bank-Einnahmen: Nur Transaktionen die einem Bankumsatz zugeordnet wurden
+  // 1. Transaktionen mit matched_rechnung_id (Rechnung zugeordnet)
+  // 2. Transaktionen mit Einnahmen-Konto (manuell zugeordnet)
+  const bankEinnahmen = useMemo(() => {
+    return bankTransactions
+      .filter(tx => {
+        if (!tx.booking_date.startsWith(selectedYear.toString())) return false
+        if (tx.match_status !== 'manual_matched') return false
+        if (tx.amount <= 0) return false
+        // Entweder Rechnung zugeordnet ODER Einnahmen-Konto zugeordnet
+        if (tx.matched_rechnung_id) return true
+        if (tx.buchungskonto_id) {
+          const konto = buchungskonten.find(k => k.id === tx.buchungskonto_id)
+          return konto?.typ === 'einnahme'
         }
+        return false
       })
-      .map(r => ({
-        rechnungId: r.id,
-        datum: r.rechnungsdatum,
-        spielerName: r.empfaenger_name,
-        tarifName: r.beschreibung || 'Sonstige Rechnung',
-        brutto: r.brutto_gesamt,
-        netto: r.netto_gesamt,
-        ust: r.ust_betrag,
-        ustSatz: r.ust_satz,
-        barBezahlt: r.bar_bezahlt,
-        istManuelleRechnung: true
-      }))
-      .sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [manuelleRechnungen, selectedYear, inclBarEinnahmen])
-
-  // Korrekturen als Einnahmen-Positionen (Gutschriften = negative Einnahmen)
-  const korrekturEinnahmen = useMemo(() => {
-    return adjustments
-      .filter(a => a.monat.startsWith(selectedYear.toString()))
-      .map(a => {
-        const sp = spieler.find(s => s.id === a.spieler_id)
-        // Für Korrekturen: Betrag ist bereits der finale Wert (negativ = Gutschrift)
-        const betrag = a.betrag
-        // Bei Kleinunternehmer keine USt
-        const brutto = betrag
-        const netto = kleinunternehmer ? betrag : betrag / 1.19
-        const ust = kleinunternehmer ? 0 : betrag - netto
-
-        return {
-          korrekturId: a.id,
-          datum: `${a.monat}-01`, // Erster Tag des Monats als Referenz
-          monat: a.monat,
-          spielerName: sp?.name || 'Unbekannt',
-          tarifName: a.grund || 'Korrektur',
-          brutto,
-          netto,
-          ust,
-          ustSatz: kleinunternehmer ? 0 : 19,
-          barBezahlt: false,
-          istKorrektur: true
+      .map(tx => {
+        // Wenn Rechnung zugeordnet, Rechnungsdaten verwenden
+        if (tx.matched_rechnung_id) {
+          const rechnung = manuelleRechnungen.find(r => r.id === tx.matched_rechnung_id)
+          if (rechnung) {
+            return {
+              bankTransactionId: tx.id,
+              rechnungId: rechnung.id,
+              datum: tx.booking_date,
+              spielerName: rechnung.empfaenger_name,
+              tarifName: rechnung.beschreibung || `Rechnung ${rechnung.rechnungsnummer}`,
+              brutto: rechnung.brutto_gesamt,
+              netto: rechnung.netto_gesamt,
+              ust: rechnung.ust_betrag,
+              ustSatz: rechnung.ust_satz,
+              barBezahlt: false,
+              istBankEinnahme: true,
+              istRechnungsZuordnung: true
+            }
+          }
         }
-      })
-  }, [adjustments, selectedYear, spieler, kleinunternehmer])
-
-  // Guthaben-Einzahlungen als Einnahmen
-  const guthabenEinzahlungen = useMemo(() => {
-    return guthabenTransaktionen
-      .filter(t => {
-        if (t.typ !== 'einzahlung') return false
-        if (!t.datum.startsWith(selectedYear.toString())) return false
-        // Bar-Einzahlungen nur bei inclBarEinnahmen anzeigen
-        if (!inclBarEinnahmen && t.bar) return false
-        return true
-      })
-      .map(t => {
-        const sp = spieler.find(s => s.id === t.spieler_id)
-        // Guthaben-Einzahlungen sind ohne USt (Vorauszahlung)
+        // Sonst Konto-Zuordnung
+        const konto = buchungskonten.find(k => k.id === tx.buchungskonto_id)
         return {
-          guthabenId: t.id,
-          datum: t.datum,
-          spielerName: sp?.name || 'Unbekannt',
-          tarifName: t.beschreibung || 'Guthaben-Einzahlung',
-          brutto: t.betrag,
-          netto: t.betrag,
+          bankTransactionId: tx.id,
+          rechnungId: undefined as string | undefined,
+          datum: tx.booking_date,
+          spielerName: tx.debtor_name || 'Bank-Einnahme',
+          tarifName: konto ? `${konto.kontonummer} - ${konto.name}` : 'Sonstige Einnahme',
+          brutto: tx.amount,
+          netto: tx.amount,
           ust: 0,
           ustSatz: 0,
-          barBezahlt: t.bar,
-          istGuthabenEinzahlung: true
+          barBezahlt: false,
+          istBankEinnahme: true,
+          istRechnungsZuordnung: false
         }
       })
       .sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [guthabenTransaktionen, selectedYear, spieler, inclBarEinnahmen])
+  }, [bankTransactions, selectedYear, buchungskonten, manuelleRechnungen])
 
-  // Alle Einnahmen kombiniert (Trainings + Manuelle Rechnungen + Korrekturen + Guthaben-Einzahlungen)
+  // Alle Einnahmen = NUR Bank-Einnahmen (nur was einem Bankumsatz zugeordnet wurde)
   const alleEinnahmen = useMemo(() => {
-    const trainingsEinnahmen = einnahmenPositionen.map(e => ({ ...e, istTraining: true, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: false, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
-    const manuelleEinnahmenMapped = manuelleEinnahmen.map(e => ({ ...e, istTraining: false, istManuelleRechnung: true, istKorrektur: false, istGuthabenEinzahlung: false, trainingId: undefined as string | undefined, korrekturId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
-    const korrekturenMapped = korrekturEinnahmen.map(e => ({ ...e, istTraining: false, istManuelleRechnung: false, istKorrektur: true, istGuthabenEinzahlung: false, trainingId: undefined as string | undefined, rechnungId: undefined as string | undefined, guthabenId: undefined as string | undefined }))
-    const guthabenMapped = guthabenEinzahlungen.map(e => ({ ...e, istTraining: false, istManuelleRechnung: false, istKorrektur: false, istGuthabenEinzahlung: true, trainingId: undefined as string | undefined, rechnungId: undefined as string | undefined, korrekturId: undefined as string | undefined }))
-    return [...trainingsEinnahmen, ...manuelleEinnahmenMapped, ...korrekturenMapped, ...guthabenMapped].sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [einnahmenPositionen, manuelleEinnahmen, korrekturEinnahmen, guthabenEinzahlungen])
+    return bankEinnahmen.map(e => ({
+      ...e,
+      istTraining: false,
+      istManuelleRechnung: e.istRechnungsZuordnung || false,
+      istKorrektur: false,
+      istGuthabenEinzahlung: false,
+      trainingId: undefined as string | undefined,
+      korrekturId: undefined as string | undefined,
+      guthabenId: undefined as string | undefined
+    })).sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [bankEinnahmen])
 
   // Einnahmen nach Monat gruppiert
   const einnahmenNachMonat = useMemo(() => {
@@ -7407,50 +7443,22 @@ function BuchhaltungView({
     ? (['einnahmen', 'ausgaben', 'euer', 'offene', 'bank'] as const)
     : (['einnahmen', 'ausgaben', 'ust', 'euer', 'offene', 'bank'] as const)
 
-  // Offene Posten berechnen
+  // Offene Posten berechnen (nur geschriebene Rechnungen die noch keinem Bankumsatz zugeordnet sind)
   const offenePosten = useMemo(() => {
     const posten: OffenerPosten[] = []
 
-    // Offene Trainings (nicht bezahlt)
-    trainings.filter(t => {
-      if (t.status !== 'durchgefuehrt') return false
-      if (!t.datum.startsWith(selectedYear.toString())) return false
-      return true
-    }).forEach(t => {
-      t.spieler_ids.forEach(spielerId => {
-        // Prüfe ob bezahlt
-        const payment = spielerPayments.find(p => p.training_id === t.id && p.spieler_id === spielerId)
-        const bezahlt = payment ? (payment.bezahlt || payment.bar_bezahlt) : (t.bezahlt || t.bar_bezahlt)
-        if (bezahlt) return
+    // IDs aller Rechnungen die bereits einem Bankumsatz zugeordnet sind
+    const zugeordneteRechnungIds = new Set(
+      bankTransactions
+        .filter(tx => tx.matched_rechnung_id)
+        .map(tx => tx.matched_rechnung_id)
+    )
 
-        const tarif = tarife.find(ta => ta.id === t.tarif_id)
-        const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-        const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-        const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
-        let betrag = preis * duration
-        if (abrechnungsart === 'proSpieler') {
-          betrag = betrag / t.spieler_ids.length
-        }
-
-        const sp = spieler.find(s => s.id === spielerId)
-
-        posten.push({
-          id: `${t.id}|${spielerId}`,
-          typ: 'training',
-          datum: t.datum,
-          empfaenger_name: sp?.name || 'Unbekannt',
-          spieler_id: spielerId,
-          betrag,
-          beschreibung: tarif?.name || 'Training'
-        })
-      })
-    })
-
-    // Offene manuelle Rechnungen
+    // Nur Rechnungen die NICHT einem Bankumsatz zugeordnet sind
     manuelleRechnungen.filter(r => {
       if (!r.rechnungsdatum.startsWith(selectedYear.toString())) return false
-      return !r.bezahlt && !r.bar_bezahlt
+      // Offen = kein Bankumsatz zugeordnet UND nicht bar bezahlt
+      return !zugeordneteRechnungIds.has(r.id) && !r.bar_bezahlt
     }).forEach(r => {
       posten.push({
         id: r.id,
@@ -7463,24 +7471,8 @@ function BuchhaltungView({
       })
     })
 
-    // Offene Ausgaben (noch nicht bezahlt)
-    ausgaben.filter(a => {
-      if (!a.datum.startsWith(selectedYear.toString())) return false
-      return !a.bezahlt
-    }).forEach(a => {
-      posten.push({
-        id: a.id,
-        typ: 'ausgabe',
-        datum: a.datum,
-        empfaenger_name: a.beschreibung || a.kategorie,
-        betrag: -a.betrag, // Negativ weil Ausgabe
-        beschreibung: a.kategorie,
-        rechnungsnummer: a.rechnungsnummer
-      })
-    })
-
     return posten.sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [trainings, manuelleRechnungen, ausgaben, spielerPayments, spieler, tarife, selectedYear])
+  }, [manuelleRechnungen, bankTransactions, selectedYear])
 
   // CSV Import Handler
   const handleCsvFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -7830,6 +7822,37 @@ function BuchhaltungView({
     }
   }
 
+  // Rechnung einer Transaktion zuordnen (für Einnahmen)
+  const handleSetRechnung = async (tx: BankTransaction, rechnungId: string) => {
+    // Rechnung als bezahlt markieren
+    await supabase
+      .from('manuelle_rechnungen')
+      .update({ bezahlt: true })
+      .eq('id', rechnungId)
+
+    // Transaktion mit Rechnung verknüpfen
+    await supabase
+      .from('bank_transactions')
+      .update({
+        matched_rechnung_id: rechnungId,
+        match_status: 'manual_matched'
+      })
+      .eq('id', tx.id)
+
+    // Transaktionen neu laden
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+
+    onUpdate() // Rechnungen neu laden
+  }
+
   // Buchungskonto für Transaktion setzen und als gebucht markieren
   const handleSetKonto = async (tx: BankTransaction, kontoId: string) => {
     // Transaktion mit Konto verknüpfen und als manuell gematcht markieren
@@ -7841,9 +7864,10 @@ function BuchhaltungView({
       })
       .eq('id', tx.id)
 
-    // Wenn es eine Ausgabe ist (negativer Betrag), auch in Ausgaben-Tabelle eintragen
     const konto = buchungskonten.find(k => k.id === kontoId)
-    if (tx.amount < 0 && konto && konto.typ === 'ausgabe') {
+
+    // Wenn es eine Ausgabe ist (negativer Betrag), in Ausgaben-Tabelle eintragen
+    if (tx.amount < 0 && konto && (konto.typ === 'ausgabe' || konto.typ === 'neutral')) {
       await supabase.from('ausgaben').insert({
         user_id: userId,
         datum: tx.booking_date,
@@ -7868,7 +7892,7 @@ function BuchhaltungView({
       setBankTransactions(data)
     }
 
-    onUpdate() // Ausgaben neu laden
+    onUpdate() // Daten neu laden
   }
 
   // Bank-Transaktionen und Buchungskonten laden beim ersten Render
@@ -8002,7 +8026,12 @@ function BuchhaltungView({
           </div>
 
           {einnahmenNachMonat.length === 0 ? (
-            <div className="empty-state">Keine Einnahmen in {selectedYear}</div>
+            <div className="empty-state">
+              <p>Keine Einnahmen in {selectedYear}</p>
+              <p style={{ fontSize: 14, color: 'var(--gray-500)' }}>
+                Einnahmen erscheinen hier, wenn du Bankumsätze einer Rechnung oder einem Konto zuordnest.
+              </p>
+            </div>
           ) : (
             einnahmenNachMonat.map(({ monat, positionen, summeNetto, summeBrutto, summeUst }) => (
               <div key={monat} style={{ marginBottom: 24 }}>
@@ -8014,171 +8043,115 @@ function BuchhaltungView({
                     <thead>
                       <tr>
                         <th>Datum</th>
-                        <th>Spieler</th>
-                        <th>Tarif</th>
+                        <th>Empfänger/Beschreibung</th>
                         <th style={{ textAlign: 'right' }}>Netto</th>
                         {!kleinunternehmer && <th style={{ textAlign: 'right' }}>USt</th>}
                         <th style={{ textAlign: 'right' }}>Brutto</th>
-                        <th>Zahlart</th>
+                        <th>Typ</th>
                         <th>Aktionen</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {positionen.map((p, i) => {
-                        const hatKorrektur = !p.istKorrektur && (p as typeof einnahmenPositionen[0]).korrektur !== 0
-                        // Alle Einträge sind bearbeitbar
-                        const canEdit = true
-                        return (
-                          <tr key={i} style={
-                            p.istKorrektur
-                              ? { background: p.brutto < 0 ? 'var(--success-light)' : 'var(--warning-light)' }
-                              : hatKorrektur
-                              ? { background: 'var(--warning-light)' }
-                              : {}
-                          }>
-                            <td>{p.istKorrektur ? formatMonthGerman((p as typeof korrekturEinnahmen[0]).monat) : formatDateGerman(p.datum)}</td>
-                            <td>{p.spielerName}</td>
-                            <td>
-                              {p.istKorrektur && (
-                                <span style={{
-                                  background: p.brutto < 0 ? 'var(--success)' : 'var(--warning)',
-                                  color: p.brutto < 0 ? '#fff' : '#000',
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  fontSize: 10,
-                                  marginRight: 6
-                                }}>
-                                  {p.brutto < 0 ? 'Gutschrift' : 'Zuschlag'}
-                                </span>
-                              )}
-                              {p.istGuthabenEinzahlung && (
-                                <span style={{
-                                  background: 'var(--primary)',
-                                  color: '#fff',
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  fontSize: 10,
-                                  marginRight: 6
-                                }}>
-                                  Guthaben
-                                </span>
-                              )}
-                              {hatKorrektur && (
-                                <span style={{
-                                  background: 'var(--warning)',
-                                  color: '#000',
-                                  padding: '2px 6px',
-                                  borderRadius: 4,
-                                  fontSize: 10,
-                                  marginRight: 6
-                                }}
-                                title={(p as typeof einnahmenPositionen[0]).korrekturGrund || 'Korrigiert'}>
-                                  {((p as typeof einnahmenPositionen[0]).korrektur || 0) > 0 ? '+' : ''}{((p as typeof einnahmenPositionen[0]).korrektur || 0).toFixed(2)}€
-                                </span>
-                              )}
-                              {p.tarifName}
-                            </td>
-                            <td style={{ textAlign: 'right', color: p.istKorrektur && (p.brutto || 0) < 0 ? 'var(--success)' : undefined }}>
-                              {(p.netto || 0).toFixed(2)} €
-                            </td>
-                            {!kleinunternehmer && (
-                              <td style={{ textAlign: 'right', color: p.istKorrektur && (p.brutto || 0) < 0 ? 'var(--success)' : undefined }}>
-                                {(p.ust || 0).toFixed(2)} € ({p.ustSatz || 0}%)
-                              </td>
+                      {positionen.map((p, i) => (
+                        <tr key={i}>
+                          <td>{formatDateGerman(p.datum)}</td>
+                          <td>
+                            {p.istManuelleRechnung && (
+                              <span style={{
+                                background: 'var(--primary)',
+                                color: '#fff',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                fontSize: 10,
+                                marginRight: 6
+                              }}>
+                                Rechnung
+                              </span>
                             )}
-                            <td style={{ textAlign: 'right', color: p.istKorrektur && (p.brutto || 0) < 0 ? 'var(--success)' : undefined }}>
-                              {(p.brutto || 0).toFixed(2)} €
+                            {p.istBankEinnahme && (
+                              <span style={{
+                                background: 'var(--info)',
+                                color: '#fff',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                fontSize: 10,
+                                marginRight: 6
+                              }}>
+                                Bank
+                              </span>
+                            )}
+                            {p.spielerName} - {p.tarifName}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {(p.netto || 0).toFixed(2)} €
+                          </td>
+                          {!kleinunternehmer && (
+                            <td style={{ textAlign: 'right' }}>
+                              {(p.ust || 0).toFixed(2)} € ({p.ustSatz || 0}%)
                             </td>
-                            <td>
-                              {p.istKorrektur ? (
-                                <span style={{ fontSize: 11, color: 'var(--gray-500)' }}>Monatskorr.</span>
-                              ) : (
-                                <span className={`status-badge ${p.barBezahlt ? 'abgesagt' : 'durchgefuehrt'}`}
-                                      style={{ fontSize: 11 }}>
-                                  {p.barBezahlt ? 'Bar' : 'Überweisung'}
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              {canEdit ? (
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                  <button
-                                    className="btn btn-sm btn-secondary"
-                                    onClick={() => {
-                                      if (p.istTraining && p.trainingId) {
-                                        const training = trainings.find(t => t.id === p.trainingId)
-                                        const spielerId = (p as typeof einnahmenPositionen[0]).spielerId
-                                        if (training && spielerId) {
-                                          setEditingTrainingEinnahme({ training, spielerId })
-                                          setShowEinnahmenEditModal('training')
-                                        }
-                                      } else if (p.istManuelleRechnung && p.rechnungId) {
-                                        const rechnung = manuelleRechnungen.find(r => r.id === p.rechnungId)
-                                        if (rechnung) {
-                                          setEditingManuelleRechnung(rechnung)
-                                          setShowEinnahmenEditModal('rechnung')
-                                        }
-                                      } else if (p.istKorrektur && p.korrekturId) {
-                                        const korrektur = adjustments.find(a => a.id === p.korrekturId)
-                                        if (korrektur) {
-                                          setEditingKorrektur(korrektur)
-                                          setShowEinnahmenEditModal('korrektur')
-                                        }
-                                      } else if (p.istGuthabenEinzahlung && p.guthabenId) {
-                                        const guthaben = guthabenTransaktionen.find(g => g.id === p.guthabenId)
-                                        if (guthaben) {
-                                          setEditingGuthaben(guthaben)
-                                          setShowEinnahmenEditModal('guthaben')
-                                        }
-                                      }
-                                    }}
-                                    title="Bearbeiten"
-                                  >
-                                    ✏️
-                                  </button>
-                                  <button
-                                    className="btn btn-sm btn-danger"
-                                    onClick={async () => {
-                                      // Trainings können nicht gelöscht werden (nur über Kalender)
-                                      if (p.istTraining) {
-                                        alert('Trainings können nur über den Kalender gelöscht werden.')
-                                        return
-                                      }
-                                      const confirmed = await showConfirm(
-                                        'Eintrag löschen',
-                                        'Diesen Eintrag wirklich löschen?'
-                                      )
-                                      if (!confirmed) return
-                                      try {
-                                        if (p.istManuelleRechnung && p.rechnungId) {
-                                          await supabase.from('manuelle_rechnungen').delete().eq('id', p.rechnungId)
-                                        } else if (p.istKorrektur && p.korrekturId) {
-                                          await supabase.from('monthly_adjustments').delete().eq('id', p.korrekturId)
-                                        } else if (p.istGuthabenEinzahlung && p.guthabenId) {
-                                          await supabase.from('guthaben_transaktionen').delete().eq('id', p.guthabenId)
-                                        }
-                                        onUpdate()
-                                      } catch (err) {
-                                        console.error('Error deleting:', err)
-                                        alert('Fehler beim Löschen')
-                                      }
-                                    }}
-                                    title="Löschen"
-                                  >
-                                    🗑️
-                                  </button>
-                                </div>
-                              ) : (
-                                <span style={{ fontSize: 10, color: 'var(--gray-400)' }}>—</span>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
+                          )}
+                          <td style={{ textAlign: 'right' }}>
+                            {(p.brutto || 0).toFixed(2)} €
+                          </td>
+                          <td>
+                            <span className="status-badge durchgefuehrt" style={{ fontSize: 11 }}>
+                              Überweisung
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                className="btn btn-sm btn-secondary"
+                                onClick={() => {
+                                  if (p.istManuelleRechnung && p.rechnungId) {
+                                    const rechnung = manuelleRechnungen.find(r => r.id === p.rechnungId)
+                                    if (rechnung) {
+                                      setEditingManuelleRechnung(rechnung)
+                                      setShowEinnahmenEditModal('rechnung')
+                                    }
+                                  } else if (p.istBankEinnahme) {
+                                    alert('Bank-Einnahmen können im Bankabgleich geändert werden.')
+                                  }
+                                }}
+                                title="Bearbeiten"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn btn-sm btn-danger"
+                                onClick={async () => {
+                                  const confirmed = await showConfirm(
+                                    'Eintrag löschen',
+                                    'Diesen Eintrag wirklich löschen?'
+                                  )
+                                  if (!confirmed) return
+                                  try {
+                                    if (p.istManuelleRechnung && p.rechnungId) {
+                                      await supabase.from('manuelle_rechnungen').delete().eq('id', p.rechnungId)
+                                    } else if (p.istBankEinnahme && p.bankTransactionId) {
+                                      await supabase.from('bank_transactions').update({
+                                        buchungskonto_id: null,
+                                        match_status: 'unmatched'
+                                      }).eq('id', p.bankTransactionId)
+                                    }
+                                    onUpdate()
+                                  } catch (err) {
+                                    console.error('Error deleting:', err)
+                                    alert('Fehler beim Löschen')
+                                  }
+                                }}
+                                title="Löschen"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                     <tfoot>
                       <tr style={{ fontWeight: 'bold', background: 'var(--gray-100)' }}>
-                        <td colSpan={3}>Summe {formatMonthGerman(monat)}</td>
+                        <td colSpan={2}>Summe {formatMonthGerman(monat)}</td>
                         <td style={{ textAlign: 'right' }}>{(summeNetto || 0).toFixed(2)} €</td>
                         {!kleinunternehmer && <td style={{ textAlign: 'right' }}>{(summeUst || 0).toFixed(2)} €</td>}
                         <td style={{ textAlign: 'right' }}>{(summeBrutto || 0).toFixed(2)} €</td>
@@ -8925,25 +8898,21 @@ function BuchhaltungView({
                   <thead>
                     <tr>
                       <th>Datum</th>
-                      <th>Typ</th>
-                      <th>Empfänger/Beschreibung</th>
+                      <th>Empfänger</th>
                       <th>Details</th>
                       <th style={{ textAlign: 'right' }}>Betrag</th>
+                      <th>Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
                     {offenePosten.map(p => (
                       <tr key={p.id}>
                         <td>{formatDateGerman(p.datum)}</td>
-                        <td>
-                          <span className={`badge ${p.typ === 'training' ? 'badge-success' : p.typ === 'rechnung' ? 'badge-primary' : 'badge-warning'}`}>
-                            {p.typ === 'training' ? 'Training' : p.typ === 'rechnung' ? 'Rechnung' : 'Ausgabe'}
-                          </span>
-                        </td>
                         <td>{p.empfaenger_name}</td>
                         <td>
+                          {p.rechnungsnummer && <span style={{ fontWeight: 500 }}>{p.rechnungsnummer}</span>}
+                          {p.rechnungsnummer && p.beschreibung && ' - '}
                           {p.beschreibung}
-                          {p.rechnungsnummer && <span style={{ color: 'var(--gray-500)', marginLeft: 8 }}>({p.rechnungsnummer})</span>}
                         </td>
                         <td style={{
                           textAlign: 'right',
@@ -8951,6 +8920,23 @@ function BuchhaltungView({
                           color: p.betrag >= 0 ? 'var(--success)' : 'var(--danger)'
                         }}>
                           {p.betrag >= 0 ? '+' : ''}{p.betrag.toFixed(2)} €
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={async () => {
+                              const confirmed = await showConfirm(
+                                'Offenen Posten löschen',
+                                `Rechnung "${p.rechnungsnummer || p.empfaenger_name}" wirklich löschen?`
+                              )
+                              if (!confirmed) return
+                              await supabase.from('manuelle_rechnungen').delete().eq('id', p.id)
+                              onUpdate()
+                            }}
+                            title="Löschen"
+                          >
+                            🗑️
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -8981,6 +8967,22 @@ function BuchhaltungView({
               >
                 {isMatching ? 'Matche...' : 'AI-Matching starten'}
               </button>
+              {bankTransactions.length > 0 && (
+                <button
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    const confirmed = await showConfirm(
+                      'Alle Umsätze löschen',
+                      `Wirklich alle ${bankTransactions.length} Bankumsätze löschen? Dies kann nicht rückgängig gemacht werden.`
+                    )
+                    if (!confirmed) return
+                    await supabase.from('bank_transactions').delete().eq('user_id', userId)
+                    onUpdate()
+                  }}
+                >
+                  Alle löschen
+                </button>
+              )}
             </div>
           </div>
 
@@ -9025,11 +9027,10 @@ function BuchhaltungView({
                 <thead>
                   <tr>
                     <th>Datum</th>
-                    <th>Auftraggeber/Empfänger</th>
                     <th>Verwendungszweck</th>
                     <th style={{ textAlign: 'right' }}>Betrag</th>
                     <th>Status</th>
-                    <th>Konto</th>
+                    <th>Zuordnung</th>
                     <th>Aktionen</th>
                   </tr>
                 </thead>
@@ -9041,10 +9042,7 @@ function BuchhaltungView({
                         background: tx.ai_suggestion_status === 'pending' ? 'var(--blue-50)' : undefined
                       }}>
                         <td>{formatDateGerman(tx.booking_date)}</td>
-                        <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {tx.amount >= 0 ? tx.debtor_name : tx.creditor_name || '-'}
-                        </td>
-                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <td style={{ maxWidth: 300 }}>
                           {tx.remittance_info || '-'}
                         </td>
                         <td style={{
@@ -9068,27 +9066,52 @@ function BuchhaltungView({
                           {tx.match_status === 'unmatched' ? (
                             <select
                               className="form-control"
-                              style={{ minWidth: 120, fontSize: 12, padding: '4px 8px' }}
+                              style={{ minWidth: 180, fontSize: 12, padding: '4px 8px' }}
                               value=""
                               onChange={e => {
                                 if (e.target.value) {
-                                  handleSetKonto(tx, e.target.value)
+                                  const [type, id] = e.target.value.split(':')
+                                  if (type === 'rechnung') {
+                                    handleSetRechnung(tx, id)
+                                  } else {
+                                    handleSetKonto(tx, id)
+                                  }
                                 }
                               }}
                             >
-                              <option value="">Konto wählen...</option>
-                              {buchungskonten
-                                .filter(k => tx.amount >= 0 ? k.typ === 'einnahme' : k.typ !== 'einnahme')
-                                .map(k => (
-                                  <option key={k.id} value={k.id}>
-                                    {k.kontonummer} - {k.name}
-                                  </option>
-                                ))
-                              }
+                              <option value="">Zuordnen...</option>
+                              {/* Für Einnahmen: Offene Rechnungen anzeigen */}
+                              {tx.amount >= 0 && offenePosten.length > 0 && (
+                                <optgroup label="📄 Offene Rechnungen">
+                                  {offenePosten
+                                    .filter(p => p.typ === 'rechnung')
+                                    .map(p => (
+                                      <option key={`rechnung:${p.id}`} value={`rechnung:${p.id}`}>
+                                        {p.empfaenger_name} - {p.betrag.toFixed(2)} € ({p.rechnungsnummer || p.datum})
+                                      </option>
+                                    ))
+                                  }
+                                </optgroup>
+                              )}
+                              {/* Passende Konten anzeigen */}
+                              <optgroup label="📊 Buchungskonten">
+                                {buchungskonten
+                                  .filter(k => tx.amount >= 0 ? k.typ === 'einnahme' : k.typ !== 'einnahme')
+                                  .map(k => (
+                                    <option key={`konto:${k.id}`} value={`konto:${k.id}`}>
+                                      {k.kontonummer} - {k.name}
+                                    </option>
+                                  ))
+                                }
+                              </optgroup>
                             </select>
                           ) : zugeordnetesKonto ? (
                             <span style={{ fontSize: 12 }}>
-                              {zugeordnetesKonto.kontonummer} - {zugeordnetesKonto.name}
+                              📊 {zugeordnetesKonto.kontonummer} - {zugeordnetesKonto.name}
+                            </span>
+                          ) : tx.matched_rechnung_id ? (
+                            <span style={{ fontSize: 12, color: 'var(--success)' }}>
+                              📄 Rechnung zugeordnet
                             </span>
                           ) : tx.ai_suggestion_status === 'accepted' ? (
                             <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>
@@ -9099,35 +9122,47 @@ function BuchhaltungView({
                           )}
                         </td>
                         <td>
-                          {tx.match_status === 'unmatched' && (
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
-                                <>
-                                  <button
-                                    className="btn btn-sm btn-success"
-                                    onClick={() => handleAcceptSuggestion(tx)}
-                                    title="Vorschlag akzeptieren"
-                                  >
-                                    ✓
-                                  </button>
-                                  <button
-                                    className="btn btn-sm btn-danger"
-                                    onClick={() => handleRejectSuggestion(tx)}
-                                    title="Vorschlag ablehnen"
-                                  >
-                                    ✕
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => handleIgnoreTransaction(tx)}
-                                title="Transaktion ignorieren"
-                              >
-                                ⊘
-                              </button>
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {tx.match_status === 'unmatched' && (
+                              <>
+                                {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
+                                  <>
+                                    <button
+                                      className="btn btn-sm btn-success"
+                                      onClick={() => handleAcceptSuggestion(tx)}
+                                      title="Vorschlag akzeptieren"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      className="btn btn-sm btn-danger"
+                                      onClick={() => handleRejectSuggestion(tx)}
+                                      title="Vorschlag ablehnen"
+                                    >
+                                      ✕
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  className="btn btn-sm btn-secondary"
+                                  onClick={() => handleIgnoreTransaction(tx)}
+                                  title="Transaktion ignorieren"
+                                >
+                                  ⊘
+                                </button>
+                              </>
+                            )}
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={async () => {
+                                await supabase.from('bank_transactions').delete().eq('id', tx.id)
+                                onUpdate()
+                              }}
+                              title="Umsatz löschen"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )

@@ -231,6 +231,8 @@ export interface ManuelleRechnung {
   freitext?: string
   bezahlt: boolean
   bar_bezahlt: boolean
+  training_ids?: string[] // Training-IDs die zu dieser Rechnung gehören (für Trainings-Rechnungen)
+  spieler_id?: string // Spieler-ID für Trainings-Rechnungen
   created_at: string
 }
 
