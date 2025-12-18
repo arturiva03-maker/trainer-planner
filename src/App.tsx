@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from './supabaseClient'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
 import type { User, Session } from '@supabase/supabase-js'
 import type {
   TrainerProfile,
@@ -17,13 +19,14 @@ import type {
   Guthaben,
   GuthabenTransaktion,
   SpielerTrainingPayment,
-  EmailVorlage,
   PdfVorlage,
   Formular,
   FormularFeld,
-  FormularAnmeldung
+  FormularAnmeldung,
+  BankTransaction,
+  OffenerPosten
 } from './types'
-import { AUSGABE_KATEGORIEN, EMAIL_PLATZHALTER, PDF_PLATZHALTER } from './types'
+import { AUSGABE_KATEGORIEN, PDF_PLATZHALTER } from './types'
 import {
   formatDate,
   formatDateGerman,
@@ -481,7 +484,6 @@ function MainApp({ user }: { user: User }) {
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
   const [ausgaben, setAusgaben] = useState<Ausgabe[]>([])
   const [manuelleRechnungen, setManuelleRechnungen] = useState<ManuelleRechnung[]>([])
-  const [emailVorlagen, setEmailVorlagen] = useState<EmailVorlage[]>([])
   const [pdfVorlagen, setPdfVorlagen] = useState<PdfVorlage[]>([])
   const [formulare, setFormulare] = useState<Formular[]>([])
   const [formularAnmeldungen, setFormularAnmeldungen] = useState<FormularAnmeldung[]>([])
@@ -490,7 +492,7 @@ function MainApp({ user }: { user: User }) {
   // Persistenter Navigation-State (wird nicht bei Daten-Refresh zurückgesetzt)
   const [kalenderDate, setKalenderDate] = useState(new Date())
   const [buchhaltungYear, setBuchhaltungYear] = useState(new Date().getFullYear())
-  const [buchhaltungSubTab, setBuchhaltungSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer'>('einnahmen')
+  const [buchhaltungSubTab, setBuchhaltungSubTab] = useState<'einnahmen' | 'ausgaben' | 'ust' | 'euer' | 'offene' | 'bank'>('einnahmen')
 
   // Load all data
   useEffect(() => {
@@ -514,7 +516,6 @@ function MainApp({ user }: { user: User }) {
         guthabenRes,
         guthabenTransaktionenRes,
         spielerPaymentsRes,
-        emailVorlagenRes,
         pdfVorlagenRes,
         formulareRes,
         formularAnmeldungenRes
@@ -532,7 +533,6 @@ function MainApp({ user }: { user: User }) {
         supabase.from('guthaben').select('*').eq('user_id', user.id),
         supabase.from('guthaben_transaktionen').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('spieler_training_payments').select('*').eq('user_id', user.id),
-        supabase.from('email_vorlagen').select('*').eq('user_id', user.id).order('name'),
         supabase.from('pdf_vorlagen').select('*').eq('user_id', user.id).order('name'),
         supabase.from('formulare').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
         supabase.from('formular_anmeldungen').select('*')
@@ -551,7 +551,6 @@ function MainApp({ user }: { user: User }) {
       if (planungRes.data) setPlanungSheets(planungRes.data)
       if (ausgabenRes.data) setAusgaben(ausgabenRes.data)
       if (manuelleRechnungenRes.data) setManuelleRechnungen(manuelleRechnungenRes.data)
-      if (emailVorlagenRes.data) setEmailVorlagen(emailVorlagenRes.data)
       if (pdfVorlagenRes.data) setPdfVorlagen(pdfVorlagenRes.data)
       if (formulareRes.data) setFormulare(formulareRes.data)
       if (formularAnmeldungenRes.data) setFormularAnmeldungen(formularAnmeldungenRes.data)
@@ -729,7 +728,6 @@ function MainApp({ user }: { user: User }) {
                 spielerPayments={spielerPayments}
                 profile={profile}
                 manuelleRechnungen={manuelleRechnungen}
-                emailVorlagen={emailVorlagen}
                 pdfVorlagen={pdfVorlagen}
                 onUpdate={loadAllData}
                 onNavigateToTraining={handleNavigateToTraining}
@@ -785,7 +783,6 @@ function MainApp({ user }: { user: User }) {
               <WeiteresView
                 profile={profile}
                 notizen={notizen}
-                emailVorlagen={emailVorlagen}
                 pdfVorlagen={pdfVorlagen}
                 onUpdate={loadAllData}
                 userId={user.id}
@@ -2867,7 +2864,6 @@ function AbrechnungView({
   spielerPayments,
   profile,
   manuelleRechnungen,
-  emailVorlagen,
   pdfVorlagen,
   onUpdate,
   onNavigateToTraining,
@@ -2881,7 +2877,6 @@ function AbrechnungView({
   spielerPayments: SpielerTrainingPayment[]
   profile: TrainerProfile | null
   manuelleRechnungen: ManuelleRechnung[]
-  emailVorlagen: EmailVorlage[]
   pdfVorlagen: PdfVorlage[]
   onUpdate: () => void
   onNavigateToTraining: (training: Training) => void
@@ -4433,7 +4428,6 @@ function AbrechnungView({
           tarife={tarife}
           profile={profile}
           selectedMonth={selectedMonth}
-          emailVorlagen={emailVorlagen}
           pdfVorlagen={pdfVorlagen}
           onClose={() => {
             setShowInvoiceModal(false)
@@ -4779,7 +4773,6 @@ function InvoiceModal({
   tarife,
   profile,
   selectedMonth,
-  emailVorlagen,
   pdfVorlagen,
   onClose
 }: {
@@ -4796,7 +4789,6 @@ function InvoiceModal({
   tarife: Tarif[]
   profile: TrainerProfile | null
   selectedMonth: string
-  emailVorlagen: EmailVorlage[]
   pdfVorlagen: PdfVorlage[]
   onClose: () => void
 }) {
@@ -4816,14 +4808,15 @@ function InvoiceModal({
   const [rechnungsnummer, setRechnungsnummer] = useState(generateRechnungsnummer())
   const [rechnungsdatum, setRechnungsdatum] = useState(formatDate(new Date()))
 
-  // E-Mail-Vorlage Auswahl (leer = Standard-Vorlage verwenden)
-  const [selectedVorlageId, setSelectedVorlageId] = useState('')
   // PDF-Vorlage Auswahl (leer = Standard-Vorlage verwenden)
   const [selectedPdfVorlageId, setSelectedPdfVorlageId] = useState('')
 
   // Manuelle Korrektur (z.B. Regenausfall)
   const [korrekturBetrag, setKorrekturBetrag] = useState('')
   const [korrekturGrund, setKorrekturGrund] = useState('')
+
+  // E-Mail-Versand State
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   // Trainingsaufstellung für den ausgewählten Spieler
   const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
@@ -5201,6 +5194,7 @@ function InvoiceModal({
               <strong>Rechnungssteller:</strong><br>
               ${rechnungsstellerName}<br>
               ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+              ${profile?.steuernummer ? `<br>Steuernummer: ${profile.steuernummer}` : ''}
               ${ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''}
             </div>
             <div class="section" style="text-align: right;">
@@ -5248,6 +5242,527 @@ function InvoiceModal({
         // URL nach dem Drucken freigeben
         URL.revokeObjectURL(url)
       }
+    }
+  }
+
+  // E-Mail mit PDF-Anhang versenden (verwendet dieselbe Vorlage wie generatePDF)
+  const sendInvoiceEmail = async () => {
+    if (!profile?.smtp_host || !profile?.smtp_user || !profile?.smtp_pass) {
+      alert('Bitte konfiguriere zuerst deine SMTP-Einstellungen unter "Weiteres" → "Mein Profil".')
+      return
+    }
+
+    const spielerEmail = selectedSummary?.spieler.kontakt_email
+    if (!spielerEmail) {
+      alert('Keine E-Mail-Adresse für diesen Spieler hinterlegt.')
+      return
+    }
+
+    setSendingEmail(true)
+
+    try {
+      const hatMehrereSpieler = verknuepfteSummaries.length > 0
+
+      // Monat formatieren
+      const [year, month] = selectedMonth.split('-')
+      const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+      const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
+
+      // Prüfe ob eine PDF-Vorlage ausgewählt ist
+      const selectedPdfVorlage = pdfVorlagen.find(v => v.id === selectedPdfVorlageId)
+
+      let pdfBlob: Blob
+
+      if (selectedPdfVorlage) {
+        // ============ MIT VORLAGE: HTML zu PDF mit html2canvas ============
+
+        // HTML-Hilfsdaten erstellen - mit stärkeren Inline-Styles
+        const positionenHtml = rechnungsPositionen.map((p) => `
+          <tr style="color: #000 !important; background-color: #ffffff !important;">
+            <td style="border: 1px solid #333; padding: 4px; color: #000 !important; background-color: #ffffff !important; word-wrap: break-word; overflow: hidden;"><strong style="color: #000 !important; font-weight: 600;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</strong></td>
+            <td style="border: 1px solid #333; padding: 4px; color: #000 !important; background-color: #ffffff !important; word-wrap: break-word; overflow: hidden;"><strong style="color: #000 !important; font-weight: 600;">${p.zeit}</strong></td>
+            <td style="border: 1px solid #333; padding: 4px; color: #000 !important; background-color: #ffffff !important; word-wrap: break-word; overflow: hidden;"><strong style="color: #000 !important; font-weight: 600;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</strong></td>
+            ${hatMehrereSpieler ? `<td style="border: 1px solid #333; padding: 4px; color: #000 !important; background-color: #ffffff !important; word-wrap: break-word; overflow: hidden;"><strong style="color: #000 !important; font-weight: 600;">${p.spielerName}</strong></td>` : ''}
+            <td style="border: 1px solid #333; padding: 4px; color: #000 !important; background-color: #ffffff !important; word-wrap: break-word; overflow: hidden;"><strong style="color: #000 !important; font-weight: 600;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</strong></td>
+            <td style="border: 1px solid #333; padding: 4px; text-align: right; color: #000 !important; background-color: #ffffff !important;"><strong style="color: #000 !important; font-weight: 600;">${p.netto.toFixed(2)} €</strong></td>
+            ${!kleinunternehmer ? `<td style="border: 1px solid #333; padding: 4px; text-align: right; color: #000 !important; background-color: #ffffff !important;"><strong style="color: #000 !important; font-weight: 600;">${p.ust.toFixed(2)} €</strong></td>` : ''}
+            <td style="border: 1px solid #333; padding: 4px; text-align: right; color: #000 !important; background-color: #ffffff !important;"><strong style="color: #000 !important; font-weight: 600;">${p.brutto.toFixed(2)} €</strong></td>
+          </tr>
+        `).join('')
+
+        const positionenTabelle = `
+          <div class="positionen-tabelle-wrapper" style="color: #000 !important; overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; color: #000 !important; table-layout: fixed; font-size: 10px;">
+            <thead>
+              <tr style="background: #f0f0f0;">
+                <th style="border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; font-weight: bold; width: 18%;">Datum</th>
+                <th style="border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; font-weight: bold; width: 14%;">Zeit</th>
+                <th style="border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; font-weight: bold; width: 12%;">Dauer</th>
+                ${hatMehrereSpieler ? '<th style="border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; font-weight: bold; width: 12%;">Spieler</th>' : ''}
+                <th style="border: 1px solid #333; padding: 4px; text-align: left; color: #000 !important; font-weight: bold; width: 18%;">Tarif</th>
+                <th style="border: 1px solid #333; padding: 4px; text-align: right; color: #000 !important; font-weight: bold; width: 10%;">Netto</th>
+                ${!kleinunternehmer ? '<th style="border: 1px solid #333; padding: 4px; text-align: right; color: #000 !important; font-weight: bold; width: 8%;">USt</th>' : ''}
+                <th style="border: 1px solid #333; padding: 4px; text-align: right; color: #000 !important; font-weight: bold; width: 10%;">Brutto</th>
+              </tr>
+            </thead>
+            <tbody style="color: #000 !important;">
+              ${positionenHtml}
+            </tbody>
+          </table>
+          </div>
+        `
+
+        const summenBlock = `
+          <div style="text-align: right; margin-top: 20px; color: #000;">
+            <div>Nettobetrag: ${summen.gesamtNetto.toFixed(2)} €</div>
+            ${!kleinunternehmer ? `<div>USt (19%): ${summen.gesamtUst.toFixed(2)} €</div>` : ''}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px;">
+              Gesamtbetrag: ${summen.gesamtBrutto.toFixed(2)} €
+            </div>
+          </div>
+        `
+
+        // IBAN maskieren
+        const maskiereIban = (ibanStr: string | undefined): string => {
+          if (!ibanStr) return '-'
+          const cleaned = ibanStr.replace(/\s/g, '')
+          if (cleaned.length <= 8) return cleaned
+          return `${cleaned.slice(0, 4)}${'*'.repeat(cleaned.length - 8)}${cleaned.slice(-4)}`
+        }
+
+        // Spieler-SEPA-Daten
+        const spielerIban = selectedSummary?.spieler.iban || ''
+        const spielerMandatsreferenz = selectedSummary?.spieler.mandatsreferenz || '-'
+        const spielerUnterschriftsdatum = selectedSummary?.spieler.unterschriftsdatum
+          ? formatDateGerman(selectedSummary.spieler.unterschriftsdatum)
+          : '-'
+
+        // Platzhalter ersetzen
+        const platzhalterWerte: Record<string, string> = {
+          '{{spieler_name}}': selectedSummary?.spieler.name || '',
+          '{{rechnungsnummer}}': rechnungsnummer,
+          '{{rechnungsdatum}}': formatDateGerman(rechnungsdatum),
+          '{{monat}}': monatFormatiert,
+          '{{positionen_tabelle}}': positionenTabelle,
+          '{{netto}}': `${summen.gesamtNetto.toFixed(2)} €`,
+          '{{ust}}': `${summen.gesamtUst.toFixed(2)} €`,
+          '{{brutto}}': `${summen.gesamtBrutto.toFixed(2)} €`,
+          '{{iban}}': iban,
+          '{{trainer_name}}': rechnungsstellerName,
+          '{{trainer_adresse}}': rechnungsstellerAdresse,
+          '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+          '{{steuernummer}}': profile?.steuernummer || '',
+          '{{empfaenger_name}}': rechnungsempfaengerName,
+          '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
+          '{{empfaenger_adresse_html}}': rechnungsempfaengerAdresse.replace(/\n/g, '<br>'),
+          '{{kleinunternehmer_hinweis}}': kleinunternehmer ? '<p style="color: #000;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : '',
+          '{{ust_zeile}}': !kleinunternehmer ? `Nettobetrag: ${summen.gesamtNetto.toFixed(2)} €<br>USt (19%): ${summen.gesamtUst.toFixed(2)} €` : '',
+          '{{summen_block}}': summenBlock,
+          '{{spieler_iban}}': maskiereIban(spielerIban),
+          '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
+          '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
+        }
+
+        let pdfBody = selectedPdfVorlage.inhalt
+        for (const [key, value] of Object.entries(platzhalterWerte)) {
+          pdfBody = pdfBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+        }
+
+        // Container erstellen - SICHTBAR für html2canvas
+        const container = document.createElement('div')
+        container.id = 'pdf-render-container'
+        container.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 794px;
+          background: white;
+          z-index: 99999;
+          padding: 40px;
+          box-sizing: border-box;
+          font-family: 'Times New Roman', Times, serif;
+          font-size: 12px;
+          line-height: 1.6;
+          color: #000 !important;
+        `
+        container.innerHTML = `
+          <style>
+            #pdf-render-container,
+            #pdf-render-container * {
+              color: #000 !important;
+              -webkit-text-fill-color: #000 !important;
+            }
+            #pdf-render-container table,
+            #pdf-render-container table *,
+            #pdf-render-container td,
+            #pdf-render-container th,
+            #pdf-render-container tr,
+            #pdf-render-container tbody,
+            #pdf-render-container tbody *,
+            #pdf-render-container tbody tr,
+            #pdf-render-container tbody td,
+            #pdf-render-container thead,
+            #pdf-render-container strong {
+              color: #000 !important;
+              -webkit-text-fill-color: #000 !important;
+              opacity: 1 !important;
+            }
+            .positionen-tabelle-wrapper,
+            .positionen-tabelle-wrapper * {
+              color: #000 !important;
+              -webkit-text-fill-color: #000 !important;
+              opacity: 1 !important;
+            }
+          </style>
+          <div>${pdfBody}</div>
+        `
+        document.body.appendChild(container)
+
+        // Warten bis gerendert
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Mit html2canvas erfassen
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: 794,
+          windowWidth: 794,
+          onclone: (clonedDoc) => {
+            // Force black color on all elements in cloned document
+            const clonedContainer = clonedDoc.getElementById('pdf-render-container')
+            if (clonedContainer) {
+              const allElements = clonedContainer.querySelectorAll('*')
+              allElements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('opacity', '1', 'important')
+              })
+              // Extra: Target tbody elements specifically
+              const tbodyElements = clonedContainer.querySelectorAll('tbody, tbody *, td, tr')
+              tbodyElements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('opacity', '1', 'important')
+              })
+            }
+          }
+        })
+
+        // Container entfernen
+        document.body.removeChild(container)
+
+        // PDF erstellen
+        const imgData = canvas.toDataURL('image/jpeg', 0.95)
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+        const imgWidth = canvas.width
+        const imgHeight = canvas.height
+        const ratio = pdfWidth / imgWidth
+        const scaledHeight = imgHeight * ratio
+
+        // Mehrere Seiten wenn nötig (nur wenn Inhalt deutlich größer als eine Seite)
+        const pageContentHeight = pdfHeight
+        const totalPages = scaledHeight > pageContentHeight + 5 ? Math.ceil(scaledHeight / pageContentHeight) : 1
+
+        for (let page = 0; page < totalPages; page++) {
+          if (page > 0) pdf.addPage()
+          const yOffset = -page * pageContentHeight
+          pdf.addImage(imgData, 'JPEG', 0, yOffset, pdfWidth, scaledHeight)
+        }
+
+        pdfBlob = pdf.output('blob')
+
+      } else {
+        // ============ OHNE VORLAGE: Direkt mit jsPDF ============
+
+        // PDF mit jsPDF direkt erstellen (zuverlässiger als html2canvas)
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+      const pageWidth = 210
+      const pageHeight = 297
+      const margin = 15
+      const contentWidth = pageWidth - 2 * margin
+      let y = margin
+
+      // Hilfsfunktion für Text mit automatischem Seitenumbruch
+      const checkNewPage = (neededHeight: number) => {
+        if (y + neededHeight > pageHeight - margin) {
+          pdf.addPage()
+          y = margin
+        }
+      }
+
+      // Header: RECHNUNG
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('RECHNUNG', pageWidth / 2, y, { align: 'center' })
+      y += 12
+
+      // Rechnungssteller (links)
+      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Rechnungssteller:', margin, y)
+      y += 4
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(rechnungsstellerName, margin, y)
+      y += 4
+      pdf.setFontSize(9)
+      rechnungsstellerAdresse.split('\n').forEach(line => {
+        pdf.text(line, margin, y)
+        y += 3.5
+      })
+      if (profile?.steuernummer) {
+        pdf.text(`Steuernummer: ${profile.steuernummer}`, margin, y)
+        y += 3.5
+      }
+      if (ustIdNr) {
+        pdf.text(`USt-IdNr: ${ustIdNr}`, margin, y)
+        y += 3.5
+      }
+
+      // Rechnungsempfänger (rechts oben)
+      let yRight = margin + 12
+      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Rechnungsempfänger:', pageWidth - margin, yRight, { align: 'right' })
+      yRight += 4
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(rechnungsempfaengerName, pageWidth - margin, yRight, { align: 'right' })
+      yRight += 4
+      pdf.setFontSize(9)
+      rechnungsempfaengerAdresse.split('\n').forEach(line => {
+        pdf.text(line, pageWidth - margin, yRight, { align: 'right' })
+        yRight += 3.5
+      })
+
+      y = Math.max(y, yRight) + 8
+
+      // Rechnungsdetails
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(`Rechnungsnummer: ${rechnungsnummer}`, margin, y)
+      y += 5
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(`Rechnungsdatum: ${formatDateGerman(rechnungsdatum)}`, margin, y)
+      y += 5
+      pdf.text(`Leistungszeitraum: ${monatFormatiert}`, margin, y)
+      y += 8
+
+      // Einleitungstext
+      pdf.text('Sehr geehrte Damen und Herren,', margin, y)
+      y += 5
+      const introLines = pdf.splitTextToSize('für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:', contentWidth)
+      pdf.text(introLines, margin, y)
+      y += introLines.length * 4 + 6
+
+      // Tabelle Header
+      const colWidths = hatMehrereSpieler
+        ? [22, 28, 22, 28, 28, 20, kleinunternehmer ? 0 : 16, 20]
+        : [25, 32, 25, 35, 22, kleinunternehmer ? 0 : 18, 22]
+      const headers = hatMehrereSpieler
+        ? ['Datum', 'Zeit', 'Dauer', 'Spieler', 'Tarif', 'Netto', ...(kleinunternehmer ? [] : ['USt']), 'Brutto']
+        : ['Datum', 'Zeit', 'Dauer', 'Tarif', 'Netto', ...(kleinunternehmer ? [] : ['USt']), 'Brutto']
+
+      // Tabellen-Header zeichnen
+      checkNewPage(10)
+      pdf.setFillColor(240, 240, 240)
+      pdf.rect(margin, y - 4, contentWidth, 7, 'F')
+      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'bold')
+
+      let xPos = margin + 1
+      headers.forEach((header, i) => {
+        if (colWidths[i] > 0) {
+          pdf.text(header, xPos, y)
+          xPos += colWidths[i]
+        }
+      })
+      y += 5
+
+      // Tabellen-Zeilen
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8)
+
+      rechnungsPositionen.forEach(p => {
+        checkNewPage(6)
+
+        xPos = margin + 1
+        const row = hatMehrereSpieler
+          ? [
+              p.istMonatlich ? p.datum : formatDateGerman(p.datum),
+              p.zeit,
+              p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`,
+              p.spielerName.substring(0, 12),
+              p.tarifName.substring(0, 12),
+              `${p.netto.toFixed(2)} €`,
+              ...(kleinunternehmer ? [] : [`${p.ust.toFixed(2)} €`]),
+              `${p.brutto.toFixed(2)} €`
+            ]
+          : [
+              p.istMonatlich ? p.datum : formatDateGerman(p.datum),
+              p.zeit,
+              p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`,
+              p.tarifName.substring(0, 15),
+              `${p.netto.toFixed(2)} €`,
+              ...(kleinunternehmer ? [] : [`${p.ust.toFixed(2)} €`]),
+              `${p.brutto.toFixed(2)} €`
+            ]
+
+        // Zeile mit Rahmen
+        pdf.setDrawColor(200, 200, 200)
+        pdf.line(margin, y + 1, margin + contentWidth, y + 1)
+
+        row.forEach((cell, i) => {
+          if (colWidths[i] > 0) {
+            pdf.text(cell, xPos, y)
+            xPos += colWidths[i]
+          }
+        })
+        y += 5
+      })
+
+      // Korrektur falls vorhanden
+      if (summen.korrektur !== 0) {
+        checkNewPage(8)
+        y += 2
+        pdf.setFont('helvetica', 'italic')
+        pdf.text(`Korrektur (${korrekturGrund || 'manuell'}): ${summen.korrektur >= 0 ? '+' : ''}${summen.korrektur.toFixed(2)} €`, margin, y)
+        y += 5
+      }
+
+      y += 6
+      checkNewPage(30)
+
+      // Summen
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      pdf.text(`Nettobetrag: ${summen.gesamtNetto.toFixed(2)} €`, pageWidth - margin, y, { align: 'right' })
+      y += 5
+
+      if (!kleinunternehmer) {
+        pdf.text(`USt (19%): ${summen.gesamtUst.toFixed(2)} €`, pageWidth - margin, y, { align: 'right' })
+        y += 5
+      }
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(12)
+      pdf.text(`Gesamtbetrag: ${summen.gesamtBrutto.toFixed(2)} €`, pageWidth - margin, y, { align: 'right' })
+      y += 8
+
+      // Kleinunternehmer-Hinweis
+      if (kleinunternehmer) {
+        pdf.setFont('helvetica', 'italic')
+        pdf.setFontSize(9)
+        pdf.text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet.', margin, y)
+        y += 6
+      }
+
+      // Zahlungsinfo
+      checkNewPage(35)
+      y += 4
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      pdf.text('Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:', margin, y)
+      y += 6
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(`IBAN: ${iban}`, margin, y)
+      y += 5
+      pdf.text(`Kontoinhaber: ${rechnungsstellerName}`, margin, y)
+      y += 8
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.text('Vielen Dank für die Zusammenarbeit.', margin, y)
+      y += 6
+      pdf.text('Mit freundlichen Grüßen', margin, y)
+      y += 5
+      pdf.text(rechnungsstellerName, margin, y)
+
+      // PDF als Blob
+      pdfBlob = pdf.output('blob')
+      }
+
+      // PDF zu Base64 konvertieren
+      const reader = new FileReader()
+      const pdfBase64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1]
+          resolve(base64)
+        }
+        reader.readAsDataURL(pdfBlob)
+      })
+
+      // E-Mail-Text - unterschiedlich je nach Vorlage
+      const emailText = selectedPdfVorlage
+        ? `Sehr geehrte/r ${rechnungsempfaengerName},
+
+anbei erhalten Sie die Rechnung Nr. ${rechnungsnummer} für ${monatFormatiert}.
+
+Gesamtbetrag: ${summen.gesamtBrutto.toFixed(2)} €
+
+Der Betrag wird per SEPA-Lastschrift von Ihrem Konto abgebucht.
+
+Bei Fragen stehen wir Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+${rechnungsstellerName}`
+        : `Sehr geehrte/r ${rechnungsempfaengerName},
+
+anbei erhalten Sie die Rechnung Nr. ${rechnungsnummer} für ${monatFormatiert}.
+
+Gesamtbetrag: ${summen.gesamtBrutto.toFixed(2)} €
+
+Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:
+IBAN: ${iban}
+Kontoinhaber: ${rechnungsstellerName}
+
+Bei Fragen stehen wir Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+${rechnungsstellerName}`
+
+      // E-Mail über API senden
+      const response = await fetch('/api/send-invoice-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtp: {
+            host: profile.smtp_host,
+            port: profile.smtp_port || 587,
+            secure: profile.smtp_secure ?? true,
+            user: profile.smtp_user,
+            pass: profile.smtp_pass,
+            fromEmail: profile.smtp_from_email || profile.smtp_user,
+            fromName: profile.smtp_from_name || `${profile.name} ${profile.nachname || ''}`.trim()
+          },
+          to: spielerEmail,
+          subject: `Rechnung ${rechnungsnummer} - ${monatFormatiert}`,
+          text: emailText,
+          pdfBase64,
+          pdfFilename: `Rechnung_${rechnungsnummer}.pdf`
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        alert(`Rechnung erfolgreich an ${spielerEmail} gesendet!`)
+      } else {
+        alert('Fehler beim E-Mail-Versand: ' + result.error)
+      }
+    } catch (err) {
+      console.error('E-Mail Fehler:', err)
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      alert('Fehler beim Erstellen oder Versenden der E-Mail: ' + errorMsg)
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -5505,41 +6020,21 @@ function InvoiceModal({
                 />
               </div>
 
-              {/* Vorlagen-Auswahl */}
-              <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
-                {/* E-Mail-Vorlage */}
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>E-Mail-Vorlage</label>
-                  <select
-                    className="form-control"
-                    value={selectedVorlageId}
-                    onChange={(e) => setSelectedVorlageId(e.target.value)}
-                  >
-                    <option value="">Standard-Vorlage</option>
-                    {emailVorlagen.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* PDF-Vorlage */}
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>PDF-Vorlage</label>
-                  <select
-                    className="form-control"
-                    value={selectedPdfVorlageId}
-                    onChange={(e) => setSelectedPdfVorlageId(e.target.value)}
-                  >
-                    <option value="">Standard-Vorlage</option>
-                    {pdfVorlagen.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* PDF-Vorlage Auswahl */}
+              <div className="form-group" style={{ marginTop: 16 }}>
+                <label>PDF-Vorlage</label>
+                <select
+                  className="form-control"
+                  value={selectedPdfVorlageId}
+                  onChange={(e) => setSelectedPdfVorlageId(e.target.value)}
+                >
+                  <option value="">Standard-Vorlage</option>
+                  {pdfVorlagen.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 16 }}>
@@ -5602,144 +6097,12 @@ function InvoiceModal({
           ) : (
             <>
               <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  const spielerEmail = selectedSummary?.spieler.kontakt_email
-                  if (!spielerEmail) {
-                    alert('Keine E-Mail-Adresse für diesen Spieler hinterlegt!')
-                    return
-                  }
-
-                  // Monat formatieren
-                  const [year, month] = selectedMonth.split('-')
-                  const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
-                  const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
-
-                  // Prüfen ob mehrere Spieler in der Rechnung sind
-                  const hatMehrereSpieler = verknuepfteSummaries.length > 0
-
-                  // Positionen als Text formatieren
-                  const positionenText = rechnungsPositionen.map(p =>
-                    `${p.istMonatlich ? p.datum : formatDateGerman(p.datum)} | ${p.zeit} | ${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}${hatMehrereSpieler ? ` | ${p.spielerName}` : ''} | ${p.tarifName} | ${p.brutto.toFixed(2)} €`
-                  ).join('\n')
-
-                  // Korrektur falls vorhanden
-                  const korrekturNum = parseFloat(korrekturBetrag) || 0
-                  const korrekturText = korrekturNum !== 0
-                    ? `\nKorrektur: ${korrekturNum > 0 ? '+' : ''}${korrekturNum.toFixed(2)} €`
-                    : ''
-
-                  // IBAN maskieren (nur erste 4 und letzte 4 Zeichen zeigen)
-                  const maskiereIban = (ibanStr: string | undefined): string => {
-                    if (!ibanStr) return ''
-                    const cleaned = ibanStr.replace(/\s/g, '')
-                    if (cleaned.length <= 8) return cleaned
-                    return `${cleaned.slice(0, 4)}${'*'.repeat(cleaned.length - 8)}${cleaned.slice(-4)}`
-                  }
-
-                  // Spieler-SEPA-Daten
-                  const spielerIban = selectedSummary?.spieler.iban || ''
-                  const spielerMandatsreferenz = selectedSummary?.spieler.mandatsreferenz || ''
-                  const spielerUnterschriftsdatum = selectedSummary?.spieler.unterschriftsdatum
-                    ? formatDateGerman(selectedSummary.spieler.unterschriftsdatum)
-                    : ''
-
-                  // Platzhalter-Werte definieren
-                  const platzhalterWerte: Record<string, string> = {
-                    '{{spieler_name}}': selectedSummary?.spieler.name || '',
-                    '{{rechnungsnummer}}': rechnungsnummer,
-                    '{{rechnungsdatum}}': formatDateGerman(rechnungsdatum),
-                    '{{monat}}': monatFormatiert,
-                    '{{positionen}}': positionenText + korrekturText,
-                    '{{netto}}': `${summen.gesamtNetto.toFixed(2)} €`,
-                    '{{ust}}': `${summen.gesamtUst.toFixed(2)} €`,
-                    '{{brutto}}': `${summen.gesamtBrutto.toFixed(2)} €`,
-                    '{{iban}}': iban,
-                    '{{trainer_name}}': rechnungsstellerName,
-                    '{{trainer_adresse}}': rechnungsstellerAdresse + (ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''),
-                    '{{steuernummer}}': profile?.steuernummer || '',
-                    '{{empfaenger_name}}': rechnungsempfaengerName,
-                    '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
-                    '{{kleinunternehmer_hinweis}}': kleinunternehmer ? 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.' : '',
-                    '{{ust_zeile}}': !kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €\nUSt (19%):     ${summen.gesamtUst.toFixed(2)} €` : '',
-                    '{{spieler_iban}}': maskiereIban(spielerIban),
-                    '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
-                    '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
-                  }
-
-                  // Funktion zum Ersetzen der Platzhalter
-                  const ersetzePlatzhalter = (text: string): string => {
-                    let result = text
-                    for (const [key, value] of Object.entries(platzhalterWerte)) {
-                      result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
-                    }
-                    return result
-                  }
-
-                  // Vorlage verwenden wenn vorhanden
-                  const selectedVorlage = emailVorlagen.find(v => v.id === selectedVorlageId)
-
-                  let subject: string
-                  let body: string
-
-                  if (selectedVorlage) {
-                    // Vorlage mit Platzhaltern verwenden
-                    subject = ersetzePlatzhalter(selectedVorlage.betreff)
-                    body = ersetzePlatzhalter(selectedVorlage.inhalt)
-                  } else {
-                    // Standard-Text (Fallback wenn keine Vorlage)
-                    subject = `Rechnung ${rechnungsnummer} - Tennisunterricht ${monatFormatiert}`
-                    const steuernummerText = profile?.steuernummer ? `\nSteuernummer: ${profile.steuernummer}` : ''
-                    body = `══════════════════════════════════════
-           R E C H N U N G
-══════════════════════════════════════
-
-Rechnungssteller:
-${rechnungsstellerName}
-${rechnungsstellerAdresse}${steuernummerText}${ustIdNr ? `\nUSt-IdNr: ${ustIdNr}` : ''}
-
-Rechnungsempfänger:
-${rechnungsempfaengerName}
-${rechnungsempfaengerAdresse}
-
-──────────────────────────────────────
-Rechnungsnummer: ${rechnungsnummer}
-Rechnungsdatum:  ${formatDateGerman(rechnungsdatum)}
-Leistungszeitraum: ${monatFormatiert}
-──────────────────────────────────────
-
-Positionen:
-${positionenText}${korrekturText}
-
-──────────────────────────────────────
-${!kleinunternehmer ? `Nettobetrag:   ${summen.gesamtNetto.toFixed(2)} €
-USt (19%):     ${summen.gesamtUst.toFixed(2)} €
-` : ''}
-  ►►► GESAMTBETRAG:  ${summen.gesamtBrutto.toFixed(2)} € ◄◄◄
-
-──────────────────────────────────────
-${kleinunternehmer ? '\nGemäß §19 UStG wird keine Umsatzsteuer berechnet.\n' : ''}
-Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf:
-IBAN: ${iban}
-Kontoinhaber: ${rechnungsstellerName}
-
-Vielen Dank für die Zusammenarbeit!
-
-Mit freundlichen Grüßen
-${rechnungsstellerName}
-
-⚠️ Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
-══════════════════════════════════════`
-                  }
-
-                  // mailto-Link öffnen
-                  const mailtoLink = `mailto:${spielerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.trim())}`
-                  window.open(mailtoLink, '_blank')
-                }}
-                disabled={!selectedSummary?.spieler.kontakt_email}
-                title={!selectedSummary?.spieler.kontakt_email ? 'Keine E-Mail hinterlegt' : ''}
+                className="btn btn-success"
+                onClick={sendInvoiceEmail}
+                disabled={sendingEmail || !selectedSummary?.spieler.kontakt_email || !profile?.smtp_host}
+                title={!profile?.smtp_host ? 'SMTP nicht konfiguriert' : !selectedSummary?.spieler.kontakt_email ? 'Keine E-Mail hinterlegt' : 'PDF-Rechnung per E-Mail senden'}
               >
-                Per E-Mail senden
+                {sendingEmail ? 'Sende...' : 'PDF per E-Mail'}
               </button>
               <button className="btn btn-primary" onClick={generatePDF}>
                 PDF erstellen
@@ -5906,6 +6269,7 @@ function ManuelleRechnungModal({
             <strong>Rechnungssteller:</strong><br>
             ${rechnungsstellerName}<br>
             ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+            ${profile?.steuernummer ? `<br>Steuernummer: ${profile.steuernummer}` : ''}
             ${ustIdNrValue ? `<br>USt-IdNr: ${ustIdNrValue}` : ''}
           </div>
           <div class="section" style="text-align: right;">
@@ -6604,8 +6968,8 @@ function BuchhaltungView({
   userEmail: string
   selectedYear: number
   onYearChange: (year: number) => void
-  activeSubTab: 'einnahmen' | 'ausgaben' | 'ust' | 'euer'
-  onSubTabChange: (tab: 'einnahmen' | 'ausgaben' | 'ust' | 'euer') => void
+  activeSubTab: 'einnahmen' | 'ausgaben' | 'ust' | 'euer' | 'offene' | 'bank'
+  onSubTabChange: (tab: 'einnahmen' | 'ausgaben' | 'ust' | 'euer' | 'offene' | 'bank') => void
 }) {
   const isAdmin = userEmail === 'arturiva03@gmail.com'
   const [ustZeitraumTyp, setUstZeitraumTyp] = useState<'monat' | 'quartal'>('monat')
@@ -6615,6 +6979,20 @@ function BuchhaltungView({
   const [inclBarEinnahmen, setInclBarEinnahmen] = useState(!isAdmin)
   const [selectedAusgabenMonat, setSelectedAusgabenMonat] = useState<string>('alle')
   const [detailPeriode, setDetailPeriode] = useState<string | null>(null)
+
+  // Bank-Abgleich States
+  const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>([])
+  const [showCsvImportModal, setShowCsvImportModal] = useState(false)
+  const [csvData, setCsvData] = useState<string[][]>([])
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvMapping, setCsvMapping] = useState<{
+    datum: string
+    betrag: string
+    verwendungszweck: string
+    auftraggeber: string
+  }>({ datum: '', betrag: '', verwendungszweck: '', auftraggeber: '' })
+  const [isMatching, setIsMatching] = useState(false)
+  const [matchingError, setMatchingError] = useState<string | null>(null)
 
   // Einnahmen-Bearbeitung States
   const [editingManuelleRechnung, setEditingManuelleRechnung] = useState<ManuelleRechnung | null>(null)
@@ -7024,8 +7402,444 @@ function BuchhaltungView({
 
   // Tabs für Navigation - USt nur wenn kein Kleinunternehmer
   const availableTabs = kleinunternehmer
-    ? (['einnahmen', 'ausgaben', 'euer'] as const)
-    : (['einnahmen', 'ausgaben', 'ust', 'euer'] as const)
+    ? (['einnahmen', 'ausgaben', 'euer', 'offene', 'bank'] as const)
+    : (['einnahmen', 'ausgaben', 'ust', 'euer', 'offene', 'bank'] as const)
+
+  // Offene Posten berechnen
+  const offenePosten = useMemo(() => {
+    const posten: OffenerPosten[] = []
+
+    // Offene Trainings (nicht bezahlt)
+    trainings.filter(t => {
+      if (t.status !== 'durchgefuehrt') return false
+      if (!t.datum.startsWith(selectedYear.toString())) return false
+      return true
+    }).forEach(t => {
+      t.spieler_ids.forEach(spielerId => {
+        // Prüfe ob bezahlt
+        const payment = spielerPayments.find(p => p.training_id === t.id && p.spieler_id === spielerId)
+        const bezahlt = payment ? (payment.bezahlt || payment.bar_bezahlt) : (t.bezahlt || t.bar_bezahlt)
+        if (bezahlt) return
+
+        const tarif = tarife.find(ta => ta.id === t.tarif_id)
+        const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+        const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+        const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+        let betrag = preis * duration
+        if (abrechnungsart === 'proSpieler') {
+          betrag = betrag / t.spieler_ids.length
+        }
+
+        const sp = spieler.find(s => s.id === spielerId)
+
+        posten.push({
+          id: `${t.id}|${spielerId}`,
+          typ: 'training',
+          datum: t.datum,
+          empfaenger_name: sp?.name || 'Unbekannt',
+          spieler_id: spielerId,
+          betrag,
+          beschreibung: tarif?.name || 'Training'
+        })
+      })
+    })
+
+    // Offene manuelle Rechnungen
+    manuelleRechnungen.filter(r => {
+      if (!r.rechnungsdatum.startsWith(selectedYear.toString())) return false
+      return !r.bezahlt && !r.bar_bezahlt
+    }).forEach(r => {
+      posten.push({
+        id: r.id,
+        typ: 'rechnung',
+        datum: r.rechnungsdatum,
+        empfaenger_name: r.empfaenger_name,
+        betrag: r.brutto_gesamt,
+        beschreibung: r.beschreibung,
+        rechnungsnummer: r.rechnungsnummer
+      })
+    })
+
+    // Offene Ausgaben (noch nicht bezahlt)
+    ausgaben.filter(a => {
+      if (!a.datum.startsWith(selectedYear.toString())) return false
+      return !a.bezahlt
+    }).forEach(a => {
+      posten.push({
+        id: a.id,
+        typ: 'ausgabe',
+        datum: a.datum,
+        empfaenger_name: a.beschreibung || a.kategorie,
+        betrag: -a.betrag, // Negativ weil Ausgabe
+        beschreibung: a.kategorie,
+        rechnungsnummer: a.rechnungsnummer
+      })
+    })
+
+    return posten.sort((a, b) => a.datum.localeCompare(b.datum))
+  }, [trainings, manuelleRechnungen, ausgaben, spielerPayments, spieler, tarife, selectedYear])
+
+  // CSV Import Handler
+  const handleCsvFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      // CSV parsen (deutsche Kodierung beachten)
+      const lines = text.split(/\r?\n/).filter(line => line.trim())
+      if (lines.length < 2) {
+        alert('CSV-Datei enthält keine Daten')
+        return
+      }
+
+      // Header und Daten extrahieren
+      const delimiter = lines[0].includes(';') ? ';' : ','
+      const headers = lines[0].split(delimiter).map(h => h.replace(/^"|"$/g, '').trim())
+      const data = lines.slice(1).map(line => {
+        // CSV-Zeilen mit Anführungszeichen korrekt parsen
+        const values: string[] = []
+        let current = ''
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i]
+          if (char === '"') {
+            inQuotes = !inQuotes
+          } else if (char === delimiter && !inQuotes) {
+            values.push(current.trim())
+            current = ''
+          } else {
+            current += char
+          }
+        }
+        values.push(current.trim())
+        return values
+      }).filter(row => row.some(cell => cell))
+
+      setCsvHeaders(headers)
+      setCsvData(data)
+
+      // Auto-Mapping versuchen (typische deutsche Bank-Spaltennamen)
+      const autoMapping = {
+        datum: headers.find(h => /buchung|datum|valuta|wertstellung/i.test(h)) || '',
+        betrag: headers.find(h => /betrag|umsatz|soll|haben|wert/i.test(h)) || '',
+        verwendungszweck: headers.find(h => /verwendung|zweck|beschreibung|text|info/i.test(h)) || '',
+        auftraggeber: headers.find(h => /auftraggeber|empf|name|partner|beguenstigter/i.test(h)) || ''
+      }
+      setCsvMapping(autoMapping)
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+
+  // CSV Import durchführen
+  const handleCsvImport = async () => {
+    if (!csvMapping.datum || !csvMapping.betrag) {
+      alert('Bitte mindestens Datum und Betrag zuordnen')
+      return
+    }
+
+    const datumIdx = csvHeaders.indexOf(csvMapping.datum)
+    const betragIdx = csvHeaders.indexOf(csvMapping.betrag)
+    const verwendungIdx = csvMapping.verwendungszweck ? csvHeaders.indexOf(csvMapping.verwendungszweck) : -1
+    const auftraggeberIdx = csvMapping.auftraggeber ? csvHeaders.indexOf(csvMapping.auftraggeber) : -1
+
+    const transactions: Omit<BankTransaction, 'id' | 'created_at'>[] = []
+
+    for (const row of csvData) {
+      const datumStr = row[datumIdx]
+      let betragStr = row[betragIdx]
+
+      if (!datumStr || !betragStr) continue
+
+      // Datum parsen (DD.MM.YYYY oder YYYY-MM-DD)
+      let datum: string
+      if (datumStr.includes('.')) {
+        const parts = datumStr.split('.')
+        datum = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+      } else {
+        datum = datumStr.substring(0, 10)
+      }
+
+      // Betrag parsen (deutsches Format: 1.234,56)
+      betragStr = betragStr.replace(/[^\d,.\-]/g, '')
+      // Wenn Punkt vor Komma, dann deutsches Format
+      if (betragStr.includes(',') && betragStr.indexOf('.') < betragStr.indexOf(',')) {
+        betragStr = betragStr.replace(/\./g, '').replace(',', '.')
+      } else if (betragStr.includes(',') && !betragStr.includes('.')) {
+        betragStr = betragStr.replace(',', '.')
+      }
+      const betrag = parseFloat(betragStr)
+
+      if (isNaN(betrag)) continue
+
+      const verwendung = verwendungIdx >= 0 ? row[verwendungIdx] : ''
+      const auftraggeber = auftraggeberIdx >= 0 ? row[auftraggeberIdx] : ''
+
+      // Eindeutige Transaction ID generieren
+      const transactionId = `csv-${datum}-${betrag.toFixed(2)}-${verwendung.substring(0, 20)}`.replace(/[^a-zA-Z0-9-]/g, '')
+
+      transactions.push({
+        user_id: userId,
+        transaction_id: transactionId,
+        booking_date: datum,
+        amount: betrag,
+        currency: 'EUR',
+        debtor_name: betrag > 0 ? auftraggeber : undefined,
+        creditor_name: betrag < 0 ? auftraggeber : undefined,
+        remittance_info: verwendung,
+        match_status: 'unmatched',
+        import_source: 'csv',
+        ai_suggestion_status: 'none'
+      })
+    }
+
+    // In Supabase speichern (Duplikate ignorieren)
+    for (const tx of transactions) {
+      await supabase.from('bank_transactions').upsert(tx, {
+        onConflict: 'transaction_id',
+        ignoreDuplicates: true
+      })
+    }
+
+    // Transaktionen neu laden
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+
+    setShowCsvImportModal(false)
+    setCsvData([])
+    setCsvHeaders([])
+    alert(`${transactions.length} Transaktionen importiert`)
+  }
+
+  // AI-Matching durchführen
+  const handleAiMatching = async () => {
+    const unmatchedTx = bankTransactions.filter(tx =>
+      tx.match_status === 'unmatched' && tx.ai_suggestion_status !== 'rejected'
+    )
+
+    if (unmatchedTx.length === 0) {
+      alert('Keine offenen Transaktionen zum Matchen')
+      return
+    }
+
+    setIsMatching(true)
+    setMatchingError(null)
+
+    try {
+      const response = await fetch('/api/match-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactions: unmatchedTx.map(tx => ({
+            id: tx.id,
+            booking_date: tx.booking_date,
+            amount: tx.amount,
+            debtor_name: tx.debtor_name,
+            creditor_name: tx.creditor_name,
+            remittance_info: tx.remittance_info
+          })),
+          offenePosten: offenePosten.map(p => ({
+            id: p.id,
+            typ: p.typ,
+            datum: p.datum,
+            empfaenger_name: p.empfaenger_name,
+            spieler_id: p.spieler_id,
+            betrag: p.betrag,
+            beschreibung: p.beschreibung,
+            rechnungsnummer: p.rechnungsnummer
+          })),
+          spielerNamen: spieler.map(s => ({ id: s.id, name: s.name }))
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Matching fehlgeschlagen')
+      }
+
+      // AI-Vorschläge in Transaktionen speichern
+      for (const match of result.results) {
+        if (match.suggestion) {
+          await supabase
+            .from('bank_transactions')
+            .update({
+              ai_suggestion: match.suggestion,
+              ai_suggestion_status: 'pending'
+            })
+            .eq('id', match.transaction_id)
+        }
+      }
+
+      // Transaktionen neu laden
+      const { data } = await supabase
+        .from('bank_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('booking_date', { ascending: false })
+
+      if (data) {
+        setBankTransactions(data)
+      }
+
+      alert(result.message)
+    } catch (error) {
+      setMatchingError(error instanceof Error ? error.message : 'Unbekannter Fehler')
+    } finally {
+      setIsMatching(false)
+    }
+  }
+
+  // AI-Vorschlag akzeptieren
+  const handleAcceptSuggestion = async (tx: BankTransaction) => {
+    if (!tx.ai_suggestion) return
+
+    const suggestion = tx.ai_suggestion
+
+    // Je nach Typ das passende Feld aktualisieren
+    if (suggestion.type === 'training' && suggestion.spieler_id) {
+      const [trainingId, spielerId] = tx.ai_suggestion.id.includes('|')
+        ? tx.ai_suggestion.id.split('|')
+        : [tx.ai_suggestion.id, suggestion.spieler_id]
+
+      // Training als bezahlt markieren
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === trainingId && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
+        await supabase
+          .from('spieler_training_payments')
+          .update({ bezahlt: true })
+          .eq('id', existingPayment.id)
+      } else {
+        await supabase.from('spieler_training_payments').insert({
+          user_id: userId,
+          training_id: trainingId,
+          spieler_id: spielerId,
+          bezahlt: true,
+          bar_bezahlt: false
+        })
+      }
+
+      // Transaktion als gematcht markieren
+      await supabase
+        .from('bank_transactions')
+        .update({
+          match_status: 'manual_matched',
+          matched_training_id: trainingId,
+          matched_spieler_id: spielerId,
+          ai_suggestion_status: 'accepted'
+        })
+        .eq('id', tx.id)
+
+    } else if (suggestion.type === 'rechnung') {
+      // Rechnung als bezahlt markieren
+      await supabase
+        .from('manuelle_rechnungen')
+        .update({ bezahlt: true })
+        .eq('id', suggestion.id)
+
+      await supabase
+        .from('bank_transactions')
+        .update({
+          match_status: 'manual_matched',
+          matched_rechnung_id: suggestion.id,
+          ai_suggestion_status: 'accepted'
+        })
+        .eq('id', tx.id)
+
+    } else if (suggestion.type === 'ausgabe') {
+      // Ausgabe als bezahlt markieren
+      await supabase
+        .from('ausgaben')
+        .update({ bezahlt: true })
+        .eq('id', suggestion.id)
+
+      await supabase
+        .from('bank_transactions')
+        .update({
+          match_status: 'manual_matched',
+          matched_ausgabe_id: suggestion.id,
+          ai_suggestion_status: 'accepted'
+        })
+        .eq('id', tx.id)
+    }
+
+    onUpdate()
+
+    // Transaktionen neu laden
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+  }
+
+  // AI-Vorschlag ablehnen
+  const handleRejectSuggestion = async (tx: BankTransaction) => {
+    await supabase
+      .from('bank_transactions')
+      .update({ ai_suggestion_status: 'rejected' })
+      .eq('id', tx.id)
+
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+  }
+
+  // Transaktion ignorieren
+  const handleIgnoreTransaction = async (tx: BankTransaction) => {
+    await supabase
+      .from('bank_transactions')
+      .update({ match_status: 'ignored' })
+      .eq('id', tx.id)
+
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+  }
+
+  // Bank-Transaktionen laden beim ersten Render
+  useEffect(() => {
+    const loadBankTransactions = async () => {
+      const { data } = await supabase
+        .from('bank_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('booking_date', { ascending: false })
+
+      if (data) {
+        setBankTransactions(data)
+      }
+    }
+    loadBankTransactions()
+  }, [userId])
 
   return (
     <div>
@@ -7039,7 +7853,9 @@ function BuchhaltungView({
           >
             {tab === 'einnahmen' ? 'Einnahmen' :
              tab === 'ausgaben' ? 'Ausgaben' :
-             tab === 'ust' ? 'USt' : 'EÜR'}
+             tab === 'ust' ? 'USt' :
+             tab === 'euer' ? 'EÜR' :
+             tab === 'offene' ? 'Offene Posten' : 'Bankabgleich'}
           </button>
         ))}
       </div>
@@ -7996,6 +8812,367 @@ function BuchhaltungView({
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Offene Posten Tab */}
+      {activeSubTab === 'offene' && (
+        <div className="card">
+          <div className="card-header">
+            <h3>Offene Posten {selectedYear}</h3>
+          </div>
+
+          {offenePosten.length === 0 ? (
+            <div className="empty-state">Keine offenen Posten vorhanden</div>
+          ) : (
+            <>
+              {/* Zusammenfassung */}
+              <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
+                <div>
+                  Offene Einnahmen: <strong style={{ color: 'var(--success)' }}>
+                    +{offenePosten.filter(p => p.betrag > 0).reduce((s, p) => s + p.betrag, 0).toFixed(2)} €
+                  </strong>
+                </div>
+                <div>
+                  Offene Ausgaben: <strong style={{ color: 'var(--danger)' }}>
+                    {offenePosten.filter(p => p.betrag < 0).reduce((s, p) => s + p.betrag, 0).toFixed(2)} €
+                  </strong>
+                </div>
+                <div>
+                  Gesamt offen: <strong>
+                    {offenePosten.reduce((s, p) => s + p.betrag, 0).toFixed(2)} €
+                  </strong>
+                </div>
+              </div>
+
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Datum</th>
+                      <th>Typ</th>
+                      <th>Empfänger/Beschreibung</th>
+                      <th>Details</th>
+                      <th style={{ textAlign: 'right' }}>Betrag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {offenePosten.map(p => (
+                      <tr key={p.id}>
+                        <td>{formatDateGerman(p.datum)}</td>
+                        <td>
+                          <span className={`badge ${p.typ === 'training' ? 'badge-success' : p.typ === 'rechnung' ? 'badge-primary' : 'badge-warning'}`}>
+                            {p.typ === 'training' ? 'Training' : p.typ === 'rechnung' ? 'Rechnung' : 'Ausgabe'}
+                          </span>
+                        </td>
+                        <td>{p.empfaenger_name}</td>
+                        <td>
+                          {p.beschreibung}
+                          {p.rechnungsnummer && <span style={{ color: 'var(--gray-500)', marginLeft: 8 }}>({p.rechnungsnummer})</span>}
+                        </td>
+                        <td style={{
+                          textAlign: 'right',
+                          fontWeight: 500,
+                          color: p.betrag >= 0 ? 'var(--success)' : 'var(--danger)'
+                        }}>
+                          {p.betrag >= 0 ? '+' : ''}{p.betrag.toFixed(2)} €
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Bankabgleich Tab */}
+      {activeSubTab === 'bank' && (
+        <div className="card">
+          <div className="card-header">
+            <h3>Bankabgleich</h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowCsvImportModal(true)}
+              >
+                CSV importieren
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleAiMatching}
+                disabled={isMatching}
+              >
+                {isMatching ? 'Matche...' : 'AI-Matching starten'}
+              </button>
+            </div>
+          </div>
+
+          {matchingError && (
+            <div className="alert alert-danger" style={{ margin: '16px 0' }}>
+              {matchingError}
+            </div>
+          )}
+
+          {/* Zusammenfassung */}
+          <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div>
+              Transaktionen: <strong>{bankTransactions.length}</strong>
+            </div>
+            <div>
+              Offen: <strong style={{ color: 'var(--warning)' }}>
+                {bankTransactions.filter(tx => tx.match_status === 'unmatched').length}
+              </strong>
+            </div>
+            <div>
+              Mit Vorschlag: <strong style={{ color: 'var(--primary)' }}>
+                {bankTransactions.filter(tx => tx.ai_suggestion_status === 'pending').length}
+              </strong>
+            </div>
+            <div>
+              Zugeordnet: <strong style={{ color: 'var(--success)' }}>
+                {bankTransactions.filter(tx => tx.match_status === 'manual_matched' || tx.match_status === 'auto_matched').length}
+              </strong>
+            </div>
+          </div>
+
+          {bankTransactions.length === 0 ? (
+            <div className="empty-state">
+              <p>Keine Bankumsätze importiert</p>
+              <p style={{ fontSize: 14, color: 'var(--gray-500)' }}>
+                Exportiere deine Kontoauszüge als CSV aus dem Online-Banking und importiere sie hier.
+              </p>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Auftraggeber/Empfänger</th>
+                    <th>Verwendungszweck</th>
+                    <th style={{ textAlign: 'right' }}>Betrag</th>
+                    <th>Status</th>
+                    <th>AI-Vorschlag</th>
+                    <th>Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bankTransactions.map(tx => (
+                    <tr key={tx.id} style={{
+                      background: tx.ai_suggestion_status === 'pending' ? 'var(--blue-50)' : undefined
+                    }}>
+                      <td>{formatDateGerman(tx.booking_date)}</td>
+                      <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {tx.amount >= 0 ? tx.debtor_name : tx.creditor_name || '-'}
+                      </td>
+                      <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {tx.remittance_info || '-'}
+                      </td>
+                      <td style={{
+                        textAlign: 'right',
+                        fontWeight: 500,
+                        color: tx.amount >= 0 ? 'var(--success)' : 'var(--danger)'
+                      }}>
+                        {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)} €
+                      </td>
+                      <td>
+                        <span className={`badge ${
+                          tx.match_status === 'unmatched' ? 'badge-warning' :
+                          tx.match_status === 'ignored' ? 'badge-secondary' :
+                          'badge-success'
+                        }`}>
+                          {tx.match_status === 'unmatched' ? 'Offen' :
+                           tx.match_status === 'ignored' ? 'Ignoriert' : 'Zugeordnet'}
+                        </span>
+                      </td>
+                      <td>
+                        {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
+                          <div style={{ fontSize: 12 }}>
+                            <div>
+                              <strong>{tx.ai_suggestion.type}</strong>
+                              <span style={{ marginLeft: 4, color: 'var(--gray-500)' }}>
+                                ({tx.ai_suggestion.confidence}%)
+                              </span>
+                            </div>
+                            <div style={{ color: 'var(--gray-600)' }}>
+                              {tx.ai_suggestion.reason}
+                            </div>
+                          </div>
+                        )}
+                        {tx.ai_suggestion_status === 'accepted' && (
+                          <span style={{ color: 'var(--success)', fontSize: 12 }}>Akzeptiert</span>
+                        )}
+                        {tx.ai_suggestion_status === 'rejected' && (
+                          <span style={{ color: 'var(--gray-500)', fontSize: 12 }}>Abgelehnt</span>
+                        )}
+                      </td>
+                      <td>
+                        {tx.match_status === 'unmatched' && (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' && (
+                              <>
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() => handleAcceptSuggestion(tx)}
+                                  title="Vorschlag akzeptieren"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-danger"
+                                  onClick={() => handleRejectSuggestion(tx)}
+                                  title="Vorschlag ablehnen"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            )}
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleIgnoreTransaction(tx)}
+                              title="Transaktion ignorieren"
+                            >
+                              ⊘
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {showCsvImportModal && (
+        <div className="modal-overlay" onClick={() => setShowCsvImportModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+            <div className="modal-header">
+              <h3>CSV importieren</h3>
+              <button className="btn btn-ghost" onClick={() => setShowCsvImportModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>CSV-Datei auswählen</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="form-control"
+                  onChange={handleCsvFileSelect}
+                />
+                <p style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+                  Unterstützt CSV-Exporte von deutschen Banken (Sparkasse, Volksbank, Commerzbank, etc.)
+                </p>
+              </div>
+
+              {csvHeaders.length > 0 && (
+                <>
+                  <hr style={{ margin: '16px 0' }} />
+                  <h4>Spalten zuordnen</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-group">
+                      <label>Datum *</label>
+                      <select
+                        className="form-control"
+                        value={csvMapping.datum}
+                        onChange={e => setCsvMapping({ ...csvMapping, datum: e.target.value })}
+                      >
+                        <option value="">Spalte wählen...</option>
+                        {csvHeaders.map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Betrag *</label>
+                      <select
+                        className="form-control"
+                        value={csvMapping.betrag}
+                        onChange={e => setCsvMapping({ ...csvMapping, betrag: e.target.value })}
+                      >
+                        <option value="">Spalte wählen...</option>
+                        {csvHeaders.map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Verwendungszweck</label>
+                      <select
+                        className="form-control"
+                        value={csvMapping.verwendungszweck}
+                        onChange={e => setCsvMapping({ ...csvMapping, verwendungszweck: e.target.value })}
+                      >
+                        <option value="">Spalte wählen...</option>
+                        {csvHeaders.map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Auftraggeber/Empfänger</label>
+                      <select
+                        className="form-control"
+                        value={csvMapping.auftraggeber}
+                        onChange={e => setCsvMapping({ ...csvMapping, auftraggeber: e.target.value })}
+                      >
+                        <option value="">Spalte wählen...</option>
+                        {csvHeaders.map(h => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Vorschau */}
+                  {csvData.length > 0 && (
+                    <>
+                      <h4 style={{ marginTop: 16 }}>Vorschau (erste 5 Zeilen)</h4>
+                      <div className="table-container" style={{ maxHeight: 200, overflow: 'auto' }}>
+                        <table style={{ fontSize: 12 }}>
+                          <thead>
+                            <tr>
+                              {csvHeaders.map(h => (
+                                <th key={h} style={{ whiteSpace: 'nowrap' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {csvData.slice(0, 5).map((row, i) => (
+                              <tr key={i}>
+                                {row.map((cell, j) => (
+                                  <td key={j} style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowCsvImportModal(false)}>
+                Abbrechen
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCsvImport}
+                disabled={!csvMapping.datum || !csvMapping.betrag || csvData.length === 0}
+              >
+                {csvData.length} Zeilen importieren
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -9036,10 +10213,15 @@ function TrainingEinnahmeEditModal({
       const neuerPreis = parseFloat(preisProStunde) || 0
 
       // Training aktualisieren (Preis und Korrektur)
+      // Nur custom_preis_pro_stunde setzen wenn wirklich ein anderer Preis als der Tarif gewählt wurde
+      // Oder wenn bereits ein custom Preis existierte
+      const tarifPreis = tarif?.preis_pro_stunde ?? 0
+      const shouldSaveCustomPreis = neuerPreis !== tarifPreis || training.custom_preis_pro_stunde !== null
+
       await supabase
         .from('trainings')
         .update({
-          custom_preis_pro_stunde: neuerPreis,
+          custom_preis_pro_stunde: shouldSaveCustomPreis ? neuerPreis : null,
           korrektur_betrag: korrektur,
           korrektur_grund: korrekturGrund || null
         })
@@ -9202,7 +10384,6 @@ function TrainingEinnahmeEditModal({
 function WeiteresView({
   profile,
   notizen,
-  emailVorlagen,
   pdfVorlagen,
   onUpdate,
   userId,
@@ -9210,17 +10391,14 @@ function WeiteresView({
 }: {
   profile: TrainerProfile | null
   notizen: Notiz[]
-  emailVorlagen: EmailVorlage[]
   pdfVorlagen: PdfVorlage[]
   onUpdate: () => void
   userId: string
   onNavigate: (tab: Tab) => void
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'profil' | 'notizen' | 'email-vorlagen' | 'pdf-vorlagen'>('profil')
+  const [activeSubTab, setActiveSubTab] = useState<'profil' | 'notizen' | 'pdf-vorlagen'>('profil')
   const [showNotizModal, setShowNotizModal] = useState(false)
   const [editingNotiz, setEditingNotiz] = useState<Notiz | null>(null)
-  const [showVorlageModal, setShowVorlageModal] = useState(false)
-  const [editingVorlage, setEditingVorlage] = useState<EmailVorlage | null>(null)
   const [showPdfVorlageModal, setShowPdfVorlageModal] = useState(false)
   const [editingPdfVorlage, setEditingPdfVorlage] = useState<PdfVorlage | null>(null)
   const [showRechtlichesModal, setShowRechtlichesModal] = useState<'impressum' | 'datenschutz' | null>(null)
@@ -9237,6 +10415,55 @@ function WeiteresView({
   const [notiz, setNotiz] = useState(profile?.notiz || '')
   const [saving, setSaving] = useState(false)
 
+  // SMTP Einstellungen
+  const [smtpHost, setSmtpHost] = useState(profile?.smtp_host || '')
+  const [smtpPort, setSmtpPort] = useState(profile?.smtp_port || 587)
+  const [smtpUser, setSmtpUser] = useState(profile?.smtp_user || '')
+  const [smtpPass, setSmtpPass] = useState(profile?.smtp_pass || '')
+  const [smtpFromEmail, setSmtpFromEmail] = useState(profile?.smtp_from_email || '')
+  const [smtpFromName, setSmtpFromName] = useState(profile?.smtp_from_name || '')
+  const [smtpSecure, setSmtpSecure] = useState(profile?.smtp_secure ?? true)
+  const [testingSmtp, setTestingSmtp] = useState(false)
+
+  const testSmtpConnection = async () => {
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      alert('Bitte fülle zuerst Host, Benutzer und Passwort aus.')
+      return
+    }
+    setTestingSmtp(true)
+    try {
+      const response = await fetch('/api/send-invoice-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtp: {
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpSecure,
+            user: smtpUser,
+            pass: smtpPass,
+            fromEmail: smtpFromEmail || smtpUser,
+            fromName: smtpFromName || name
+          },
+          to: smtpFromEmail || smtpUser,
+          subject: 'SMTP Test - Tennis Trainer Planner',
+          text: 'Dies ist eine Test-E-Mail. Wenn du diese E-Mail erhältst, funktioniert deine SMTP-Konfiguration!'
+        })
+      })
+      const result = await response.json()
+      if (response.ok) {
+        alert('Test-E-Mail erfolgreich gesendet! Prüfe deinen Posteingang.')
+      } else {
+        alert('Fehler: ' + result.error)
+      }
+    } catch (err) {
+      console.error('SMTP Test Fehler:', err)
+      alert('Verbindungsfehler beim Test')
+    } finally {
+      setTestingSmtp(false)
+    }
+  }
+
   const saveProfile = async () => {
     setSaving(true)
     try {
@@ -9250,6 +10477,13 @@ function WeiteresView({
         finanzamt: finanzamt || null,
         steuernummer: steuernummer || null,
         notiz: notiz || null,
+        smtp_host: smtpHost || null,
+        smtp_port: smtpPort || 587,
+        smtp_user: smtpUser || null,
+        smtp_pass: smtpPass || null,
+        smtp_from_email: smtpFromEmail || null,
+        smtp_from_name: smtpFromName || null,
+        smtp_secure: smtpSecure,
         updated_at: new Date().toISOString()
       }
 
@@ -9299,12 +10533,6 @@ function WeiteresView({
           onClick={() => setActiveSubTab('notizen')}
         >
           Notizen ({notizen.length})
-        </button>
-        <button
-          className={`tab ${activeSubTab === 'email-vorlagen' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('email-vorlagen')}
-        >
-          E-Mail-Vorlagen ({emailVorlagen.length})
         </button>
         <button
           className={`tab ${activeSubTab === 'pdf-vorlagen' ? 'active' : ''}`}
@@ -9424,6 +10652,97 @@ function WeiteresView({
             />
           </div>
 
+          <h4 style={{ margin: '24px 0 12px', color: 'var(--gray-700)' }}>E-Mail-Versand (SMTP)</h4>
+          <p style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 16 }}>
+            Konfiguriere deinen SMTP-Server um Rechnungen direkt per E-Mail versenden zu können.
+          </p>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>SMTP-Server</label>
+              <input
+                type="text"
+                className="form-control"
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                placeholder="z.B. smtp.gmail.com"
+              />
+            </div>
+            <div className="form-group" style={{ maxWidth: 120 }}>
+              <label>Port</label>
+              <input
+                type="number"
+                className="form-control"
+                value={smtpPort}
+                onChange={(e) => setSmtpPort(parseInt(e.target.value) || 587)}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Benutzername</label>
+              <input
+                type="text"
+                className="form-control"
+                value={smtpUser}
+                onChange={(e) => setSmtpUser(e.target.value)}
+                placeholder="E-Mail oder Benutzername"
+              />
+            </div>
+            <div className="form-group">
+              <label>Passwort</label>
+              <input
+                type="password"
+                className="form-control"
+                value={smtpPass}
+                onChange={(e) => setSmtpPass(e.target.value)}
+                placeholder="SMTP-Passwort"
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Absender E-Mail</label>
+              <input
+                type="email"
+                className="form-control"
+                value={smtpFromEmail}
+                onChange={(e) => setSmtpFromEmail(e.target.value)}
+                placeholder="deine@email.de"
+              />
+            </div>
+            <div className="form-group">
+              <label>Absender Name</label>
+              <input
+                type="text"
+                className="form-control"
+                value={smtpFromName}
+                onChange={(e) => setSmtpFromName(e.target.value)}
+                placeholder="z.B. Max Mustermann Tennis"
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <label className="checkbox-group" style={{ marginBottom: 0 }}>
+              <input
+                type="checkbox"
+                checked={smtpSecure}
+                onChange={(e) => setSmtpSecure(e.target.checked)}
+              />
+              SSL/TLS verwenden
+            </label>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={testSmtpConnection}
+              disabled={testingSmtp || !smtpHost}
+            >
+              {testingSmtp ? 'Teste...' : 'Verbindung testen'}
+            </button>
+          </div>
+
           <button className="btn btn-primary" onClick={saveProfile} disabled={saving}>
             {saving ? 'Speichere...' : 'Profil speichern'}
           </button>
@@ -9478,88 +10797,6 @@ function WeiteresView({
           onSave={() => {
             setShowNotizModal(false)
             setEditingNotiz(null)
-            onUpdate()
-          }}
-        />
-      )}
-
-      {activeSubTab === 'email-vorlagen' && (
-        <div>
-          <div style={{ marginBottom: 16 }}>
-            <button className="btn btn-primary" onClick={() => setShowVorlageModal(true)}>
-              + Neue Vorlage
-            </button>
-          </div>
-
-          {/* Standard-Vorlage (immer sichtbar) */}
-          <div className="card" style={{ marginBottom: 12, border: '2px solid var(--success)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <strong>Standard-Vorlage</strong>
-                <span style={{ fontSize: 10, background: 'var(--success)', color: 'white', padding: '2px 6px', borderRadius: 4 }}>
-                  System
-                </span>
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-              <strong>Betreff:</strong> Rechnung {'{{rechnungsnummer}}'} - Tennisunterricht {'{{monat}}'}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
-              Die integrierte Rechnungs-E-Mail mit allen Positionen, Beträgen und Zahlungsinformationen.
-              Diese Vorlage wird verwendet, wenn keine eigene Vorlage ausgewählt ist.
-            </div>
-          </div>
-
-          {/* Eigene Vorlagen */}
-          {emailVorlagen.length > 0 && (
-            <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500, color: 'var(--gray-600)' }}>
-              Eigene Vorlagen:
-            </div>
-          )}
-          {emailVorlagen.map((v) => (
-            <div key={v.id} className="card" style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <strong>{v.name}</strong>
-                  {v.ist_standard && (
-                    <span style={{ fontSize: 10, background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: 4 }}>
-                      Bevorzugt
-                    </span>
-                  )}
-                </div>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => {
-                    setEditingVorlage(v)
-                    setShowVorlageModal(true)
-                  }}
-                >
-                  Bearbeiten
-                </button>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
-                <strong>Betreff:</strong> {v.betreff}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 100, overflow: 'hidden' }}>
-                {v.inhalt.substring(0, 200)}{v.inhalt.length > 200 ? '...' : ''}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showVorlageModal && (
-        <EmailVorlageModal
-          vorlage={editingVorlage}
-          vorlagen={emailVorlagen}
-          userId={userId}
-          onClose={() => {
-            setShowVorlageModal(false)
-            setEditingVorlage(null)
-          }}
-          onSave={() => {
-            setShowVorlageModal(false)
-            setEditingVorlage(null)
             onUpdate()
           }}
         />
@@ -9775,214 +11012,6 @@ function WeiteresView({
       )}
     </div>
   )
-}
-
-// ============ EMAIL VORLAGE MODAL ============
-function EmailVorlageModal({
-  vorlage,
-  vorlagen,
-  userId,
-  onClose,
-  onSave
-}: {
-  vorlage: EmailVorlage | null
-  vorlagen: EmailVorlage[]
-  userId: string
-  onClose: () => void
-  onSave: () => void
-}) {
-  const [name, setName] = useState(vorlage?.name || '')
-  const [betreff, setBetreff] = useState(vorlage?.betreff || 'Rechnung {{rechnungsnummer}} - Tennisunterricht {{monat}}')
-  const [inhalt, setInhalt] = useState(vorlage?.inhalt || getDefaultEmailInhalt())
-  const [istStandard, setIstStandard] = useState(vorlage?.ist_standard || vorlagen.length === 0)
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    if (!name.trim()) {
-      alert('Name ist erforderlich')
-      return
-    }
-    if (!betreff.trim()) {
-      alert('Betreff ist erforderlich')
-      return
-    }
-
-    setSaving(true)
-    try {
-      // Wenn diese Vorlage Standard wird, andere auf nicht-Standard setzen
-      if (istStandard) {
-        await supabase.from('email_vorlagen')
-          .update({ ist_standard: false })
-          .eq('user_id', userId)
-      }
-
-      if (vorlage) {
-        await supabase.from('email_vorlagen').update({
-          name: name.trim(),
-          betreff: betreff.trim(),
-          inhalt: inhalt,
-          ist_standard: istStandard
-        }).eq('id', vorlage.id)
-      } else {
-        await supabase.from('email_vorlagen').insert({
-          user_id: userId,
-          name: name.trim(),
-          betreff: betreff.trim(),
-          inhalt: inhalt,
-          ist_standard: istStandard
-        })
-      }
-      onSave()
-    } catch (err) {
-      console.error('Error saving vorlage:', err)
-      alert('Fehler beim Speichern')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!vorlage) return
-    const confirmed = await showConfirm('Vorlage löschen', 'Vorlage wirklich löschen?')
-    if (!confirmed) return
-
-    await supabase.from('email_vorlagen').delete().eq('id', vorlage.id)
-    onSave()
-  }
-
-  const insertPlatzhalter = (key: string) => {
-    setInhalt(prev => prev + key)
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
-        <div className="modal-header">
-          <h3>{vorlage ? 'E-Mail-Vorlage bearbeiten' : 'Neue E-Mail-Vorlage'}</h3>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label>Name der Vorlage *</label>
-            <input
-              type="text"
-              className="form-control"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="z.B. Standard-Rechnung, Mahnung, etc."
-            />
-          </div>
-
-          <div className="form-group">
-            <label>E-Mail-Betreff *</label>
-            <input
-              type="text"
-              className="form-control"
-              value={betreff}
-              onChange={(e) => setBetreff(e.target.value)}
-              placeholder="Betreff der E-Mail"
-            />
-          </div>
-
-          <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={istStandard}
-                onChange={(e) => setIstStandard(e.target.checked)}
-              />
-              Als Standard-Vorlage verwenden
-            </label>
-          </div>
-
-          <div className="form-group">
-            <label>Platzhalter einfügen:</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-              {EMAIL_PLATZHALTER.map(p => (
-                <button
-                  key={p.key}
-                  type="button"
-                  className="btn btn-sm"
-                  style={{ fontSize: 10, padding: '2px 6px' }}
-                  onClick={() => insertPlatzhalter(p.key)}
-                  title={p.beschreibung}
-                >
-                  {p.key}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>E-Mail-Inhalt *</label>
-            <textarea
-              className="form-control"
-              value={inhalt}
-              onChange={(e) => setInhalt(e.target.value)}
-              rows={15}
-              style={{ fontFamily: 'monospace', fontSize: 12 }}
-              placeholder="E-Mail-Text mit Platzhaltern..."
-            />
-          </div>
-        </div>
-        <div className="modal-footer">
-          {vorlage && (
-            <button className="btn btn-danger" onClick={handleDelete}>
-              Löschen
-            </button>
-          )}
-          <button className="btn btn-secondary" onClick={onClose}>
-            Abbrechen
-          </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Speichere...' : 'Speichern'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Standard E-Mail-Inhalt mit Platzhaltern
-function getDefaultEmailInhalt(): string {
-  return `══════════════════════════════════════
-           R E C H N U N G
-══════════════════════════════════════
-
-Rechnungssteller:
-{{trainer_name}}
-{{trainer_adresse}}
-
-Rechnungsempfänger:
-{{empfaenger_name}}
-{{empfaenger_adresse}}
-
-──────────────────────────────────────
-Rechnungsnummer: {{rechnungsnummer}}
-Rechnungsdatum:  {{rechnungsdatum}}
-Leistungszeitraum: {{monat}}
-──────────────────────────────────────
-
-Positionen:
-{{positionen}}
-
-──────────────────────────────────────
-{{ust_zeile}}
-  ►►► GESAMTBETRAG:  {{brutto}} ◄◄◄
-
-──────────────────────────────────────
-{{kleinunternehmer_hinweis}}
-Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf:
-IBAN: {{iban}}
-Kontoinhaber: {{trainer_name}}
-
-Vielen Dank für die Zusammenarbeit!
-
-Mit freundlichen Grüßen
-{{trainer_name}}
-
-⚠️ Hinweis: Falls Sie eine PDF-Version dieser Rechnung wünschen, bitte ich um einen kurzen Hinweis.
-══════════════════════════════════════`
 }
 
 // ============ PDF VORLAGE MODAL ============

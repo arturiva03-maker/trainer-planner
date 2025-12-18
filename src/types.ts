@@ -13,6 +13,14 @@ export interface TrainerProfile {
   notiz?: string
   finanzamt?: string
   steuernummer?: string
+  // SMTP-Einstellungen für E-Mail-Versand
+  smtp_host?: string
+  smtp_port?: number
+  smtp_user?: string
+  smtp_pass?: string
+  smtp_from_email?: string
+  smtp_from_name?: string
+  smtp_secure?: boolean
   created_at: string
   updated_at: string
 }
@@ -336,8 +344,8 @@ export interface BankConnection {
 export interface BankTransaction {
   id: string
   user_id: string
-  bank_connection_id: string
-  transaction_id: string // GoCardless Transaction ID (für Deduplizierung)
+  bank_connection_id?: string // Optional bei CSV-Import
+  transaction_id: string // Eindeutige ID (bei CSV: generiert aus Datum+Betrag+Verwendungszweck)
   booking_date: string
   value_date?: string
   amount: number // Positiv = Eingang, Negativ = Ausgang
@@ -352,7 +360,43 @@ export interface BankTransaction {
   matched_rechnung_id?: string
   matched_ausgabe_id?: string
   match_confidence?: number // 0-100 bei auto_match
+  // CSV-Import und AI-Matching
+  import_source?: 'csv' | 'api' | 'manual'
+  ai_suggestion?: AISuggestion
+  ai_suggestion_status?: 'pending' | 'accepted' | 'rejected' | 'none'
   created_at: string
 }
 
+// AI-Vorschlag für Transaktion-Matching
+export interface AISuggestion {
+  type: 'training' | 'rechnung' | 'ausgabe' | 'guthaben'
+  id: string
+  spieler_id?: string
+  confidence: number // 0-100
+  reason: string // Begründung für den Vorschlag
+}
+
 export type BankTransactionMatchType = 'training' | 'rechnung' | 'ausgabe' | 'guthaben'
+
+// Offene Posten (View aus DB oder berechnet)
+export interface OffenerPosten {
+  id: string
+  typ: 'training' | 'rechnung' | 'ausgabe'
+  datum: string
+  empfaenger_name: string
+  spieler_id?: string
+  betrag: number // Positiv = Einnahme, Negativ = Ausgabe
+  beschreibung?: string
+  rechnungsnummer?: string
+}
+
+// CSV-Import Format (häufige deutsche Banken)
+export interface CSVImportMapping {
+  datum: string // Spaltenname für Datum
+  betrag: string // Spaltenname für Betrag
+  verwendungszweck: string // Spaltenname für Verwendungszweck
+  auftraggeber?: string // Spaltenname für Auftraggeber/Empfänger
+  datumFormat: string // z.B. "DD.MM.YYYY" oder "YYYY-MM-DD"
+  dezimalTrennzeichen: ',' | '.' // Deutsches Format: Komma
+  tausenderTrennzeichen?: '.' | ',' | '' // Deutsches Format: Punkt
+}
