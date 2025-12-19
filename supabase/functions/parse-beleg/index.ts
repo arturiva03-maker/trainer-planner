@@ -87,7 +87,7 @@ Das JSON soll folgende Felder haben:
   - "platzmiete" = Tennisplatz-Miete, Hallenmiete, Raummiete, Courtbuchung
   - "fortbildung" = Kurse, Seminare, Trainerlizenzen, Fachliteratur, Lehrgänge
   - "buero" = Büromaterial, Druckerkosten, Papier, Stifte, Porto
-  - "werbung" = Werbung, Marketing, Flyer, Visitenkarten, Online-Werbung
+  - "werbung" = Werbung, Marketing, Flyer, Visitenkarten, Online-Werbung, ChatGPT, OpenAI, KI-Tools, Software-Abos für Marketing, Website-Kosten, Social Media, Google Ads, Facebook Ads, Canva, Content-Erstellung
   - "anschaffungen" = Fremdleistungen, externe Dienstleistungen, Honorare, Subunternehmer
   - "sonstiges" = GWG, geringwertige Wirtschaftsgüter, alles andere
 - hatVorsteuer: true wenn MwSt/USt ausgewiesen ist, sonst false
