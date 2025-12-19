@@ -190,7 +190,7 @@ export interface Ausgabe {
   user_id: string
   datum: string
   betrag: number
-  kategorie: 'platzmiete' | 'material' | 'fahrtkosten' | 'fortbildung' | 'tennistraining' | 'sonstiges'
+  kategorie: 'platzmiete' | 'fahrtkosten' | 'fortbildung' | 'buero' | 'werbung' | 'anschaffungen' | 'sonstiges' | 'material' | 'tennistraining'
   beschreibung?: string
   hat_vorsteuer: boolean
   vorsteuer_satz: number
@@ -204,11 +204,12 @@ export interface Ausgabe {
 }
 
 export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[] = [
-  { value: 'platzmiete', label: 'Platzmiete' },
-  { value: 'material', label: 'Material' },
+  { value: 'platzmiete', label: 'Platzmiete/Raumkosten' },
   { value: 'fahrtkosten', label: 'Fahrtkosten' },
   { value: 'fortbildung', label: 'Fortbildung' },
-  { value: 'tennistraining', label: 'Tennistraining' },
+  { value: 'buero', label: 'Bürobedarf' },
+  { value: 'werbung', label: 'Werbekosten' },
+  { value: 'anschaffungen', label: 'Anschaffungen (GWG)' },
   { value: 'sonstiges', label: 'Sonstiges' }
 ]
 
