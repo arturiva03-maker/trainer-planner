@@ -7234,8 +7234,7 @@ function BuchhaltungView({
     datum: string
     betrag: string
     verwendungszweck: string
-    auftraggeber: string
-  }>({ datum: '', betrag: '', verwendungszweck: '', auftraggeber: '' })
+  }>({ datum: '', betrag: '', verwendungszweck: '' })
   const [isMatching, setIsMatching] = useState(false)
   const [matchingError, setMatchingError] = useState<string | null>(null)
 
@@ -7737,7 +7736,6 @@ function BuchhaltungView({
     const datumIdx = csvHeaders.indexOf(csvMapping.datum)
     const betragIdx = csvHeaders.indexOf(csvMapping.betrag)
     const verwendungIdx = csvMapping.verwendungszweck ? csvHeaders.indexOf(csvMapping.verwendungszweck) : -1
-    const auftraggeberIdx = csvMapping.auftraggeber ? csvHeaders.indexOf(csvMapping.auftraggeber) : -1
 
     const transactions: Omit<BankTransaction, 'id' | 'created_at'>[] = []
 
@@ -7769,7 +7767,6 @@ function BuchhaltungView({
       if (isNaN(betrag)) continue
 
       const verwendung = verwendungIdx >= 0 ? row[verwendungIdx] : ''
-      const auftraggeber = auftraggeberIdx >= 0 ? row[auftraggeberIdx] : ''
 
       // Eindeutige Transaction ID generieren
       const transactionId = `csv-${datum}-${betrag.toFixed(2)}-${verwendung.substring(0, 20)}`.replace(/[^a-zA-Z0-9-]/g, '')
@@ -7780,8 +7777,6 @@ function BuchhaltungView({
         booking_date: datum,
         amount: betrag,
         currency: 'EUR',
-        debtor_name: betrag > 0 ? auftraggeber : undefined,
-        creditor_name: betrag < 0 ? auftraggeber : undefined,
         remittance_info: verwendung,
         match_status: 'unmatched',
         import_source: 'csv',
@@ -9433,19 +9428,6 @@ function BuchhaltungView({
                         className="form-control"
                         value={csvMapping.verwendungszweck}
                         onChange={e => setCsvMapping({ ...csvMapping, verwendungszweck: e.target.value })}
-                      >
-                        <option value="">Spalte wählen...</option>
-                        {csvHeaders.map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Auftraggeber/Empfänger</label>
-                      <select
-                        className="form-control"
-                        value={csvMapping.auftraggeber}
-                        onChange={e => setCsvMapping({ ...csvMapping, auftraggeber: e.target.value })}
                       >
                         <option value="">Spalte wählen...</option>
                         {csvHeaders.map(h => (
