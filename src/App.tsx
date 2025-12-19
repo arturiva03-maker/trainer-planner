@@ -9248,14 +9248,25 @@ function BuchhaltungView({
                           {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)} €
                         </td>
                         <td>
-                          <span className={`badge ${
-                            tx.match_status === 'unmatched' ? 'badge-warning' :
-                            tx.match_status === 'ignored' ? 'badge-secondary' :
-                            'badge-success'
-                          }`}>
-                            {tx.match_status === 'unmatched' ? 'Offen' :
-                             tx.match_status === 'ignored' ? 'Ignoriert' : 'Gebucht'}
-                          </span>
+                          {tx.ai_suggestion && tx.ai_suggestion_status === 'pending' ? (
+                            <div style={{ fontSize: 11 }}>
+                              <span className="badge badge-info" style={{ marginBottom: 4 }}>
+                                🤖 AI-Vorschlag ({tx.ai_suggestion.confidence}%)
+                              </span>
+                              <div style={{ color: 'var(--gray-600)', marginTop: 2 }}>
+                                {tx.ai_suggestion.reason}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className={`badge ${
+                              tx.match_status === 'unmatched' ? 'badge-warning' :
+                              tx.match_status === 'ignored' ? 'badge-secondary' :
+                              'badge-success'
+                            }`}>
+                              {tx.match_status === 'unmatched' ? 'Offen' :
+                               tx.match_status === 'ignored' ? 'Ignoriert' : 'Gebucht'}
+                            </span>
+                          )}
                         </td>
                         <td>
                           {tx.match_status === 'unmatched' ? (
