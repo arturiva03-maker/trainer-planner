@@ -208,6 +208,7 @@ export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[
   { value: 'fortbildung', label: 'Fortbildung' },
   { value: 'buero', label: 'Bürobedarf' },
   { value: 'werbung', label: 'Werbekosten' },
+  { value: 'anschaffungen', label: 'Fremdleistungen' },
   { value: 'sonstiges', label: 'GWG/Sonstiges' }
 ]
 
@@ -429,7 +430,8 @@ export const STANDARD_KONTEN: Omit<Buchungskonto, 'id' | 'user_id' | 'created_at
   { kontonummer: '4600', name: 'Werbekosten', typ: 'ausgabe', beschreibung: 'Werbung, Marketing, Flyer', ist_standard: true, sortierung: 11 },
   { kontonummer: '4930', name: 'Bürobedarf', typ: 'ausgabe', beschreibung: 'Büromaterial, Druckerkosten', ist_standard: true, sortierung: 12 },
   { kontonummer: '4946', name: 'Fortbildungskosten', typ: 'ausgabe', beschreibung: 'Trainerlehrgänge, Lizenzen', ist_standard: true, sortierung: 13 },
-  { kontonummer: '4980', name: 'GWG/Sonstige Ausgaben', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter, sonstige Aufwendungen', ist_standard: true, sortierung: 14 },
+  { kontonummer: '4780', name: 'Fremdleistungen', typ: 'ausgabe', beschreibung: 'Externe Dienstleistungen, Honorare', ist_standard: true, sortierung: 14 },
+  { kontonummer: '4980', name: 'GWG/Sonstige Ausgaben', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter, sonstige Aufwendungen', ist_standard: true, sortierung: 15 },
   // Neutral
   { kontonummer: '1800', name: 'Privatentnahmen', typ: 'neutral', beschreibung: 'Private Entnahmen aus dem Betriebsvermögen', ist_standard: true, sortierung: 20 },
   { kontonummer: '1890', name: 'Privateinlagen', typ: 'neutral', beschreibung: 'Private Einlagen ins Betriebsvermögen', ist_standard: true, sortierung: 21 },

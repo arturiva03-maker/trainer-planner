@@ -27,7 +27,8 @@ CROSS JOIN (
     ('4600', 'Werbekosten', 'ausgabe', 'Werbung, Marketing, Flyer', 11),
     ('4930', 'Bürobedarf', 'ausgabe', 'Büromaterial, Druckerkosten', 12),
     ('4946', 'Fortbildungskosten', 'ausgabe', 'Trainerlehrgänge, Lizenzen', 13),
-    ('4980', 'GWG/Sonstige Ausgaben', 'ausgabe', 'Geringwertige Wirtschaftsgüter, sonstige Aufwendungen', 14),
+    ('4780', 'Fremdleistungen', 'ausgabe', 'Externe Dienstleistungen, Honorare', 14),
+    ('4980', 'GWG/Sonstige Ausgaben', 'ausgabe', 'Geringwertige Wirtschaftsgüter, sonstige Aufwendungen', 15),
     ('1800', 'Privatentnahmen', 'neutral', 'Private Entnahmen aus dem Betriebsvermögen', 20),
     ('1890', 'Privateinlagen', 'neutral', 'Private Einlagen ins Betriebsvermögen', 21)
 ) AS k(kontonummer, name, typ, beschreibung, sortierung);
