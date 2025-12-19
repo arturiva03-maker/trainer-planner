@@ -727,6 +727,7 @@ function MainApp({ user }: { user: User }) {
                 adjustments={adjustments}
                 guthabenListe={guthabenListe}
                 spielerPayments={spielerPayments}
+                setSpielerPayments={setSpielerPayments}
                 profile={profile}
                 manuelleRechnungen={manuelleRechnungen}
                 pdfVorlagen={pdfVorlagen}
@@ -3002,6 +3003,7 @@ function AbrechnungView({
   adjustments,
   guthabenListe,
   spielerPayments,
+  setSpielerPayments,
   profile,
   manuelleRechnungen,
   pdfVorlagen,
@@ -3015,6 +3017,7 @@ function AbrechnungView({
   adjustments: MonthlyAdjustment[]
   guthabenListe: Guthaben[]
   spielerPayments: SpielerTrainingPayment[]
+  setSpielerPayments: React.Dispatch<React.SetStateAction<SpielerTrainingPayment[]>>
   profile: TrainerProfile | null
   manuelleRechnungen: ManuelleRechnung[]
   pdfVorlagen: PdfVorlage[]
@@ -3376,20 +3379,50 @@ function AbrechnungView({
 
     const newStatus = !currentStatus
 
-    // Für jeden Training des Spielers: Eintrag in spieler_training_payments erstellen/aktualisieren
+    // Optimistisches Update - sofort alle UI aktualisieren
+    const updatedPayments: SpielerTrainingPayment[] = []
+    const newPayments: SpielerTrainingPayment[] = []
+
     for (const training of spielerData.trainings) {
       const existingPayment = spielerPayments.find(
         p => p.training_id === training.id && p.spieler_id === spielerId
       )
 
       if (existingPayment) {
-        // Update existierenden Eintrag - bar_bezahlt Status beibehalten
+        updatedPayments.push({ ...existingPayment, bezahlt: newStatus })
+      } else {
+        newPayments.push({
+          id: `temp-${training.id}-${spielerId}`,
+          user_id: userId,
+          training_id: training.id,
+          spieler_id: spielerId,
+          bezahlt: newStatus,
+          bar_bezahlt: training.bar_bezahlt || false,
+          created_at: new Date().toISOString()
+        })
+      }
+    }
+
+    setSpielerPayments(prev => {
+      const updated = prev.map(p => {
+        const match = updatedPayments.find(up => up.id === p.id)
+        return match || p
+      })
+      return [...updated, ...newPayments]
+    })
+
+    // Datenbank-Operationen
+    for (const training of spielerData.trainings) {
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === training.id && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
         await supabase
           .from('spieler_training_payments')
           .update({ bezahlt: newStatus })
           .eq('id', existingPayment.id)
       } else {
-        // Neuen Eintrag erstellen - bar_bezahlt Status vom Training übernehmen
         await supabase
           .from('spieler_training_payments')
           .insert({
@@ -3414,22 +3447,41 @@ function AbrechnungView({
     // Finde das Training um den bar_bezahlt Status zu prüfen
     const training = monthTrainings.find(t => t.id === trainingId)
     const trainingBarBezahlt = training?.bar_bezahlt || false
+    const newStatus = !currentStatus
 
+    // Optimistisches Update - sofort UI aktualisieren
     if (existingPayment) {
-      // Update existierenden Eintrag - bar_bezahlt Status beibehalten
+      setSpielerPayments(prev => prev.map(p =>
+        p.id === existingPayment.id ? { ...p, bezahlt: newStatus } : p
+      ))
+    } else {
+      // Temporärer Eintrag für optimistisches Update
+      const tempPayment: SpielerTrainingPayment = {
+        id: `temp-${trainingId}-${spielerId}`,
+        user_id: userId,
+        training_id: trainingId,
+        spieler_id: spielerId,
+        bezahlt: newStatus,
+        bar_bezahlt: trainingBarBezahlt,
+        created_at: new Date().toISOString()
+      }
+      setSpielerPayments(prev => [...prev, tempPayment])
+    }
+
+    // Datenbank-Operation
+    if (existingPayment) {
       await supabase
         .from('spieler_training_payments')
-        .update({ bezahlt: !currentStatus })
+        .update({ bezahlt: newStatus })
         .eq('id', existingPayment.id)
     } else {
-      // Neuen Eintrag erstellen - bar_bezahlt Status vom Training übernehmen
       await supabase
         .from('spieler_training_payments')
         .insert({
           user_id: userId,
           training_id: trainingId,
           spieler_id: spielerId,
-          bezahlt: !currentStatus,
+          bezahlt: newStatus,
           bar_bezahlt: trainingBarBezahlt
         })
     }
