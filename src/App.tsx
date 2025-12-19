@@ -4964,6 +4964,9 @@ function InvoiceModal({
   // E-Mail-Versand State
   const [sendingEmail, setSendingEmail] = useState(false)
 
+  // Option: Als offenen Posten speichern (für Buchhaltung)
+  const [alsOffenenPostenSpeichern, setAlsOffenenPostenSpeichern] = useState(true)
+
   // Trainingsaufstellung für den ausgewählten Spieler
   const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
 
@@ -5136,7 +5139,51 @@ function InvoiceModal({
     }
   }, [selectedSpielerId, spieler])
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
+    // Zuerst Rechnung speichern wenn gewünscht
+    if (alsOffenenPostenSpeichern) {
+      const trainingIds = rechnungsPositionen.map(p => p.trainingId).filter(Boolean) as string[]
+      const alleSpielerIds = [selectedSpielerId, ...verknuepfteSpieler.map(v => v.id)]
+
+      const [year, month] = selectedMonth.split('-')
+      const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+      const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
+
+      const { error: saveError } = await supabase
+        .from('manuelle_rechnungen')
+        .insert({
+          user_id: userId,
+          rechnungsnummer,
+          rechnungsdatum,
+          monat: selectedMonth,
+          empfaenger_name: rechnungsempfaengerName,
+          empfaenger_adresse: rechnungsempfaengerAdresse,
+          leistungszeitraum: monatFormatiert,
+          beschreibung: `Trainingsrechnung für ${alleSpielerIds.length > 1 ? alleSpielerIds.length + ' Spieler' : selectedSummary?.spieler.name}`,
+          positionen: rechnungsPositionen.map(p => ({
+            beschreibung: `${p.spielerName}: ${p.tarifName} (${p.datum})`,
+            menge: 1,
+            einzelpreis: p.brutto
+          })),
+          ust_satz: kleinunternehmer ? 0 : 19,
+          netto_gesamt: summen.gesamtNetto,
+          ust_betrag: summen.gesamtUst,
+          brutto_gesamt: summen.gesamtBrutto,
+          zahlungsziel: 14,
+          bezahlt: false,
+          bar_bezahlt: false,
+          training_ids: trainingIds,
+          spieler_id: selectedSpielerId
+        })
+
+      if (saveError) {
+        console.error('Fehler beim Speichern der Rechnung:', saveError)
+        alert('Fehler beim Speichern der Rechnung in der Buchhaltung')
+      } else {
+        onUpdate() // Daten neu laden
+      }
+    }
+
     const hatMehrereSpieler = verknuepfteSummaries.length > 0
 
     // Monat formatieren
@@ -6260,6 +6307,20 @@ ${rechnungsstellerName}`
             </>
           )}
         </div>
+        {/* Option: In Buchhaltung speichern */}
+        {step === 2 && (
+          <div style={{ padding: '0 16px 16px', borderTop: '1px solid #e2e8f0' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={alsOffenenPostenSpeichern}
+                onChange={e => setAlsOffenenPostenSpeichern(e.target.checked)}
+              />
+              In Buchhaltung übernehmen (als offener Posten speichern)
+            </label>
+          </div>
+        )}
+
         <div className="modal-footer">
           {step === 2 && (
             <button className="btn btn-secondary" onClick={() => setStep(1)}>
@@ -6288,7 +6349,7 @@ ${rechnungsstellerName}`
                 {sendingEmail ? 'Sende...' : 'PDF per E-Mail'}
               </button>
               <button className="btn btn-primary" onClick={generatePDF}>
-                PDF erstellen
+                {alsOffenenPostenSpeichern ? 'Speichern & PDF' : 'PDF erstellen'}
               </button>
             </>
           )}
