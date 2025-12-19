@@ -205,12 +205,10 @@ export interface Ausgabe {
 
 export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[] = [
   { value: 'platzmiete', label: 'Platzmiete/Raumkosten' },
-  { value: 'fahrtkosten', label: 'Fahrtkosten' },
   { value: 'fortbildung', label: 'Fortbildung' },
   { value: 'buero', label: 'Bürobedarf' },
   { value: 'werbung', label: 'Werbekosten' },
-  { value: 'anschaffungen', label: 'Anschaffungen (GWG)' },
-  { value: 'sonstiges', label: 'Sonstiges' }
+  { value: 'sonstiges', label: 'GWG/Sonstiges' }
 ]
 
 export interface ManuelleRechnung {
@@ -428,12 +426,10 @@ export const STANDARD_KONTEN: Omit<Buchungskonto, 'id' | 'user_id' | 'created_at
   { kontonummer: '8195', name: 'Erlöse Kleinunternehmer', typ: 'einnahme', beschreibung: 'Einnahmen ohne USt (§19 UStG)', ist_standard: true, sortierung: 3 },
   // Ausgaben
   { kontonummer: '4210', name: 'Platzmiete/Raumkosten', typ: 'ausgabe', beschreibung: 'Miete für Tennisplätze, Hallen', ist_standard: true, sortierung: 10 },
-  { kontonummer: '4530', name: 'Fahrtkosten', typ: 'ausgabe', beschreibung: 'Benzin, Diesel, Kfz-Betriebskosten', ist_standard: true, sortierung: 11 },
-  { kontonummer: '4600', name: 'Werbekosten', typ: 'ausgabe', beschreibung: 'Werbung, Marketing, Flyer', ist_standard: true, sortierung: 12 },
-  { kontonummer: '4930', name: 'Bürobedarf', typ: 'ausgabe', beschreibung: 'Büromaterial, Druckerkosten', ist_standard: true, sortierung: 13 },
-  { kontonummer: '4946', name: 'Fortbildungskosten', typ: 'ausgabe', beschreibung: 'Trainerlehrgänge, Lizenzen', ist_standard: true, sortierung: 14 },
-  { kontonummer: '4980', name: 'Sonstige Ausgaben', typ: 'ausgabe', beschreibung: 'Sonstige betriebliche Aufwendungen', ist_standard: true, sortierung: 15 },
-  { kontonummer: '0670', name: 'GWG (Anschaffungen)', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter bis 800€', ist_standard: true, sortierung: 16 },
+  { kontonummer: '4600', name: 'Werbekosten', typ: 'ausgabe', beschreibung: 'Werbung, Marketing, Flyer', ist_standard: true, sortierung: 11 },
+  { kontonummer: '4930', name: 'Bürobedarf', typ: 'ausgabe', beschreibung: 'Büromaterial, Druckerkosten', ist_standard: true, sortierung: 12 },
+  { kontonummer: '4946', name: 'Fortbildungskosten', typ: 'ausgabe', beschreibung: 'Trainerlehrgänge, Lizenzen', ist_standard: true, sortierung: 13 },
+  { kontonummer: '4980', name: 'GWG/Sonstige Ausgaben', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter, sonstige Aufwendungen', ist_standard: true, sortierung: 14 },
   // Neutral
   { kontonummer: '1800', name: 'Privatentnahmen', typ: 'neutral', beschreibung: 'Private Entnahmen aus dem Betriebsvermögen', ist_standard: true, sortierung: 20 },
   { kontonummer: '1890', name: 'Privateinlagen', typ: 'neutral', beschreibung: 'Private Einlagen ins Betriebsvermögen', ist_standard: true, sortierung: 21 },
