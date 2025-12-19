@@ -823,6 +823,7 @@ function KalenderView({
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
   )
   const [editingTraining, setEditingTraining] = useState<Training | null>(null)
+  const [selectedTrainingIds, setSelectedTrainingIds] = useState<Set<string>>(new Set())
 
   // Navigation von Abrechnung: Zum Training-Datum springen und Bearbeitung öffnen
   useEffect(() => {
@@ -1081,6 +1082,123 @@ function KalenderView({
     onUpdate()
   }
 
+  // Klick-Handler für Trainings (Strg+Klick = Mehrfachauswahl)
+  const handleTrainingClick = (e: React.MouseEvent, training: Training) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Strg/Cmd gedrückt: Training zur Auswahl hinzufügen/entfernen
+      e.preventDefault()
+      setSelectedTrainingIds(prev => {
+        const newSet = new Set(prev)
+        if (newSet.has(training.id)) {
+          newSet.delete(training.id)
+        } else {
+          newSet.add(training.id)
+        }
+        return newSet
+      })
+    } else {
+      // Normaler Klick: Auswahl aufheben und Training bearbeiten
+      setSelectedTrainingIds(new Set())
+      setEditingTraining(training)
+    }
+  }
+
+  // Alle ausgewählten Trainings als durchgeführt markieren
+  const handleMarkSelectedAsDurchgefuehrt = async () => {
+    const selectedTrainings = trainings.filter(t => selectedTrainingIds.has(t.id))
+
+    for (const training of selectedTrainings) {
+      if (training.status === 'durchgefuehrt') continue // Schon durchgeführt
+
+      await supabase.from('trainings').update({ status: 'durchgefuehrt' }).eq('id', training.id)
+
+      // Bei Wechsel auf "durchgeführt": Automatisch Guthaben verrechnen
+      if (training.spieler_ids.length > 0) {
+        const tarif = tarife.find(ta => ta.id === training.tarif_id)
+        const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+        const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+        const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+        let betragProSpieler = preis * duration
+        if (abrechnungsart === 'proSpieler') {
+          const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+          betragProSpieler = betragProSpieler / (training.spieler_ids.length + entfernteMitBezahlung.length)
+        }
+
+        for (const spielerId of training.spieler_ids) {
+          const { data: guthaben } = await supabase
+            .from('guthaben')
+            .select('*')
+            .eq('spieler_id', spielerId)
+            .eq('user_id', userId)
+            .single()
+
+          if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
+            await supabase
+              .from('guthaben')
+              .update({
+                aktuell: guthaben.aktuell - betragProSpieler,
+                verbraucht_gesamt: guthaben.verbraucht_gesamt + betragProSpieler,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', guthaben.id)
+
+            await supabase
+              .from('guthaben_transaktionen')
+              .insert({
+                user_id: userId,
+                spieler_id: spielerId,
+                betrag: -betragProSpieler,
+                typ: 'abbuchung',
+                training_id: training.id,
+                beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
+                bar: false,
+                datum: formatDate(new Date())
+              })
+
+            const { data: existingPayment } = await supabase
+              .from('spieler_training_payments')
+              .select('id')
+              .eq('training_id', training.id)
+              .eq('spieler_id', spielerId)
+              .single()
+
+            if (existingPayment) {
+              await supabase
+                .from('spieler_training_payments')
+                .update({ bezahlt: true })
+                .eq('id', existingPayment.id)
+            } else {
+              await supabase
+                .from('spieler_training_payments')
+                .insert({
+                  user_id: userId,
+                  training_id: training.id,
+                  spieler_id: spielerId,
+                  bezahlt: true,
+                  bar_bezahlt: false
+                })
+            }
+          }
+        }
+      }
+    }
+
+    setSelectedTrainingIds(new Set())
+    onUpdate()
+  }
+
+  // Auswahl aufheben mit Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTrainingIds.size > 0) {
+        setSelectedTrainingIds(new Set())
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedTrainingIds.size])
+
   const navigateWeek = (direction: number) => {
     const newDate = new Date(currentDate)
     newDate.setDate(newDate.getDate() + direction * 7)
@@ -1167,6 +1285,26 @@ function KalenderView({
           </div>
         </div>
 
+        {/* Aktionsleiste bei Mehrfachauswahl */}
+        {selectedTrainingIds.size > 0 && (
+          <div className="selection-action-bar">
+            <span>{selectedTrainingIds.size} Training{selectedTrainingIds.size > 1 ? 's' : ''} ausgewählt</span>
+            <div className="selection-actions">
+              <button
+                className="btn btn-success"
+                onClick={handleMarkSelectedAsDurchgefuehrt}
+              >
+                Als durchgeführt markieren
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setSelectedTrainingIds(new Set())}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
 
         <div
           className="calendar-scroll-container"
@@ -1209,17 +1347,18 @@ function KalenderView({
                         const layout = overlapLayout[training.id] || { column: 0, totalColumns: 1 }
                         const width = 100 / layout.totalColumns
                         const left = layout.column * width
+                        const isSelected = selectedTrainingIds.has(training.id)
                         return (
                           <div
                             key={training.id}
-                            className={`training-block status-${training.status}`}
+                            className={`training-block status-${training.status}${isSelected ? ' selected' : ''}`}
                             style={{
                               top: pos.top % cellHeight,
                               height: pos.height,
                               left: `${left}%`,
                               width: `${width}%`
                             }}
-                            onClick={() => setEditingTraining(training)}
+                            onClick={(e) => handleTrainingClick(e, training)}
                             onDoubleClick={() => handleDoubleClick(training)}
                           >
                             <div className="training-title">{training.name || getTrainingDisplayTitle(training, true)}</div>
