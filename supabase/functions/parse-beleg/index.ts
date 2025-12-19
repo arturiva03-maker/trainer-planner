@@ -10,7 +10,7 @@ interface BelegData {
   datum: string | null
   betrag: number | null
   beschreibung: string | null
-  kategorie: 'platzmiete' | 'material' | 'fahrtkosten' | 'fortbildung' | 'tennistraining' | 'sonstiges' | null
+  kategorie: 'platzmiete' | 'fortbildung' | 'buero' | 'werbung' | 'anschaffungen' | 'sonstiges' | null
   hatVorsteuer: boolean
   vorsteuerSatz: number | null
   haendler: string | null
@@ -83,13 +83,13 @@ Das JSON soll folgende Felder haben:
 - datum: Das Datum im Format YYYY-MM-DD (oder null wenn nicht lesbar)
 - betrag: Der Gesamtbetrag als Zahl (Brutto-Betrag inkl. MwSt, oder null wenn nicht lesbar)
 - beschreibung: Eine kurze Beschreibung was gekauft wurde (max 100 Zeichen)
-- kategorie: Eine der folgenden Kategorien die am besten passt: "platzmiete", "material", "fahrtkosten", "fortbildung", "tennistraining", "sonstiges"
-  - "platzmiete" = Tennisplatz-Miete, Hallenmiete, Courtbuchung
-  - "material" = Tennisbälle, Schläger, Netze, Trainingsgeräte, Sportartikel
-  - "fahrtkosten" = Tankquittungen, Parktickets, Bahntickets, Maut
-  - "fortbildung" = Kurse, Seminare, Trainerlizenzen, Fachliteratur
-  - "tennistraining" = Tennisunterricht, Trainerstunden, Coaching-Gebühren
-  - "sonstiges" = Alles andere
+- kategorie: Eine der folgenden Kategorien die am besten passt: "platzmiete", "fortbildung", "buero", "werbung", "anschaffungen", "sonstiges"
+  - "platzmiete" = Tennisplatz-Miete, Hallenmiete, Raummiete, Courtbuchung
+  - "fortbildung" = Kurse, Seminare, Trainerlizenzen, Fachliteratur, Lehrgänge
+  - "buero" = Büromaterial, Druckerkosten, Papier, Stifte, Porto
+  - "werbung" = Werbung, Marketing, Flyer, Visitenkarten, Online-Werbung
+  - "anschaffungen" = Fremdleistungen, externe Dienstleistungen, Honorare, Subunternehmer
+  - "sonstiges" = GWG, geringwertige Wirtschaftsgüter, alles andere
 - hatVorsteuer: true wenn MwSt/USt ausgewiesen ist, sonst false
 - vorsteuerSatz: Der MwSt-Satz als Zahl (7 oder 19), oder null wenn keine MwSt
 - haendler: Name des Händlers/Geschäfts (oder null wenn nicht lesbar)
@@ -97,7 +97,7 @@ Das JSON soll folgende Felder haben:
 - rechnungsdatum: Das Rechnungsdatum im Format YYYY-MM-DD (oder null wenn nicht vorhanden, oft identisch mit datum)
 
 Beispiel-Antwort:
-{"datum":"2024-12-10","betrag":49.99,"beschreibung":"Tennisbälle Wilson","kategorie":"material","hatVorsteuer":true,"vorsteuerSatz":19,"haendler":"Decathlon","rechnungsnummer":"RE-2024-12345","rechnungsdatum":"2024-12-10"}`
+{"datum":"2024-12-10","betrag":49.99,"beschreibung":"Büromaterial","kategorie":"buero","hatVorsteuer":true,"vorsteuerSatz":19,"haendler":"Staples","rechnungsnummer":"RE-2024-12345","rechnungsdatum":"2024-12-10"}`
               }
             ]
           }
