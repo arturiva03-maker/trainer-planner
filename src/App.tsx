@@ -5019,6 +5019,9 @@ function InvoiceModal({
   // Option: Als offenen Posten speichern (für Buchhaltung)
   const [alsOffenenPostenSpeichern, setAlsOffenenPostenSpeichern] = useState(true)
 
+  // Vorschau-Modus: 'edit' | 'pdf' | 'email'
+  const [previewMode, setPreviewMode] = useState<'edit' | 'pdf' | 'email'>('edit')
+
   // Trainingsaufstellung für den ausgewählten Spieler
   const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
 
@@ -5190,6 +5193,203 @@ function InvoiceModal({
       }
     }
   }, [selectedSpielerId, spieler])
+
+  // Vorschau-Daten für PDF und E-Mail generieren
+  const vorschauDaten = useMemo(() => {
+    if (!selectedSummary) return { pdfHtml: '', emailText: '' }
+
+    const hatMehrereSpieler = verknuepfteSummaries.length > 0
+
+    // Monat formatieren
+    const [year, month] = selectedMonth.split('-')
+    const monatNamen = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+    const monatFormatiert = `${monatNamen[parseInt(month) - 1]} ${year}`
+
+    // Positionen-Tabelle HTML
+    const positionenHtml = rechnungsPositionen.map((p) => `
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 6px;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${p.zeit}</td>
+        <td style="border: 1px solid #ddd; padding: 6px;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td style="border: 1px solid #ddd; padding: 6px;">${p.spielerName}</td>` : ''}
+        <td style="border: 1px solid #ddd; padding: 6px;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${p.brutto.toFixed(2)} €</td>
+      </tr>
+    `).join('')
+
+    // Korrekturzeile falls vorhanden
+    const korrekturColSpan = hatMehrereSpieler ? 4 : 3
+    const korrekturHtml = summen.korrektur !== 0 ? `
+      <tr style="background: ${summen.korrektur < 0 ? '#fee2e2' : '#dcfce7'}">
+        <td colspan="${korrekturColSpan}" style="border: 1px solid #ddd; padding: 6px;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td style="border: 1px solid #ddd; padding: 6px;"><em>Korrektur</em></td>
+        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="border: 1px solid #ddd; padding: 6px; text-align: right;">${summen.korrektur.toFixed(2)} €</td>
+      </tr>
+    ` : ''
+
+    // PDF-Vorlage verwenden wenn ausgewählt
+    const selectedPdfVorlage = pdfVorlagen.find(v => v.id === selectedPdfVorlageId)
+
+    // Summen-Block
+    const summenBlockHtml = `
+      <div style="text-align: right; margin-top: 20px;">
+        <div style="display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0;">
+          <span>Nettobetrag:</span>
+          <span>${summen.gesamtNetto.toFixed(2)} €</span>
+        </div>
+        ${!kleinunternehmer ? `
+        <div style="display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0;">
+          <span>USt (19%):</span>
+          <span>${summen.gesamtUst.toFixed(2)} €</span>
+        </div>
+        ` : ''}
+        <div style="display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px;">
+          <span>Gesamtbetrag:</span>
+          <span>${summen.gesamtBrutto.toFixed(2)} €</span>
+        </div>
+      </div>
+    `
+
+    // Positionen-Tabelle
+    const positionenTabelle = `
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
+        <thead>
+          <tr style="background: #f5f5f5;">
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Datum</th>
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Zeit</th>
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Dauer</th>
+            ${hatMehrereSpieler ? '<th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Spieler</th>' : ''}
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: left;">Tarif</th>
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: right;">Netto</th>
+            ${!kleinunternehmer ? '<th style="border: 1px solid #ddd; padding: 6px; text-align: right;">USt</th>' : ''}
+            <th style="border: 1px solid #ddd; padding: 6px; text-align: right;">Brutto</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${positionenHtml}
+          ${korrekturHtml}
+        </tbody>
+      </table>
+    `
+
+    // Platzhalter-Werte
+    const platzhalterWerte: Record<string, string> = {
+      '{{spieler_name}}': selectedSummary?.spieler.name || '',
+      '{{rechnungsnummer}}': rechnungsnummer,
+      '{{rechnungsdatum}}': formatDateGerman(rechnungsdatum),
+      '{{monat}}': monatFormatiert,
+      '{{positionen_tabelle}}': positionenTabelle,
+      '{{netto}}': `${summen.gesamtNetto.toFixed(2)} €`,
+      '{{ust}}': `${summen.gesamtUst.toFixed(2)} €`,
+      '{{brutto}}': `${summen.gesamtBrutto.toFixed(2)} €`,
+      '{{iban}}': iban,
+      '{{trainer_name}}': rechnungsstellerName,
+      '{{trainer_adresse}}': rechnungsstellerAdresse,
+      '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+      '{{steuernummer}}': profile?.steuernummer || '',
+      '{{empfaenger_name}}': rechnungsempfaengerName,
+      '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
+      '{{empfaenger_adresse_html}}': rechnungsempfaengerAdresse.replace(/\n/g, '<br>'),
+      '{{kleinunternehmer_hinweis}}': kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : '',
+      '{{summen_block}}': summenBlockHtml,
+    }
+
+    // Funktion zum Ersetzen der Platzhalter
+    const ersetzePlatzhalter = (text: string): string => {
+      let result = text
+      for (const [key, value] of Object.entries(platzhalterWerte)) {
+        result = result.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+      }
+      return result
+    }
+
+    // PDF HTML generieren
+    let pdfHtml: string
+    if (selectedPdfVorlage) {
+      pdfHtml = ersetzePlatzhalter(selectedPdfVorlage.inhalt)
+    } else {
+      // Standard PDF-Layout
+      pdfHtml = `
+        <h1 style="text-align: center; margin-bottom: 30px; font-size: 24px;">RECHNUNG</h1>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <strong>Rechnungssteller:</strong><br>
+            ${rechnungsstellerName}<br>
+            ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
+            ${profile?.steuernummer ? `<br>Steuernummer: ${profile.steuernummer}` : ''}
+            ${ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''}
+          </div>
+          <div style="text-align: right;">
+            <strong>Rechnungsempfänger:</strong><br>
+            ${rechnungsempfaengerName}<br>
+            ${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <strong>Rechnungsnummer:</strong> ${rechnungsnummer}<br>
+          <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungsdatum)}<br>
+          <strong>Leistungszeitraum:</strong> ${monatFormatiert}
+        </div>
+
+        <p>Sehr geehrte Damen und Herren,</p>
+        <p>für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
+
+        ${positionenTabelle}
+        ${summenBlockHtml}
+
+        ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+
+        <div style="margin-top: 40px;">
+          <p>Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
+          <p>
+            <strong>IBAN:</strong> ${iban}<br>
+            <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
+          </p>
+          <p>Vielen Dank für die Zusammenarbeit.</p>
+          <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
+        </div>
+      `
+    }
+
+    // E-Mail-Text generieren
+    const emailText = selectedPdfVorlage
+      ? `Sehr geehrte/r ${rechnungsempfaengerName},
+
+anbei erhalten Sie die Rechnung Nr. ${rechnungsnummer} für ${monatFormatiert}.
+
+Gesamtbetrag: ${summen.gesamtBrutto.toFixed(2)} €
+
+Der Betrag wird per SEPA-Lastschrift von Ihrem Konto abgebucht.
+
+Bei Fragen stehen wir Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+${rechnungsstellerName}`
+      : `Sehr geehrte/r ${rechnungsempfaengerName},
+
+anbei erhalten Sie die Rechnung Nr. ${rechnungsnummer} für ${monatFormatiert}.
+
+Gesamtbetrag: ${summen.gesamtBrutto.toFixed(2)} €
+
+Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:
+IBAN: ${iban}
+Kontoinhaber: ${rechnungsstellerName}
+
+Bei Fragen stehen wir Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüßen
+${rechnungsstellerName}`
+
+    const emailBetreff = `Rechnung ${rechnungsnummer} - ${monatFormatiert}`
+
+    return { pdfHtml, emailText, emailBetreff, monatFormatiert }
+  }, [selectedSummary, verknuepfteSummaries, rechnungsPositionen, summen, selectedMonth, rechnungsnummer, rechnungsdatum, rechnungsstellerName, rechnungsstellerAdresse, rechnungsempfaengerName, rechnungsempfaengerAdresse, iban, ustIdNr, kleinunternehmer, korrekturGrund, profile, pdfVorlagen, selectedPdfVorlageId])
 
   const generatePDF = async () => {
     // Zuerst Rechnung speichern wenn gewünscht
@@ -6243,6 +6443,77 @@ ${rechnungsstellerName}`
 
           {step === 2 && (
             <>
+              {/* Vorschau-Tabs */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--gray-200)', paddingBottom: 12 }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${previewMode === 'edit' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setPreviewMode('edit')}
+                  style={{ fontSize: 13 }}
+                >
+                  Bearbeiten
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${previewMode === 'pdf' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setPreviewMode('pdf')}
+                  style={{ fontSize: 13 }}
+                >
+                  PDF-Vorschau
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${previewMode === 'email' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setPreviewMode('email')}
+                  style={{ fontSize: 13 }}
+                >
+                  E-Mail-Vorschau
+                </button>
+              </div>
+
+              {/* PDF-Vorschau */}
+              {previewMode === 'pdf' && (
+                <div style={{
+                  background: '#fff',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: 'var(--radius)',
+                  padding: 24,
+                  maxHeight: 500,
+                  overflowY: 'auto',
+                  fontFamily: "'Times New Roman', serif",
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <div dangerouslySetInnerHTML={{ __html: vorschauDaten.pdfHtml }} />
+                </div>
+              )}
+
+              {/* E-Mail-Vorschau */}
+              {previewMode === 'email' && (
+                <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                  <div style={{ background: 'var(--gray-100)', padding: '12px 16px', borderBottom: '1px solid var(--gray-300)' }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontWeight: 500, color: 'var(--gray-600)', minWidth: 50 }}>An:</span>
+                      <span>{selectedSummary?.spieler.kontakt_email || '(keine E-Mail hinterlegt)'}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <span style={{ fontWeight: 500, color: 'var(--gray-600)', minWidth: 50 }}>Betreff:</span>
+                      <span>{vorschauDaten.emailBetreff}</span>
+                    </div>
+                  </div>
+                  <div style={{ padding: 16, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.6 }}>
+                    {vorschauDaten.emailText}
+                  </div>
+                  <div style={{ background: 'var(--gray-100)', padding: '12px 16px', borderTop: '1px solid var(--gray-300)', fontSize: 12, color: 'var(--gray-600)' }}>
+                    Anhang: Rechnung_{rechnungsnummer}.pdf
+                  </div>
+                </div>
+              )}
+
+              {/* Bearbeitungs-Formular */}
+              {previewMode === 'edit' && (
+              <>
               <div className="form-row">
                 <div className="form-group">
                   <label>Rechnungssteller</label>
@@ -6356,6 +6627,8 @@ ${rechnungsstellerName}`
                   <strong>{summen.gesamtBrutto.toFixed(2)} €</strong>
                 </div>
               </div>
+              </>
+              )}
             </>
           )}
         </div>
