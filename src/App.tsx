@@ -5022,6 +5022,10 @@ function InvoiceModal({
   // Vorschau-Modus: 'edit' | 'pdf' | 'email'
   const [previewMode, setPreviewMode] = useState<'edit' | 'pdf' | 'email'>('edit')
 
+  // Benutzerdefinierter E-Mail-Text (leer = automatisch generiert)
+  const [customEmailText, setCustomEmailText] = useState('')
+  const [customEmailBetreff, setCustomEmailBetreff] = useState('')
+
   // Trainingsaufstellung für den ausgewählten Spieler
   const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
 
@@ -6145,8 +6149,8 @@ ${rechnungsstellerName}`
         reader.readAsDataURL(pdfBlob)
       })
 
-      // E-Mail-Text - unterschiedlich je nach Vorlage
-      const emailText = selectedPdfVorlage
+      // E-Mail-Text - benutzerdefiniert oder Standard
+      const defaultEmailText = selectedPdfVorlage
         ? `Sehr geehrte/r ${rechnungsempfaengerName},
 
 anbei erhalten Sie die Rechnung Nr. ${rechnungsnummer} für ${monatFormatiert}.
@@ -6174,6 +6178,10 @@ Bei Fragen stehen wir Ihnen gerne zur Verfügung.
 Mit freundlichen Grüßen
 ${rechnungsstellerName}`
 
+      // Benutzerdefinierten Text verwenden falls vorhanden
+      const emailText = customEmailText || defaultEmailText
+      const emailBetreff = customEmailBetreff || `Rechnung ${rechnungsnummer} - ${monatFormatiert}`
+
       // E-Mail über API senden
       const response = await fetch('/api/send-invoice-email', {
         method: 'POST',
@@ -6189,7 +6197,7 @@ ${rechnungsstellerName}`
             fromName: profile.smtp_from_name || `${profile.name} ${profile.nachname || ''}`.trim()
           },
           to: spielerEmail,
-          subject: `Rechnung ${rechnungsnummer} - ${monatFormatiert}`,
+          subject: emailBetreff,
           text: emailText,
           pdfBase64,
           pdfFilename: `Rechnung_${rechnungsnummer}.pdf`
@@ -6493,17 +6501,44 @@ ${rechnungsstellerName}`
               {previewMode === 'email' && (
                 <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
                   <div style={{ background: 'var(--gray-100)', padding: '12px 16px', borderBottom: '1px solid var(--gray-300)' }}>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontWeight: 500, color: 'var(--gray-600)', minWidth: 50 }}>An:</span>
                       <span>{selectedSummary?.spieler.kontakt_email || '(keine E-Mail hinterlegt)'}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <span style={{ fontWeight: 500, color: 'var(--gray-600)', minWidth: 50 }}>Betreff:</span>
-                      <span>{vorschauDaten.emailBetreff}</span>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={customEmailBetreff || vorschauDaten.emailBetreff}
+                        onChange={(e) => setCustomEmailBetreff(e.target.value)}
+                        placeholder={vorschauDaten.emailBetreff}
+                        style={{ flex: 1, fontSize: 14 }}
+                      />
                     </div>
                   </div>
-                  <div style={{ padding: 16, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.6 }}>
-                    {vorschauDaten.emailText}
+                  <div style={{ padding: 16 }}>
+                    <textarea
+                      className="form-control"
+                      value={customEmailText || vorschauDaten.emailText}
+                      onChange={(e) => setCustomEmailText(e.target.value)}
+                      placeholder={vorschauDaten.emailText}
+                      rows={12}
+                      style={{ fontFamily: 'inherit', fontSize: 14, lineHeight: 1.6, resize: 'vertical' }}
+                    />
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--gray-500)' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => {
+                          setCustomEmailText('')
+                          setCustomEmailBetreff('')
+                        }}
+                        style={{ fontSize: 11, padding: '4px 8px' }}
+                      >
+                        Auf Standard zurücksetzen
+                      </button>
+                    </div>
                   </div>
                   <div style={{ background: 'var(--gray-100)', padding: '12px 16px', borderTop: '1px solid var(--gray-300)', fontSize: 12, color: 'var(--gray-600)' }}>
                     Anhang: Rechnung_{rechnungsnummer}.pdf
