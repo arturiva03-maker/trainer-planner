@@ -3335,20 +3335,6 @@ function AbrechnungView({
     return manuelleRechnungen.filter(r => r.monat === selectedMonth)
   }, [manuelleRechnungen, selectedMonth])
 
-  // Gefilterte manuelle Rechnungen basierend auf Status-Filter
-  const filteredManuelleRechnungen = useMemo(() => {
-    switch (filter) {
-      case 'bezahlt':
-        return monthManuelleRechnungen.filter(r => r.bezahlt && !r.bar_bezahlt)
-      case 'offen':
-        return monthManuelleRechnungen.filter(r => !r.bezahlt && !r.bar_bezahlt)
-      case 'bar':
-        return monthManuelleRechnungen.filter(r => r.bar_bezahlt)
-      default:
-        return monthManuelleRechnungen
-    }
-  }, [monthManuelleRechnungen, filter])
-
   const stats = useMemo(() => {
     // Trainings-Stats
     const trainingsTotal = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
@@ -3590,24 +3576,6 @@ function AbrechnungView({
     setSelectedSpielerDetail(spielerId)
   }
 
-  // Manuelle Rechnung als bezahlt/offen markieren
-  const toggleManuelleRechnungBezahlt = async (rechnungId: string, currentBezahlt: boolean, barBezahlt?: boolean) => {
-    if (barBezahlt !== undefined) {
-      // Bar-Status umschalten
-      await supabase
-        .from('manuelle_rechnungen')
-        .update({ bar_bezahlt: barBezahlt, bezahlt: barBezahlt ? false : false })
-        .eq('id', rechnungId)
-    } else {
-      // Normal bezahlt umschalten
-      await supabase
-        .from('manuelle_rechnungen')
-        .update({ bezahlt: !currentBezahlt, bar_bezahlt: false })
-        .eq('id', rechnungId)
-    }
-    onUpdate()
-  }
-
   // Korrektur speichern oder aktualisieren
   const saveKorrektur = async (spielerId: string) => {
     setKorrekturSaving(true)
@@ -3737,14 +3705,6 @@ function AbrechnungView({
     setShowTrainingKorrekturModal(null)
     setTrainingKorrekturBetrag('')
     setTrainingKorrekturGrund('')
-    onUpdate()
-  }
-
-  // Manuelle Rechnung löschen
-  const deleteManuelleRechnung = async (rechnungId: string) => {
-    const confirmed = await showConfirm('Rechnung löschen', 'Rechnung wirklich löschen?')
-    if (!confirmed) return
-    await supabase.from('manuelle_rechnungen').delete().eq('id', rechnungId)
     onUpdate()
   }
 
@@ -4072,122 +4032,6 @@ function AbrechnungView({
             </div>
           </div>
         </div>
-
-        {/* Manuelle Rechnungen Sektion */}
-        {filteredManuelleRechnungen.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <h4 style={{ margin: '0 0 12px', color: 'var(--gray-600)' }}>Sonstige Rechnungen</h4>
-            <div className="table-container desktop-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nr.</th>
-                    <th>Empfänger</th>
-                    <th>Beschreibung</th>
-                    <th>Betrag</th>
-                    <th>Status</th>
-                    <th>Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredManuelleRechnungen.map(rechnung => (
-                    <tr key={rechnung.id}>
-                      <td>{rechnung.rechnungsnummer}</td>
-                      <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{rechnung.empfaenger_name}</td>
-                      <td>{rechnung.beschreibung || '-'}</td>
-                      <td>{rechnung.brutto_gesamt.toFixed(2)} €</td>
-                      <td>
-                        <span className={`status-badge ${rechnung.bezahlt || rechnung.bar_bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
-                          {rechnung.bar_bezahlt ? 'Bar' : rechnung.bezahlt ? 'Bezahlt' : 'Offen'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, rechnung.bezahlt)}
-                            title={rechnung.bezahlt ? 'Als offen markieren' : 'Als bezahlt markieren'}
-                          >
-                            {rechnung.bezahlt || rechnung.bar_bezahlt ? '↩' : '✓'}
-                          </button>
-                          {!rechnung.bezahlt && !rechnung.bar_bezahlt && (
-                            <button
-                              className="btn btn-sm"
-                              style={{ background: 'var(--warning)', color: 'white' }}
-                              onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, false, true)}
-                              title="Als bar bezahlt markieren"
-                            >
-                              Bar
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-sm"
-                            style={{ background: 'var(--danger)', color: 'white' }}
-                            onClick={() => deleteManuelleRechnung(rechnung.id)}
-                            title="Löschen"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Mobile Cards für manuelle Rechnungen */}
-            <div className="mobile-card-list">
-              {filteredManuelleRechnungen.map(rechnung => (
-                <div key={rechnung.id} className="mobile-card">
-                  <div className="mobile-card-header">
-                    <div>
-                      <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{rechnung.empfaenger_name}</div>
-                      <div className="mobile-card-subtitle">{rechnung.rechnungsnummer} - {rechnung.beschreibung || 'Sonstige Rechnung'}</div>
-                    </div>
-                    <span className={`status-badge ${rechnung.bezahlt || rechnung.bar_bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
-                      {rechnung.bar_bezahlt ? 'Bar' : rechnung.bezahlt ? 'Bezahlt' : 'Offen'}
-                    </span>
-                  </div>
-                  <div className="mobile-card-content">
-                    <div className="mobile-card-row">
-                      <span>Betrag</span>
-                      <strong>{rechnung.brutto_gesamt.toFixed(2)} €</strong>
-                    </div>
-                  </div>
-                  <div className="mobile-card-actions">
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, rechnung.bezahlt)}
-                    >
-                      {rechnung.bezahlt || rechnung.bar_bezahlt ? 'Offen' : 'Bezahlt'}
-                    </button>
-                    {!rechnung.bezahlt && !rechnung.bar_bezahlt && (
-                      <button
-                        className="btn btn-sm"
-                        style={{ background: 'var(--warning)', color: 'white' }}
-                        onClick={() => toggleManuelleRechnungBezahlt(rechnung.id, false, true)}
-                      >
-                        Bar
-                      </button>
-                    )}
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: 'var(--danger)', color: 'white' }}
-                      onClick={() => deleteManuelleRechnung(rechnung.id)}
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Spieler-Trainings Überschrift */}
-        {filteredSummary.length > 0 && filteredManuelleRechnungen.length > 0 && (
-          <h4 style={{ margin: '0 0 12px', color: 'var(--gray-600)' }}>Trainings</h4>
-        )}
 
         {/* Desktop Table */}
         <div className="table-container desktop-table">
@@ -7600,6 +7444,7 @@ function BuchhaltungView({
 
   // Einnahmen-Bearbeitung States
   const [editingManuelleRechnung, setEditingManuelleRechnung] = useState<ManuelleRechnung | null>(null)
+  const [viewingRechnung, setViewingRechnung] = useState<ManuelleRechnung | null>(null)
   const [editingKorrektur, setEditingKorrektur] = useState<MonthlyAdjustment | null>(null)
   const [editingGuthaben, setEditingGuthaben] = useState<GuthabenTransaktion | null>(null)
   const [editingTrainingEinnahme, setEditingTrainingEinnahme] = useState<{ training: Training, spielerId: string } | null>(null)
@@ -9460,10 +9305,17 @@ function BuchhaltungView({
                     </tr>
                   </thead>
                   <tbody>
-                    {offenePosten.map(p => (
-                      <tr key={p.id}>
+                    {offenePosten.map(p => {
+                      const fullRechnung = manuelleRechnungen.find(r => r.id === p.id)
+                      return (
+                      <tr
+                        key={p.id}
+                        onClick={() => fullRechnung && setViewingRechnung(fullRechnung)}
+                        style={{ cursor: 'pointer' }}
+                        className="clickable-row"
+                      >
                         <td>{formatDateGerman(p.datum)}</td>
-                        <td>{p.empfaenger_name}</td>
+                        <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{p.empfaenger_name}</td>
                         <td>
                           {p.rechnungsnummer && <span style={{ fontWeight: 500 }}>{p.rechnungsnummer}</span>}
                           {p.rechnungsnummer && p.beschreibung && ' - '}
@@ -9479,7 +9331,8 @@ function BuchhaltungView({
                         <td>
                           <button
                             className="btn btn-sm btn-danger"
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation()
                               const confirmed = await showConfirm(
                                 'Offenen Posten löschen',
                                 `Rechnung "${p.rechnungsnummer || p.empfaenger_name}" wirklich löschen?`
@@ -9494,7 +9347,7 @@ function BuchhaltungView({
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
@@ -9941,6 +9794,206 @@ function BuchhaltungView({
             onUpdate()
           }}
         />
+      )}
+
+      {/* Rechnungs-Vorschau Modal */}
+      {viewingRechnung && (
+        <div className="modal-overlay" onClick={() => setViewingRechnung(null)}>
+          <div className="modal" style={{ maxWidth: 800 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Rechnung {viewingRechnung.rechnungsnummer}</h3>
+              <button className="modal-close" onClick={() => setViewingRechnung(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{
+                background: '#fff',
+                border: '1px solid var(--gray-300)',
+                borderRadius: 'var(--radius)',
+                padding: 24,
+                fontFamily: "'Times New Roman', serif",
+                fontSize: 12,
+                lineHeight: 1.6
+              }}>
+                <h1 style={{ textAlign: 'center', marginBottom: 30, fontSize: 24 }}>RECHNUNG</h1>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div>
+                    <strong>Rechnungssteller:</strong><br />
+                    {profile?.name} {profile?.nachname}<br />
+                    {profile?.adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
+                    {profile?.steuernummer && <>Steuernummer: {profile.steuernummer}<br /></>}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <strong>Rechnungsempfänger:</strong><br />
+                    {viewingRechnung.empfaenger_name}<br />
+                    {viewingRechnung.empfaenger_adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <strong>Rechnungsnummer:</strong> {viewingRechnung.rechnungsnummer}<br />
+                  <strong>Rechnungsdatum:</strong> {formatDateGerman(viewingRechnung.rechnungsdatum)}<br />
+                  <strong>Leistungszeitraum:</strong> {viewingRechnung.leistungszeitraum}
+                </div>
+
+                {viewingRechnung.beschreibung && (
+                  <p style={{ marginBottom: 16 }}>{viewingRechnung.beschreibung}</p>
+                )}
+
+                {/* Positionen-Tabelle */}
+                {viewingRechnung.positionen && viewingRechnung.positionen.length > 0 && (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20 }}>
+                    <thead>
+                      <tr style={{ background: '#f5f5f5' }}>
+                        <th style={{ border: '1px solid #ddd', padding: 8, textAlign: 'left' }}>Beschreibung</th>
+                        <th style={{ border: '1px solid #ddd', padding: 8, textAlign: 'right' }}>Menge</th>
+                        <th style={{ border: '1px solid #ddd', padding: 8, textAlign: 'right' }}>Einzelpreis</th>
+                        <th style={{ border: '1px solid #ddd', padding: 8, textAlign: 'right' }}>Gesamt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewingRechnung.positionen.map((pos: { beschreibung: string; menge: number; einzelpreis: number }, i: number) => (
+                        <tr key={i}>
+                          <td style={{ border: '1px solid #ddd', padding: 8 }}>{pos.beschreibung}</td>
+                          <td style={{ border: '1px solid #ddd', padding: 8, textAlign: 'right' }}>{pos.menge}</td>
+                          <td style={{ border: '1px solid #ddd', padding: 8, textAlign: 'right' }}>{pos.einzelpreis.toFixed(2)} €</td>
+                          <td style={{ border: '1px solid #ddd', padding: 8, textAlign: 'right' }}>{(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {/* Summen */}
+                <div style={{ textAlign: 'right', marginTop: 20 }}>
+                  <div style={{ marginBottom: 4 }}>
+                    Nettobetrag: {viewingRechnung.netto_gesamt.toFixed(2)} €
+                  </div>
+                  {viewingRechnung.ust_satz > 0 && (
+                    <div style={{ marginBottom: 4 }}>
+                      USt ({viewingRechnung.ust_satz}%): {viewingRechnung.ust_betrag.toFixed(2)} €
+                    </div>
+                  )}
+                  <div style={{ fontWeight: 'bold', fontSize: 16, marginTop: 8, borderTop: '2px solid #333', paddingTop: 8 }}>
+                    Gesamtbetrag: {viewingRechnung.brutto_gesamt.toFixed(2)} €
+                  </div>
+                </div>
+
+                {viewingRechnung.ust_satz === 0 && (
+                  <p style={{ fontStyle: 'italic', marginTop: 16 }}>
+                    Gemäß §19 UStG wird keine Umsatzsteuer berechnet.
+                  </p>
+                )}
+
+                <div style={{ marginTop: 30 }}>
+                  <p>Bitte überweisen Sie den Betrag innerhalb von {viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
+                  <p>
+                    <strong>IBAN:</strong> {profile?.iban}<br />
+                    <strong>Kontoinhaber:</strong> {profile?.name} {profile?.nachname}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setViewingRechnung(null)}>
+                Schließen
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  // PDF zum Drucken generieren
+                  const html = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta charset="utf-8">
+                      <title>Rechnung ${viewingRechnung.rechnungsnummer}</title>
+                      <style>
+                        body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+                        h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+                        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background: #f5f5f5; }
+                        @media print { body { padding: 20px; } @page { size: A4; margin: 15mm; } }
+                      </style>
+                    </head>
+                    <body>
+                      <h1>RECHNUNG</h1>
+                      <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div>
+                          <strong>Rechnungssteller:</strong><br>
+                          ${profile?.name || ''} ${profile?.nachname || ''}<br>
+                          ${(profile?.adresse || '').replace(/\n/g, '<br>')}
+                          ${profile?.steuernummer ? `<br>Steuernummer: ${profile.steuernummer}` : ''}
+                        </div>
+                        <div style="text-align: right;">
+                          <strong>Rechnungsempfänger:</strong><br>
+                          ${viewingRechnung.empfaenger_name}<br>
+                          ${(viewingRechnung.empfaenger_adresse || '').replace(/\n/g, '<br>')}
+                        </div>
+                      </div>
+                      <div style="margin-bottom: 20px;">
+                        <strong>Rechnungsnummer:</strong> ${viewingRechnung.rechnungsnummer}<br>
+                        <strong>Rechnungsdatum:</strong> ${formatDateGerman(viewingRechnung.rechnungsdatum)}<br>
+                        <strong>Leistungszeitraum:</strong> ${viewingRechnung.leistungszeitraum || '-'}
+                      </div>
+                      ${viewingRechnung.beschreibung ? `<p>${viewingRechnung.beschreibung}</p>` : ''}
+                      ${viewingRechnung.positionen?.length ? `
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Beschreibung</th>
+                              <th style="text-align: right">Menge</th>
+                              <th style="text-align: right">Einzelpreis</th>
+                              <th style="text-align: right">Gesamt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${viewingRechnung.positionen.map((pos: { beschreibung: string; menge: number; einzelpreis: number }) => `
+                              <tr>
+                                <td>${pos.beschreibung}</td>
+                                <td style="text-align: right">${pos.menge}</td>
+                                <td style="text-align: right">${pos.einzelpreis.toFixed(2)} €</td>
+                                <td style="text-align: right">${(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
+                              </tr>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      ` : ''}
+                      <div style="text-align: right; margin-top: 20px;">
+                        <div>Nettobetrag: ${viewingRechnung.netto_gesamt.toFixed(2)} €</div>
+                        ${viewingRechnung.ust_satz > 0 ? `<div>USt (${viewingRechnung.ust_satz}%): ${viewingRechnung.ust_betrag.toFixed(2)} €</div>` : ''}
+                        <div style="font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px;">
+                          Gesamtbetrag: ${viewingRechnung.brutto_gesamt.toFixed(2)} €
+                        </div>
+                      </div>
+                      ${viewingRechnung.ust_satz === 0 ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+                      <div style="margin-top: 30px;">
+                        <p>Bitte überweisen Sie den Betrag innerhalb von ${viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
+                        <p>
+                          <strong>IBAN:</strong> ${profile?.iban || '-'}<br>
+                          <strong>Kontoinhaber:</strong> ${profile?.name || ''} ${profile?.nachname || ''}
+                        </p>
+                      </div>
+                    </body>
+                    </html>
+                  `
+                  const blob = new Blob([html], { type: 'text/html' })
+                  const url = URL.createObjectURL(blob)
+                  const printWindow = window.open(url, '_blank')
+                  if (printWindow) {
+                    printWindow.onload = () => {
+                      printWindow.print()
+                      URL.revokeObjectURL(url)
+                    }
+                  }
+                }}
+              >
+                PDF drucken
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
