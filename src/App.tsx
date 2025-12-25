@@ -4494,6 +4494,18 @@ function InvoiceModal({
       </table>
     `
 
+    // Spieler-spezifische Daten für SEPA
+    const spielerIban = selectedSummary?.spieler.iban || ''
+    const spielerMandatsreferenz = selectedSummary?.spieler.mandatsreferenz || ''
+    const spielerUnterschriftsdatum = selectedSummary?.spieler.unterschriftsdatum ? formatDateGerman(selectedSummary.spieler.unterschriftsdatum) : ''
+
+    // IBAN maskieren (nur erste 4 und letzte 4 Zeichen zeigen)
+    const maskiereIban = (iban: string): string => {
+      if (!iban || iban.length < 10) return iban
+      const clean = iban.replace(/\s/g, '')
+      return clean.substring(0, 4) + ' **** **** ' + clean.substring(clean.length - 4)
+    }
+
     // Platzhalter-Werte
     const platzhalterWerte: Record<string, string> = {
       '{{spieler_name}}': selectedSummary?.spieler.name || '',
@@ -4514,6 +4526,9 @@ function InvoiceModal({
       '{{empfaenger_adresse_html}}': rechnungsempfaengerAdresse.replace(/\n/g, '<br>'),
       '{{kleinunternehmer_hinweis}}': kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : '',
       '{{summen_block}}': summenBlockHtml,
+      '{{spieler_iban}}': maskiereIban(spielerIban),
+      '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
+      '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
     }
 
     // Funktion zum Ersetzen der Platzhalter
