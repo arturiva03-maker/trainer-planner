@@ -4240,6 +4240,9 @@ function InvoiceModal({
   const [customEmailText, setCustomEmailText] = useState('')
   const [customEmailBetreff, setCustomEmailBetreff] = useState('')
 
+  // Benutzerdefinierter PDF-Inhalt (leer = automatisch generiert)
+  const [customPdfHtml, setCustomPdfHtml] = useState('')
+
   // Trainingsaufstellung für den ausgewählten Spieler
   const selectedSummary = spielerSummary.find((s) => s.spieler.id === selectedSpielerId)
 
@@ -4809,7 +4812,36 @@ ${rechnungsstellerName}`
 
     let html: string
 
-    if (selectedPdfVorlage) {
+    // Wenn benutzerdefinierter PDF-Inhalt vorhanden, diesen verwenden
+    if (customPdfHtml) {
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Rechnung ${rechnungsnummer}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
+            h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
+            .section { margin-bottom: 20px; }
+            .flex { display: flex; justify-content: space-between; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; font-size: 11px; }
+            .total { text-align: right; margin-top: 20px; }
+            .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
+            .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
+            .footer { margin-top: 40px; }
+            @media print {
+              body { padding: 20px; margin: 0; }
+              @page { size: A4; margin: 15mm; }
+            }
+          </style>
+        </head>
+        <body>${customPdfHtml}</body>
+        </html>
+      `
+    } else if (selectedPdfVorlage) {
       // Eigene PDF-Vorlage mit Platzhaltern verwenden
       const pdfBody = ersetzePlatzhalter(selectedPdfVorlage.inhalt)
       html = `
@@ -4952,8 +4984,8 @@ ${rechnungsstellerName}`
 
       let pdfBlob: Blob
 
-      if (selectedPdfVorlage) {
-        // ============ MIT VORLAGE: HTML zu PDF mit html2canvas ============
+      if (selectedPdfVorlage || customPdfHtml) {
+        // ============ MIT VORLAGE ODER BEARBEITETEM INHALT: HTML zu PDF mit html2canvas ============
 
         // HTML-Hilfsdaten erstellen - mit stärkeren Inline-Styles
         const positionenHtml = rechnungsPositionen.map((p) => `
@@ -5042,9 +5074,18 @@ ${rechnungsstellerName}`
           '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
         }
 
-        let pdfBody = selectedPdfVorlage.inhalt
-        for (const [key, value] of Object.entries(platzhalterWerte)) {
-          pdfBody = pdfBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+        // Wenn benutzerdefinierter PDF-Inhalt vorhanden, diesen verwenden
+        let pdfBody: string
+        if (customPdfHtml) {
+          pdfBody = customPdfHtml
+        } else if (selectedPdfVorlage) {
+          pdfBody = selectedPdfVorlage.inhalt
+          for (const [key, value] of Object.entries(platzhalterWerte)) {
+            pdfBody = pdfBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
+          }
+        } else {
+          // Fallback: Standard-Layout (sollte nicht vorkommen)
+          pdfBody = '<p>Fehler: Kein PDF-Inhalt verfügbar</p>'
         }
 
         // Container erstellen - SICHTBAR für html2canvas
@@ -5710,19 +5751,42 @@ ${rechnungsstellerName}`
 
               {/* PDF-Vorschau */}
               {previewMode === 'pdf' && (
-                <div style={{
-                  background: '#fff',
-                  border: '1px solid var(--gray-300)',
-                  borderRadius: 'var(--radius)',
-                  padding: 24,
-                  maxHeight: 500,
-                  overflowY: 'auto',
-                  fontFamily: "'Times New Roman', serif",
-                  fontSize: 12,
-                  lineHeight: 1.6,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                }}>
-                  <div dangerouslySetInnerHTML={{ __html: vorschauDaten.pdfHtml }} />
+                <div>
+                  <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>
+                      Klicke in die Vorschau um Text direkt zu bearbeiten
+                    </span>
+                    {customPdfHtml && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => setCustomPdfHtml('')}
+                        style={{ fontSize: 11, padding: '4px 8px' }}
+                      >
+                        Auf Standard zurücksetzen
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => setCustomPdfHtml(e.currentTarget.innerHTML)}
+                    dangerouslySetInnerHTML={{ __html: customPdfHtml || vorschauDaten.pdfHtml }}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid var(--gray-300)',
+                      borderRadius: 'var(--radius)',
+                      padding: 24,
+                      maxHeight: 500,
+                      overflowY: 'auto',
+                      fontFamily: "'Times New Roman', serif",
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      cursor: 'text',
+                      outline: 'none'
+                    }}
+                  />
                 </div>
               )}
 
