@@ -16,8 +16,6 @@ import type {
   Tab,
   Ausgabe,
   ManuelleRechnung,
-  Guthaben,
-  GuthabenTransaktion,
   SpielerTrainingPayment,
   PdfVorlage,
   Formular,
@@ -478,8 +476,6 @@ function MainApp({ user }: { user: User }) {
   const [trainings, setTrainings] = useState<Training[]>([])
   const [trainer, setTrainer] = useState<Trainer[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
-  const [guthabenListe, setGuthabenListe] = useState<Guthaben[]>([])
-  const [guthabenTransaktionen, setGuthabenTransaktionen] = useState<GuthabenTransaktion[]>([])
   const [spielerPayments, setSpielerPayments] = useState<SpielerTrainingPayment[]>([])
   const [notizen, setNotizen] = useState<Notiz[]>([])
   const [planungSheets, setPlanungSheets] = useState<PlanungSheet[]>([])
@@ -514,8 +510,6 @@ function MainApp({ user }: { user: User }) {
         planungRes,
         ausgabenRes,
         manuelleRechnungenRes,
-        guthabenRes,
-        guthabenTransaktionenRes,
         spielerPaymentsRes,
         pdfVorlagenRes,
         formulareRes,
@@ -531,8 +525,6 @@ function MainApp({ user }: { user: User }) {
         supabase.from('planung_sheets').select('*').eq('user_id', user.id).order('created_at'),
         supabase.from('ausgaben').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('manuelle_rechnungen').select('*').eq('user_id', user.id).order('rechnungsdatum', { ascending: false }),
-        supabase.from('guthaben').select('*').eq('user_id', user.id),
-        supabase.from('guthaben_transaktionen').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('spieler_training_payments').select('*').eq('user_id', user.id),
         supabase.from('pdf_vorlagen').select('*').eq('user_id', user.id).order('name'),
         supabase.from('formulare').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -545,8 +537,6 @@ function MainApp({ user }: { user: User }) {
       if (trainingsRes.data) setTrainings(trainingsRes.data)
       if (trainerRes.data) setTrainer(trainerRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
-      if (guthabenRes.data) setGuthabenListe(guthabenRes.data)
-      if (guthabenTransaktionenRes.data) setGuthabenTransaktionen(guthabenTransaktionenRes.data)
       if (spielerPaymentsRes.data) setSpielerPayments(spielerPaymentsRes.data)
       if (notizenRes.data) setNotizen(notizenRes.data)
       if (planungRes.data) setPlanungSheets(planungRes.data)
@@ -725,7 +715,6 @@ function MainApp({ user }: { user: User }) {
                 spieler={spieler}
                 tarife={tarife}
                 adjustments={adjustments}
-                guthabenListe={guthabenListe}
                 spielerPayments={spielerPayments}
                 setSpielerPayments={setSpielerPayments}
                 profile={profile}
@@ -762,7 +751,6 @@ function MainApp({ user }: { user: User }) {
                 manuelleRechnungen={manuelleRechnungen}
                 adjustments={adjustments}
                 spielerPayments={spielerPayments}
-                guthabenTransaktionen={guthabenTransaktionen}
                 profile={profile}
                 onUpdate={loadAllData}
                 userId={user.id}
@@ -1003,83 +991,6 @@ function KalenderView({
   const handleDoubleClick = async (training: Training) => {
     const newStatus = training.status === 'geplant' ? 'durchgefuehrt' : 'geplant'
     await supabase.from('trainings').update({ status: newStatus }).eq('id', training.id)
-
-    // Bei Wechsel auf "durchgeführt": Automatisch Guthaben verrechnen
-    if (newStatus === 'durchgefuehrt' && training.spieler_ids.length > 0) {
-      const tarif = tarife.find(ta => ta.id === training.tarif_id)
-      const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-      const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
-      const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
-      // Berechne Betrag pro Spieler
-      let betragProSpieler = preis * duration
-      if (abrechnungsart === 'proSpieler') {
-        const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
-        betragProSpieler = betragProSpieler / (training.spieler_ids.length + entfernteMitBezahlung.length)
-      }
-
-      // Für jeden Spieler prüfen ob Guthaben vorhanden
-      for (const spielerId of training.spieler_ids) {
-        const { data: guthaben } = await supabase
-          .from('guthaben')
-          .select('*')
-          .eq('spieler_id', spielerId)
-          .eq('user_id', userId)
-          .single()
-
-        if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
-          // Guthaben abbuchen
-          await supabase
-            .from('guthaben')
-            .update({
-              aktuell: guthaben.aktuell - betragProSpieler,
-              verbraucht_gesamt: guthaben.verbraucht_gesamt + betragProSpieler,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', guthaben.id)
-
-          // Transaktion speichern
-          await supabase
-            .from('guthaben_transaktionen')
-            .insert({
-              user_id: userId,
-              spieler_id: spielerId,
-              betrag: -betragProSpieler,
-              typ: 'abbuchung',
-              training_id: training.id,
-              beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
-              bar: false,
-              datum: formatDate(new Date())
-            })
-
-          // Training als bezahlt markieren für diesen Spieler
-          const { data: existingPayment } = await supabase
-            .from('spieler_training_payments')
-            .select('id')
-            .eq('training_id', training.id)
-            .eq('spieler_id', spielerId)
-            .single()
-
-          if (existingPayment) {
-            await supabase
-              .from('spieler_training_payments')
-              .update({ bezahlt: true })
-              .eq('id', existingPayment.id)
-          } else {
-            await supabase
-              .from('spieler_training_payments')
-              .insert({
-                user_id: userId,
-                training_id: training.id,
-                spieler_id: spielerId,
-                bezahlt: true,
-                bar_bezahlt: false
-              })
-          }
-        }
-      }
-    }
-
     onUpdate()
   }
 
@@ -1110,79 +1021,7 @@ function KalenderView({
 
     for (const training of selectedTrainings) {
       if (training.status === 'durchgefuehrt') continue // Schon durchgeführt
-
       await supabase.from('trainings').update({ status: 'durchgefuehrt' }).eq('id', training.id)
-
-      // Bei Wechsel auf "durchgeführt": Automatisch Guthaben verrechnen
-      if (training.spieler_ids.length > 0) {
-        const tarif = tarife.find(ta => ta.id === training.tarif_id)
-        const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-        const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
-        const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
-        let betragProSpieler = preis * duration
-        if (abrechnungsart === 'proSpieler') {
-          const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
-          betragProSpieler = betragProSpieler / (training.spieler_ids.length + entfernteMitBezahlung.length)
-        }
-
-        for (const spielerId of training.spieler_ids) {
-          const { data: guthaben } = await supabase
-            .from('guthaben')
-            .select('*')
-            .eq('spieler_id', spielerId)
-            .eq('user_id', userId)
-            .single()
-
-          if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
-            await supabase
-              .from('guthaben')
-              .update({
-                aktuell: guthaben.aktuell - betragProSpieler,
-                verbraucht_gesamt: guthaben.verbraucht_gesamt + betragProSpieler,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', guthaben.id)
-
-            await supabase
-              .from('guthaben_transaktionen')
-              .insert({
-                user_id: userId,
-                spieler_id: spielerId,
-                betrag: -betragProSpieler,
-                typ: 'abbuchung',
-                training_id: training.id,
-                beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
-                bar: false,
-                datum: formatDate(new Date())
-              })
-
-            const { data: existingPayment } = await supabase
-              .from('spieler_training_payments')
-              .select('id')
-              .eq('training_id', training.id)
-              .eq('spieler_id', spielerId)
-              .single()
-
-            if (existingPayment) {
-              await supabase
-                .from('spieler_training_payments')
-                .update({ bezahlt: true })
-                .eq('id', existingPayment.id)
-            } else {
-              await supabase
-                .from('spieler_training_payments')
-                .insert({
-                  user_id: userId,
-                  training_id: training.id,
-                  spieler_id: spielerId,
-                  bezahlt: true,
-                  bar_bezahlt: false
-                })
-            }
-          }
-        }
-      }
     }
 
     setSelectedTrainingIds(new Set())
@@ -3001,7 +2840,6 @@ function AbrechnungView({
   spieler,
   tarife,
   adjustments,
-  guthabenListe,
   spielerPayments,
   setSpielerPayments,
   profile,
@@ -3015,7 +2853,6 @@ function AbrechnungView({
   spieler: Spieler[]
   tarife: Tarif[]
   adjustments: MonthlyAdjustment[]
-  guthabenListe: Guthaben[]
   spielerPayments: SpielerTrainingPayment[]
   setSpielerPayments: React.Dispatch<React.SetStateAction<SpielerTrainingPayment[]>>
   profile: TrainerProfile | null
@@ -3041,13 +2878,6 @@ function AbrechnungView({
   const [showTrainingKorrekturModal, setShowTrainingKorrekturModal] = useState<Training | null>(null)
   const [trainingKorrekturBetrag, setTrainingKorrekturBetrag] = useState('')
   const [trainingKorrekturGrund, setTrainingKorrekturGrund] = useState('')
-  const [showGuthabenModal, setShowGuthabenModal] = useState<string | null>(null) // spielerId
-  const [guthabenModus, setGuthabenModus] = useState<'einzahlen' | 'bearbeiten'>('einzahlen')
-  const [guthabenBetrag, setGuthabenBetrag] = useState('')
-  const [guthabenNeuerStand, setGuthabenNeuerStand] = useState('')
-  const [guthabenDatum, setGuthabenDatum] = useState(formatDate(new Date()))
-  const [guthabenNotiz, setGuthabenNotiz] = useState('')
-  const [guthabenBar, setGuthabenBar] = useState(false)
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -3067,10 +2897,6 @@ function AbrechnungView({
     })
   }, [trainings, selectedMonth])
 
-  // Hilfsfunktion: Holt Guthaben für einen Spieler
-  const getGuthaben = (spielerId: string): Guthaben | null => {
-    return guthabenListe.find(g => g.spieler_id === spielerId) || null
-  }
 
   // Prüft den Bezahlstatus eines Spielers für ein Training
   // Nutzt spielerPayments wenn vorhanden, sonst Fallback auf training.bezahlt/bar_bezahlt
@@ -3095,7 +2921,6 @@ function AbrechnungView({
         summe: number
         barSumme: number
         bezahltSumme: number
-        guthabenVerfuegbar: number // Aktuelles Guthaben des Spielers
         offeneSumme: number
         bezahlt: boolean
         adjustment: number
@@ -3117,14 +2942,12 @@ function AbrechnungView({
         if (!summary[spielerId]) {
           const sp = spieler.find((s) => s.id === spielerId)
           if (!sp) return
-          const guthaben = getGuthaben(spielerId)
           summary[spielerId] = {
             spieler: sp,
             trainings: [],
             summe: 0,
             barSumme: 0,
             bezahltSumme: 0,
-            guthabenVerfuegbar: guthaben?.aktuell || 0,
             offeneSumme: 0,
             bezahlt: false,
             adjustment: 0,
@@ -3183,14 +3006,12 @@ function AbrechnungView({
           if (!summary[spielerId]) {
             const sp = spieler.find((s) => s.id === spielerId)
             if (!sp) return
-            const guthaben = getGuthaben(spielerId)
             summary[spielerId] = {
               spieler: sp,
               trainings: [],
               summe: 0,
               barSumme: 0,
               bezahltSumme: 0,
-              guthabenVerfuegbar: guthaben?.aktuell || 0,
               offeneSumme: 0,
               bezahlt: false,
               adjustment: 0,
@@ -3243,7 +3064,7 @@ function AbrechnungView({
     })
 
     return Object.values(summary)
-  }, [monthTrainings, spieler, tarife, adjustments, guthabenListe, spielerPayments, selectedMonth])
+  }, [monthTrainings, spieler, tarife, adjustments, spielerPayments, selectedMonth])
 
   // Alle Tage im Monat mit Trainings
   const tageImMonat = useMemo(() => {
@@ -3341,7 +3162,6 @@ function AbrechnungView({
     const trainingsBar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
     const trainingsBezahlt = trainingsBar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
     const trainingsOffen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
-    const guthabenGesamt = filteredSummary.reduce((sum, s) => sum + s.guthabenVerfuegbar, 0)
 
     // Manuelle Rechnungen Stats
     const manuelleTotal = monthManuelleRechnungen.reduce((sum, r) => sum + r.brutto_gesamt, 0)
@@ -3352,7 +3172,6 @@ function AbrechnungView({
     return {
       total: trainingsTotal + manuelleTotal,
       bar: trainingsBar + manuelleBar,
-      guthaben: guthabenGesamt,
       bezahlt: trainingsBezahlt + manuelleBezahlt,
       offen: trainingsOffen + manuelleOffen
     }
@@ -3475,106 +3294,6 @@ function AbrechnungView({
     onUpdate()
   }
 
-  // Automatische Guthaben-Verrechnung beim Öffnen der Spieler-Detailansicht
-  const openSpielerDetailMitAutoVerrechnung = async (spielerId: string) => {
-    // Guthaben frisch aus DB laden
-    const { data: guthaben } = await supabase
-      .from('guthaben')
-      .select('*')
-      .eq('spieler_id', spielerId)
-      .eq('user_id', userId)
-      .single()
-
-    if (guthaben && guthaben.aktuell > 0) {
-      // Finde alle offenen durchgeführten Trainings des Spielers im aktuellen Monat
-      const offeneTrainings = monthTrainings.filter(t => {
-        if (!t.spieler_ids.includes(spielerId)) return false
-        if (t.status !== 'durchgefuehrt') return false
-        const ps = getSpielerPaymentStatus(spielerId, t)
-        return !ps.bezahlt && !ps.barBezahlt
-      })
-
-      let verfuegbaresGuthaben = guthaben.aktuell
-      let verbrauchtesGuthaben = 0
-
-      for (const training of offeneTrainings) {
-        if (verfuegbaresGuthaben <= 0) break
-
-        // Berechne Betrag für dieses Training
-        const tarif = tarife.find(ta => ta.id === training.tarif_id)
-        const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-        const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
-        const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
-        let betrag = preis * duration
-        if (abrechnungsart === 'proSpieler') {
-          const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
-          betrag = betrag / (training.spieler_ids.length + entfernteMitBezahlung.length)
-        }
-
-        if (verfuegbaresGuthaben >= betrag && betrag > 0) {
-          // Training als bezahlt markieren
-          const { data: existingPayment } = await supabase
-            .from('spieler_training_payments')
-            .select('id')
-            .eq('training_id', training.id)
-            .eq('spieler_id', spielerId)
-            .single()
-
-          if (existingPayment) {
-            await supabase
-              .from('spieler_training_payments')
-              .update({ bezahlt: true })
-              .eq('id', existingPayment.id)
-          } else {
-            await supabase
-              .from('spieler_training_payments')
-              .insert({
-                user_id: userId,
-                training_id: training.id,
-                spieler_id: spielerId,
-                bezahlt: true,
-                bar_bezahlt: false
-              })
-          }
-
-          // Transaktion speichern
-          await supabase
-            .from('guthaben_transaktionen')
-            .insert({
-              user_id: userId,
-              spieler_id: spielerId,
-              betrag: -betrag,
-              typ: 'abbuchung',
-              training_id: training.id,
-              beschreibung: `Training vom ${formatDateGerman(training.datum)}`,
-              bar: false,
-              datum: formatDate(new Date())
-            })
-
-          verfuegbaresGuthaben -= betrag
-          verbrauchtesGuthaben += betrag
-        }
-      }
-
-      // Guthaben aktualisieren wenn etwas verrechnet wurde
-      if (verbrauchtesGuthaben > 0) {
-        await supabase
-          .from('guthaben')
-          .update({
-            aktuell: guthaben.aktuell - verbrauchtesGuthaben,
-            verbraucht_gesamt: guthaben.verbraucht_gesamt + verbrauchtesGuthaben,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', guthaben.id)
-
-        // Daten neu laden damit UI aktualisiert wird
-        onUpdate()
-      }
-    }
-
-    setSelectedSpielerDetail(spielerId)
-  }
 
   // Korrektur speichern oder aktualisieren
   const saveKorrektur = async (spielerId: string) => {
@@ -3706,165 +3425,6 @@ function AbrechnungView({
     setTrainingKorrekturBetrag('')
     setTrainingKorrekturGrund('')
     onUpdate()
-  }
-
-  // Guthaben einzahlen
-  const saveGuthabenEinzahlung = async () => {
-    if (!showGuthabenModal) return
-
-    const betrag = parseFloat(guthabenBetrag.replace(',', '.'))
-    if (isNaN(betrag) || betrag <= 0) {
-      alert('Bitte gültigen Betrag eingeben')
-      return
-    }
-
-    const spielerId = showGuthabenModal
-    const existing = getGuthaben(spielerId)
-
-    if (existing) {
-      // Guthaben aufstocken
-      await supabase
-        .from('guthaben')
-        .update({
-          aktuell: existing.aktuell + betrag,
-          eingezahlt_gesamt: existing.eingezahlt_gesamt + betrag,
-          letzte_einzahlung: guthabenDatum,
-          notiz: guthabenNotiz || existing.notiz || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-    } else {
-      // Neues Guthaben anlegen
-      await supabase
-        .from('guthaben')
-        .insert({
-          user_id: userId,
-          spieler_id: spielerId,
-          aktuell: betrag,
-          eingezahlt_gesamt: betrag,
-          verbraucht_gesamt: 0,
-          letzte_einzahlung: guthabenDatum,
-          notiz: guthabenNotiz || null
-        })
-    }
-
-    // Transaktion speichern
-    await supabase
-      .from('guthaben_transaktionen')
-      .insert({
-        user_id: userId,
-        spieler_id: spielerId,
-        betrag: betrag,
-        typ: 'einzahlung',
-        beschreibung: guthabenNotiz || 'Einzahlung',
-        bar: guthabenBar,
-        datum: guthabenDatum
-      })
-
-    setShowGuthabenModal(null)
-    resetGuthabenForm()
-    onUpdate()
-  }
-
-  const resetGuthabenForm = () => {
-    setGuthabenModus('einzahlen')
-    setGuthabenBetrag('')
-    setGuthabenNeuerStand('')
-    setGuthabenDatum(formatDate(new Date()))
-    setGuthabenNotiz('')
-    setGuthabenBar(false)
-  }
-
-  // Guthaben bearbeiten (Stand direkt setzen)
-  const saveGuthabenBearbeitung = async () => {
-    if (!showGuthabenModal) return
-
-    const neuerStand = parseFloat(guthabenNeuerStand.replace(',', '.'))
-    if (isNaN(neuerStand) || neuerStand < 0) {
-      alert('Bitte gültigen Betrag eingeben (0 oder mehr)')
-      return
-    }
-
-    const spielerId = showGuthabenModal
-    const existing = getGuthaben(spielerId)
-
-    if (existing) {
-      // Guthaben aktualisieren
-      const differenz = neuerStand - existing.aktuell
-      await supabase
-        .from('guthaben')
-        .update({
-          aktuell: neuerStand,
-          // Bei Erhöhung: eingezahlt_gesamt anpassen, bei Verringerung: verbraucht_gesamt
-          eingezahlt_gesamt: differenz > 0 ? existing.eingezahlt_gesamt + differenz : existing.eingezahlt_gesamt,
-          verbraucht_gesamt: differenz < 0 ? existing.verbraucht_gesamt + Math.abs(differenz) : existing.verbraucht_gesamt,
-          notiz: guthabenNotiz || existing.notiz || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-
-      // Korrektur-Transaktion speichern
-      if (differenz !== 0) {
-        await supabase
-          .from('guthaben_transaktionen')
-          .insert({
-            user_id: userId,
-            spieler_id: spielerId,
-            betrag: differenz,
-            typ: differenz > 0 ? 'einzahlung' : 'abbuchung',
-            beschreibung: guthabenNotiz || 'Manuelle Korrektur',
-            bar: false,
-            datum: formatDate(new Date())
-          })
-      }
-    } else if (neuerStand > 0) {
-      // Neues Guthaben anlegen
-      await supabase
-        .from('guthaben')
-        .insert({
-          user_id: userId,
-          spieler_id: spielerId,
-          aktuell: neuerStand,
-          eingezahlt_gesamt: neuerStand,
-          verbraucht_gesamt: 0,
-          letzte_einzahlung: formatDate(new Date()),
-          notiz: guthabenNotiz || null
-        })
-    }
-
-    setShowGuthabenModal(null)
-    resetGuthabenForm()
-    onUpdate()
-  }
-
-  // Guthaben löschen
-  const deleteGuthaben = async () => {
-    if (!showGuthabenModal) return
-
-    const existing = getGuthaben(showGuthabenModal)
-    if (!existing) return
-
-    if (!confirm(`Guthaben wirklich löschen? Aktueller Stand: ${existing.aktuell.toFixed(2)} €\n\nAlle Transaktionen werden ebenfalls gelöscht.`)) return
-
-    // Erst alle Transaktionen für diesen Spieler löschen
-    await supabase.from('guthaben_transaktionen').delete().eq('user_id', userId).eq('spieler_id', showGuthabenModal)
-    // Dann das Guthaben selbst löschen
-    await supabase.from('guthaben').delete().eq('id', existing.id)
-
-    setShowGuthabenModal(null)
-    resetGuthabenForm()
-    onUpdate()
-  }
-
-  // Guthaben Modal öffnen
-  const openGuthabenModal = (spielerId: string) => {
-    resetGuthabenForm()
-    const existing = getGuthaben(spielerId)
-    if (existing) {
-      setGuthabenNeuerStand(existing.aktuell.toString())
-      setGuthabenNotiz(existing.notiz || '')
-    }
-    setShowGuthabenModal(spielerId)
   }
 
   return (
@@ -4049,7 +3609,7 @@ function AbrechnungView({
               {filteredSummary.map((item) => (
                 <tr
                   key={item.spieler.id}
-                  onClick={() => openSpielerDetailMitAutoVerrechnung(item.spieler.id)}
+                  onClick={() => setSelectedSpielerDetail(item.spieler.id)}
                   style={{ cursor: 'pointer' }}
                 >
                   <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{item.spieler.name}</td>
@@ -4097,7 +3657,7 @@ function AbrechnungView({
             <div
               key={item.spieler.id}
               className="mobile-card"
-              onClick={() => openSpielerDetailMitAutoVerrechnung(item.spieler.id)}
+              onClick={() => setSelectedSpielerDetail(item.spieler.id)}
               style={{ cursor: 'pointer' }}
             >
               <div className="mobile-card-header">
@@ -4202,7 +3762,6 @@ function AbrechnungView({
           const ps = getSpielerPaymentStatus(detail.spieler.id, t.training)
           return !ps.bezahlt && !ps.barBezahlt
         }).reduce((sum, t) => sum + t.betrag, 0)
-        const spielerGuthaben = getGuthaben(detail.spieler.id)
 
         return (
           <div className="modal-overlay" onClick={() => setSelectedSpielerDetail(null)}>
@@ -4222,11 +3781,6 @@ function AbrechnungView({
                   {gefilterteBarSumme > 0 && (
                     <div style={{ color: 'var(--warning)' }}>
                       <strong>Bar:</strong> {gefilterteBarSumme.toFixed(2)} €
-                    </div>
-                  )}
-                  {spielerGuthaben && spielerGuthaben.aktuell > 0 && (
-                    <div style={{ color: 'var(--primary)' }}>
-                      <strong>Guthaben:</strong> {spielerGuthaben.aktuell.toFixed(2)} €
                     </div>
                   )}
                   {gefilterteBezahltSumme > 0 && (
@@ -4408,43 +3962,6 @@ function AbrechnungView({
                   </div>
                 )}
 
-                {/* Guthaben Sektion */}
-                {!(filterType === 'tag' && selectedTag) && (
-                  <div style={{
-                    marginTop: 12,
-                    padding: 12,
-                    background: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary-light)' : 'var(--gray-50)',
-                    borderRadius: 8,
-                    border: `1px solid ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : 'var(--gray-200)'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                      <div>
-                        <strong style={{ color: spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'var(--primary)' : undefined }}>
-                          Guthaben {spielerGuthaben && spielerGuthaben.aktuell > 0 && '(wird automatisch verrechnet)'}
-                        </strong>
-                        {spielerGuthaben && spielerGuthaben.aktuell > 0 ? (
-                          <p style={{ fontSize: 12, color: 'var(--primary)', margin: '4px 0 0', fontWeight: 500 }}>
-                            Aktuell: {spielerGuthaben.aktuell.toFixed(2)} €
-                            {spielerGuthaben.letzte_einzahlung && (
-                              <> · Letzte Einzahlung: {formatDateGerman(spielerGuthaben.letzte_einzahlung)}</>
-                            )}
-                          </p>
-                        ) : (
-                          <p style={{ fontSize: 12, color: 'var(--gray-600)', margin: '4px 0 0' }}>
-                            Kein Guthaben vorhanden
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        className={`btn ${spielerGuthaben && spielerGuthaben.aktuell > 0 ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ fontSize: 13 }}
-                        onClick={() => openGuthabenModal(detail.spieler.id)}
-                      >
-                        Aufladen
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
@@ -4653,153 +4170,6 @@ function AbrechnungView({
         )
       })()}
 
-      {/* Guthaben Modal */}
-      {showGuthabenModal && (() => {
-        const gSpieler = spieler.find(s => s.id === showGuthabenModal)
-        const existing = getGuthaben(showGuthabenModal)
-
-        return (
-          <div className="modal-overlay" onClick={() => setShowGuthabenModal(null)}>
-            <div className="modal" style={{ maxWidth: 450 }} onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Guthaben verwalten</h3>
-                <button className="modal-close" onClick={() => setShowGuthabenModal(null)}>×</button>
-              </div>
-              <div className="modal-body">
-                <div style={{ marginBottom: 16, padding: 12, background: 'var(--gray-50)', borderRadius: 8 }}>
-                  <div><strong>Spieler:</strong> {gSpieler?.name}</div>
-                  <div><strong>Aktuelles Guthaben:</strong> {existing ? existing.aktuell.toFixed(2) : '0.00'} €</div>
-                  {existing && existing.eingezahlt_gesamt > 0 && (
-                    <div style={{ fontSize: 12, color: 'var(--gray-600)', marginTop: 4 }}>
-                      Gesamt eingezahlt: {existing.eingezahlt_gesamt.toFixed(2)} € · Verbraucht: {existing.verbraucht_gesamt.toFixed(2)} €
-                    </div>
-                  )}
-                </div>
-
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                  <button
-                    className={`btn ${guthabenModus === 'einzahlen' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1 }}
-                    onClick={() => setGuthabenModus('einzahlen')}
-                  >
-                    Einzahlen
-                  </button>
-                  <button
-                    className={`btn ${guthabenModus === 'bearbeiten' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ flex: 1 }}
-                    onClick={() => setGuthabenModus('bearbeiten')}
-                  >
-                    Bearbeiten
-                  </button>
-                </div>
-
-                {guthabenModus === 'einzahlen' ? (
-                  <>
-                    <div className="form-group">
-                      <label>Einzahlungsbetrag (€)</label>
-                      <input
-                        type="text"
-                        value={guthabenBetrag}
-                        onChange={e => setGuthabenBetrag(e.target.value)}
-                        placeholder="0.00"
-                        style={{ fontFamily: 'monospace' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Einzahlungsdatum</label>
-                      <input
-                        type="date"
-                        value={guthabenDatum}
-                        onChange={e => setGuthabenDatum(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>Notiz (optional)</label>
-                      <input
-                        type="text"
-                        value={guthabenNotiz}
-                        onChange={e => setGuthabenNotiz(e.target.value)}
-                        placeholder="z.B. Einzahlung für Q1 2025"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={guthabenBar}
-                          onChange={e => setGuthabenBar(e.target.checked)}
-                        />
-                        Bar eingezahlt
-                      </label>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="form-group">
-                      <label>Neuer Guthaben-Stand (€)</label>
-                      <input
-                        type="text"
-                        value={guthabenNeuerStand}
-                        onChange={e => setGuthabenNeuerStand(e.target.value)}
-                        placeholder="0.00"
-                        style={{ fontFamily: 'monospace' }}
-                      />
-                      <small style={{ color: 'var(--gray-500)', display: 'block', marginTop: 4 }}>
-                        Aktuell: {existing ? existing.aktuell.toFixed(2) : '0.00'} €
-                      </small>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Notiz / Grund (optional)</label>
-                      <input
-                        type="text"
-                        value={guthabenNotiz}
-                        onChange={e => setGuthabenNotiz(e.target.value)}
-                        placeholder="z.B. Korrektur, Rückerstattung..."
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
-                <div>
-                  {existing && guthabenModus === 'bearbeiten' && (
-                    <button className="btn btn-danger" onClick={deleteGuthaben}>
-                      Löschen
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-secondary" onClick={() => setShowGuthabenModal(null)}>
-                    Abbrechen
-                  </button>
-                  {guthabenModus === 'einzahlen' ? (
-                    <button
-                      className="btn btn-primary"
-                      onClick={saveGuthabenEinzahlung}
-                      disabled={!guthabenBetrag}
-                    >
-                      Einzahlen
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-primary"
-                      onClick={saveGuthabenBearbeitung}
-                      disabled={guthabenNeuerStand === ''}
-                    >
-                      Speichern
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
@@ -7392,7 +6762,6 @@ function BuchhaltungView({
   manuelleRechnungen,
   adjustments: _adjustments,
   spielerPayments,
-  guthabenTransaktionen,
   profile,
   onUpdate,
   userId,
@@ -7409,7 +6778,6 @@ function BuchhaltungView({
   manuelleRechnungen: ManuelleRechnung[]
   adjustments: MonthlyAdjustment[]
   spielerPayments: SpielerTrainingPayment[]
-  guthabenTransaktionen: GuthabenTransaktion[]
   profile: TrainerProfile | null
   onUpdate: () => void
   userId: string
@@ -7446,9 +6814,8 @@ function BuchhaltungView({
   const [editingManuelleRechnung, setEditingManuelleRechnung] = useState<ManuelleRechnung | null>(null)
   const [viewingRechnung, setViewingRechnung] = useState<ManuelleRechnung | null>(null)
   const [editingKorrektur, setEditingKorrektur] = useState<MonthlyAdjustment | null>(null)
-  const [editingGuthaben, setEditingGuthaben] = useState<GuthabenTransaktion | null>(null)
   const [editingTrainingEinnahme, setEditingTrainingEinnahme] = useState<{ training: Training, spielerId: string } | null>(null)
-  const [showEinnahmenEditModal, setShowEinnahmenEditModal] = useState<'rechnung' | 'korrektur' | 'guthaben' | 'training' | null>(null)
+  const [showEinnahmenEditModal, setShowEinnahmenEditModal] = useState<'rechnung' | 'korrektur' | 'training' | null>(null)
 
   // Reset detailPeriode wenn Zeitraum-Typ geändert wird
   useEffect(() => {
@@ -7482,13 +6849,6 @@ function BuchhaltungView({
 
   // Einnahmen aus bezahlten Trainings berechnen
   const einnahmenPositionen = useMemo(() => {
-    // Set von Training-IDs die mit Guthaben bezahlt wurden (diese nicht als separate Einnahme zählen)
-    const mitGuthabenBezahlt = new Set(
-      guthabenTransaktionen
-        .filter(t => t.typ === 'abbuchung' && t.training_id)
-        .map(t => `${t.training_id}|${t.spieler_id}`)
-    )
-
     // Set von Training-IDs die zu einer Rechnung gehören (diese nicht als separate Einnahme zählen)
     // Die Einnahme kommt dann über die Rechnung, nicht über das Training
     const inRechnungGestellt = new Set(
@@ -7515,12 +6875,6 @@ function BuchhaltungView({
       const monat = t.datum.substring(0, 7) // YYYY-MM
 
       return t.spieler_ids.map(spielerId => {
-        // Prüfe ob dieses Training mit Guthaben bezahlt wurde - dann nicht als separate Einnahme zählen
-        // (das Geld wurde bereits bei der Guthaben-Einzahlung gezählt)
-        if (mitGuthabenBezahlt.has(`${t.id}|${spielerId}`)) {
-          return null
-        }
-
         // Prüfe ob dieses Training zu einer Rechnung gehört - dann nicht als separate Einnahme zählen
         // (die Einnahme kommt dann über die Rechnung, nicht über das Training)
         if (inRechnungGestellt.has(t.id)) {
@@ -7617,7 +6971,7 @@ function BuchhaltungView({
         istMonatlich: boolean
       }[]
     }).sort((a, b) => a.datum.localeCompare(b.datum))
-  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen, guthabenTransaktionen, manuelleRechnungen])
+  }, [trainings, tarife, spieler, spielerPayments, selectedYear, kleinunternehmer, inclBarEinnahmen, manuelleRechnungen])
 
 
   // Bank-Einnahmen: Nur Transaktionen die einem Bankumsatz zugeordnet wurden
@@ -9759,23 +9113,6 @@ function BuchhaltungView({
         />
       )}
 
-      {/* Guthaben-Einzahlung bearbeiten */}
-      {showEinnahmenEditModal === 'guthaben' && editingGuthaben && (
-        <GuthabenEditModal
-          transaktion={editingGuthaben}
-          spieler={spieler}
-          onClose={() => {
-            setShowEinnahmenEditModal(null)
-            setEditingGuthaben(null)
-          }}
-          onSave={() => {
-            setShowEinnahmenEditModal(null)
-            setEditingGuthaben(null)
-            onUpdate()
-          }}
-        />
-      )}
-
       {/* Training-Einnahme bearbeiten */}
       {showEinnahmenEditModal === 'training' && editingTrainingEinnahme && (
         <TrainingEinnahmeEditModal
@@ -10755,121 +10092,6 @@ function KorrekturEditModal({
               onChange={e => setGrund(e.target.value)}
               placeholder="z.B. Rabatt, Kartenlesergebühr..."
             />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Speichern...' : 'Speichern'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============ GUTHABEN EDIT MODAL ============
-function GuthabenEditModal({
-  transaktion,
-  spieler,
-  onClose,
-  onSave
-}: {
-  transaktion: GuthabenTransaktion
-  spieler: Spieler[]
-  onClose: () => void
-  onSave: () => void
-}) {
-  const [datum, setDatum] = useState(transaktion.datum)
-  const [betrag, setBetrag] = useState(transaktion.betrag.toString())
-  const [beschreibung, setBeschreibung] = useState(transaktion.beschreibung || '')
-  const [bar, setBar] = useState(transaktion.bar)
-  const [saving, setSaving] = useState(false)
-
-  const sp = spieler.find(s => s.id === transaktion.spieler_id)
-
-  const handleSave = async () => {
-    const betragNum = parseFloat(betrag)
-    if (isNaN(betragNum) || betragNum <= 0) {
-      alert('Bitte einen gültigen Betrag eingeben')
-      return
-    }
-    setSaving(true)
-    try {
-      await supabase
-        .from('guthaben_transaktionen')
-        .update({
-          datum,
-          betrag: betragNum,
-          beschreibung: beschreibung || null,
-          bar
-        })
-        .eq('id', transaktion.id)
-      onSave()
-    } catch (err) {
-      console.error('Error updating guthaben:', err)
-      alert('Fehler beim Speichern')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Guthaben-Einzahlung bearbeiten</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label>Spieler</label>
-            <input
-              type="text"
-              className="form-control"
-              value={sp?.name || 'Unbekannt'}
-              disabled
-            />
-          </div>
-          <div className="form-group">
-            <label>Datum</label>
-            <input
-              type="date"
-              className="form-control"
-              value={datum}
-              onChange={e => setDatum(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label>Betrag (€)</label>
-            <input
-              type="number"
-              className="form-control"
-              value={betrag}
-              onChange={e => setBetrag(e.target.value)}
-              step="0.01"
-              min="0"
-            />
-          </div>
-          <div className="form-group">
-            <label>Beschreibung</label>
-            <input
-              type="text"
-              className="form-control"
-              value={beschreibung}
-              onChange={e => setBeschreibung(e.target.value)}
-              placeholder="z.B. Guthaben-Aufladung"
-            />
-          </div>
-          <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={bar}
-                onChange={e => setBar(e.target.checked)}
-              />
-              Bar bezahlt
-            </label>
           </div>
         </div>
         <div className="modal-footer">
