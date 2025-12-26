@@ -5439,7 +5439,7 @@ ${rechnungsstellerName}`
         pdfBlob = pdf.output('blob')
 
       } else {
-        // ============ OHNE VORLAGE: Direkt mit jsPDF - Sportliches Design ============
+        // ============ OHNE VORLAGE: Direkt mit jsPDF - Professionelles Design ============
 
         // PDF mit jsPDF direkt erstellen (zuverlässiger als html2canvas)
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -5458,8 +5458,8 @@ ${rechnungsstellerName}`
         }
       }
 
-      // Header: RECHNUNG mit Teal-Hintergrund
-      pdf.setFillColor(13, 148, 136) // Teal #0d9488
+      // Header: RECHNUNG mit grauem Hintergrund
+      pdf.setFillColor(31, 41, 55) // Dark gray #1f2937
       pdf.rect(0, 0, pageWidth, 25, 'F')
       pdf.setFontSize(24)
       pdf.setFont('helvetica', 'bold')
@@ -5468,16 +5468,16 @@ ${rechnungsstellerName}`
       pdf.setTextColor(0, 0, 0)
       y = 35
 
-      // Rechnungssteller (links) - Card-Style mit Linie
+      // Rechnungssteller (links) - Card-Style professionell
       pdf.setFillColor(248, 250, 252)
       pdf.rect(margin, y - 3, 85, 28, 'F')
-      pdf.setDrawColor(13, 148, 136)
+      pdf.setDrawColor(55, 65, 81)
       pdf.setLineWidth(1)
       pdf.line(margin, y - 3, margin, y + 25)
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(13, 148, 136)
+      pdf.setTextColor(107, 114, 128)
       pdf.text('RECHNUNGSSTELLER', margin + 3, y + 1)
       pdf.setTextColor(0, 0, 0)
       y += 5
@@ -5505,17 +5505,17 @@ ${rechnungsstellerName}`
       }
       pdf.setTextColor(0, 0, 0)
 
-      // Rechnungsempfänger (rechts oben) - Card-Style mit Linie
+      // Rechnungsempfänger (rechts oben) - Card-Style professionell
       let yRight = 35
       pdf.setFillColor(248, 250, 252)
       pdf.rect(pageWidth - margin - 85, yRight - 3, 85, 28, 'F')
-      pdf.setDrawColor(8, 145, 178) // Cyan #0891b2
+      pdf.setDrawColor(107, 114, 128) // Gray
       pdf.setLineWidth(1)
       pdf.line(pageWidth - margin - 85, yRight - 3, pageWidth - margin - 85, yRight + 25)
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(8, 145, 178)
+      pdf.setTextColor(107, 114, 128)
       pdf.text('RECHNUNGSEMPFÄNGER', pageWidth - margin - 82, yRight + 1)
       pdf.setTextColor(0, 0, 0)
       yRight += 5
@@ -5533,13 +5533,13 @@ ${rechnungsstellerName}`
       y = Math.max(y, yRight) + 10
 
       // Rechnungsdetails - Info-Box
-      pdf.setFillColor(236, 254, 255) // Light cyan
+      pdf.setFillColor(249, 250, 251) // Light gray
       pdf.roundedRect(margin, y - 3, contentWidth, 14, 3, 3, 'F')
 
       const detailWidth = contentWidth / 3
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(13, 148, 136)
+      pdf.setTextColor(107, 114, 128)
       pdf.text('RECHNUNGSNUMMER', margin + 5, y + 1)
       pdf.text('RECHNUNGSDATUM', margin + detailWidth + 5, y + 1)
       pdf.text('LEISTUNGSZEITRAUM', margin + detailWidth * 2 + 5, y + 1)
@@ -5560,7 +5560,7 @@ ${rechnungsstellerName}`
       pdf.text(introLines, margin, y)
       y += introLines.length * 4 + 6
 
-      // Tabelle Header - Sportliches Design mit Teal
+      // Tabelle Header - Professionell grau
       const colWidths = hatMehrereSpieler
         ? [22, 28, 22, 28, 28, 20, kleinunternehmer ? 0 : 16, 20]
         : [25, 32, 25, 35, 22, kleinunternehmer ? 0 : 18, 22]
@@ -5568,9 +5568,9 @@ ${rechnungsstellerName}`
         ? ['Datum', 'Zeit', 'Dauer', 'Spieler', 'Tarif', 'Netto', ...(kleinunternehmer ? [] : ['USt']), 'Brutto']
         : ['Datum', 'Zeit', 'Dauer', 'Tarif', 'Netto', ...(kleinunternehmer ? [] : ['USt']), 'Brutto']
 
-      // Tabellen-Header zeichnen mit Teal-Hintergrund
+      // Tabellen-Header zeichnen mit grauem Hintergrund
       checkNewPage(10)
-      pdf.setFillColor(13, 148, 136) // Teal
+      pdf.setFillColor(31, 41, 55) // Dark gray
       pdf.roundedRect(margin, y - 4, contentWidth, 8, 2, 2, 'F')
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
@@ -5595,7 +5595,7 @@ ${rechnungsstellerName}`
 
         // Zebra-Stripe Hintergrund
         if (index % 2 === 0) {
-          pdf.setFillColor(240, 253, 244) // Light green
+          pdf.setFillColor(249, 250, 251) // Light gray
           pdf.rect(margin, y - 3, contentWidth, 5.5, 'F')
         }
 
@@ -5650,9 +5650,9 @@ ${rechnungsstellerName}`
       y += 6
       checkNewPage(35)
 
-      // Summen-Box - Sportliches Design
-      pdf.setFillColor(240, 253, 244) // Light green
-      pdf.setDrawColor(16, 185, 129) // Green accent
+      // Summen-Box - Professionell grau
+      pdf.setFillColor(249, 250, 251) // Light gray
+      pdf.setDrawColor(31, 41, 55) // Dark gray
       pdf.setLineWidth(1)
       const summenHeight = kleinunternehmer ? 18 : 24
       pdf.roundedRect(margin, y - 3, contentWidth, summenHeight, 3, 3, 'F')
@@ -5676,7 +5676,7 @@ ${rechnungsstellerName}`
 
       pdf.setFont('helvetica', 'bold')
       pdf.setFontSize(12)
-      pdf.setTextColor(13, 148, 136) // Teal
+      pdf.setTextColor(107, 114, 128) // Teal
       pdf.text('Gesamtbetrag:', margin + 5, y + 2)
       pdf.text(`${summen.gesamtBrutto.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
       pdf.setTextColor(0, 0, 0)
@@ -5692,23 +5692,23 @@ ${rechnungsstellerName}`
         y += 6
       }
 
-      // Zahlungsinfo-Box - Gelb/Amber Design
+      // Zahlungsinfo-Box - Professionell grau
       checkNewPage(40)
       y += 4
-      pdf.setFillColor(254, 243, 199) // Amber light
-      pdf.setDrawColor(245, 158, 11) // Amber accent
+      pdf.setFillColor(249, 250, 251) // Light gray
+      pdf.setDrawColor(55, 65, 81) // Dark gray
       pdf.setLineWidth(1)
       pdf.roundedRect(margin, y - 3, contentWidth, 28, 3, 3, 'F')
       pdf.line(margin, y - 3, margin, y + 25)
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(146, 64, 14) // Amber dark
+      pdf.setTextColor(31, 41, 55) // Dark gray
       pdf.text('ZAHLUNGSINFORMATIONEN', margin + 5, y + 2)
 
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(9)
-      pdf.setTextColor(120, 53, 15)
+      pdf.setTextColor(75, 85, 99)
       pdf.text('Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:', margin + 5, y + 8)
 
       // IBAN-Box
@@ -5720,7 +5720,7 @@ ${rechnungsstellerName}`
       pdf.setFont('helvetica', 'bold')
       pdf.text('IBAN:', margin + 8, y + 16)
       pdf.setFont('courier', 'normal')
-      pdf.setTextColor(13, 148, 136)
+      pdf.setTextColor(107, 114, 128)
       pdf.text(iban, margin + 22, y + 16)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(0, 0, 0)
@@ -5736,7 +5736,7 @@ ${rechnungsstellerName}`
       pdf.text('Mit freundlichen Grüßen', margin, y)
       y += 5
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(13, 148, 136)
+      pdf.setTextColor(107, 114, 128)
       pdf.text(rechnungsstellerName, margin, y)
       pdf.setTextColor(0, 0, 0)
 
