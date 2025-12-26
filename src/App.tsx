@@ -4615,24 +4615,24 @@ function InvoiceModal({
     if (selectedPdfVorlage) {
       pdfHtml = ersetzePlatzhalter(selectedPdfVorlage.inhalt)
     } else {
-      // Standard PDF-Layout - Sportlich-Dynamisches Design
+      // Standard PDF-Layout - Professionelles Design
       pdfHtml = `
-        <!-- Header mit Farbverlauf -->
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); margin: -24px -24px 24px -24px; padding: 30px 24px; border-radius: 0 0 20px 20px;">
-          <h1 style="text-align: center; margin: 0; font-size: 32px; color: white; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">RECHNUNG</h1>
+        <!-- Header -->
+        <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px;">
+          <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; ">RECHNUNG</h1>
         </div>
 
         <!-- Adressbereich -->
         <div style="display: flex; justify-content: space-between; margin-bottom: 24px; gap: 20px;">
-          <div style="flex: 1; background: #f8fafc; padding: 16px; border-radius: 12px; border-left: 4px solid #0d9488;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
+          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
             <div style="font-weight: 600; color: #1f2937;">${rechnungsstellerName}</div>
             <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
             ${profile?.steuernummer ? `<div style="color: #6b7280; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile.steuernummer}</div>` : ''}
             ${ustIdNr ? `<div style="color: #6b7280; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
           </div>
-          <div style="flex: 1; background: #f8fafc; padding: 16px; border-radius: 12px; border-left: 4px solid #0891b2;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #0891b2; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
+          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
             <div style="font-weight: 600; color: #1f2937;">${rechnungsempfaengerName}</div>
             <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}</div>
           </div>
@@ -4640,17 +4640,17 @@ function InvoiceModal({
 
         <!-- Rechnungsdetails -->
         <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-          <div style="flex: 1; background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 12px 16px; border-radius: 10px; text-align: center;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Rechnungsnummer</div>
-            <div style="font-size: 14px; font-weight: 700; color: #134e4a; margin-top: 4px;">${rechnungsnummer}</div>
+          <div style="flex: 1; background: #f9fafb; padding: 12px 16px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
+            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 4px;">${rechnungsnummer}</div>
           </div>
-          <div style="flex: 1; background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 12px 16px; border-radius: 10px; text-align: center;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Rechnungsdatum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #134e4a; margin-top: 4px;">${formatDateGerman(rechnungsdatum)}</div>
+          <div style="flex: 1; background: #f9fafb; padding: 12px 16px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 4px;">${formatDateGerman(rechnungsdatum)}</div>
           </div>
-          <div style="flex: 1; background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); padding: 12px 16px; border-radius: 10px; text-align: center;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Leistungszeitraum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #134e4a; margin-top: 4px;">${monatFormatiert}</div>
+          <div style="flex: 1; background: #f9fafb; padding: 12px 16px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 4px;">${monatFormatiert}</div>
           </div>
         </div>
 
@@ -4659,22 +4659,22 @@ function InvoiceModal({
         <p style="color: #374151; margin-bottom: 20px;">für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
 
         <!-- Positionen -->
-        ${positionenTabelle}
+        ${positionenTabelleKlassisch}
 
         <!-- Summen -->
-        ${summenBlockHtml}
+        ${summenBlockKlassisch}
 
         ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px; font-size: 11px;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
 
         <!-- Zahlungshinweis -->
-        <div style="margin-top: 32px; background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #f59e0b;">
-          <div style="font-weight: 600; color: #92400e; margin-bottom: 12px;">Zahlungsinformationen</div>
-          <div style="display: flex; gap: 24px; color: #78350f; font-size: 12px;">
+        <div style="margin-top: 32px; background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 12px;">Zahlungsinformationen</div>
+          <div style="display: flex; gap: 24px; color: #4b5563; font-size: 12px;">
             <div>
               <span style="font-weight: 600;">IBAN:</span> ${iban}<br>
               <span style="font-weight: 600;">Kontoinhaber:</span> ${rechnungsstellerName}
             </div>
-            <div style="color: #92400e;">
+            <div style="color: #6b7280;">
               Bitte überweisen Sie den Betrag<br>innerhalb von <strong>14 Tagen</strong>.
             </div>
           </div>
@@ -4683,7 +4683,7 @@ function InvoiceModal({
         <!-- Abschluss -->
         <div style="margin-top: 32px; color: #374151;">
           <p>Vielen Dank für Ihr Vertrauen und die gute Zusammenarbeit!</p>
-          <p style="margin-top: 24px;">Mit sportlichen Grüßen<br><strong style="color: #0d9488;">${rechnungsstellerName}</strong></p>
+          <p style="margin-top: 24px;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
         </div>
       `
     }
@@ -4784,7 +4784,7 @@ ${rechnungsstellerName}`
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
         <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right">${p.netto.toFixed(2)} €</td>
         ${!kleinunternehmer ? `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #0d9488;">${p.brutto.toFixed(2)} €</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #1f2937;">${p.brutto.toFixed(2)} €</td>
       </tr>
     `).join('')
 
@@ -4836,8 +4836,8 @@ ${rechnungsstellerName}`
         </div>
         ` : ''}
         <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #10b981; margin-top: 8px;">
-          <span style="font-size: 16px; font-weight: 700; color: #0d9488;">Gesamtbetrag:</span>
-          <span style="font-size: 18px; font-weight: 700; color: #0d9488;">${summen.gesamtBrutto.toFixed(2)} €</span>
+          <span style="font-size: 16px; font-weight: 700; color: #1f2937;">Gesamtbetrag:</span>
+          <span style="font-size: 18px; font-weight: 700; color: #1f2937;">${summen.gesamtBrutto.toFixed(2)} €</span>
         </div>
       </div>
     `
@@ -5034,7 +5034,7 @@ ${rechnungsstellerName}`
         </html>
       `
     } else {
-      // Standard PDF-Layout - Sportlich-dynamisches Design
+      // Standard PDF-Layout - Professionelles Design
       html = `
         <!DOCTYPE html>
         <html>
@@ -5057,39 +5057,39 @@ ${rechnungsstellerName}`
           </style>
         </head>
         <body>
-          <!-- Header mit Farbverlauf -->
-          <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); margin: -24px -24px 24px -24px; padding: 30px 24px; border-radius: 0 0 20px 20px;">
-            <h1 style="text-align: center; margin: 0; font-size: 32px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
+          <!-- Header -->
+          <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px;">
+            <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
           </div>
 
           <!-- Adressen in Cards -->
           <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
-            <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 16px; border-left: 4px solid #0d9488;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
+            <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
+              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
               <strong style="color: #111827;">${rechnungsstellerName}</strong><br>
               <span style="color: #4b5563;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</span>
               ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile.steuernummer}</span>` : ''}
               ${ustIdNr ? `<br><span style="color: #6b7280; font-size: 11px;">USt-IdNr: ${ustIdNr}</span>` : ''}
             </div>
-            <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 16px; border-left: 4px solid #0891b2;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #0891b2; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
+            <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
+              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
               <strong style="color: #111827;">${rechnungsempfaengerName}</strong><br>
               <span style="color: #4b5563;">${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}</span>
             </div>
           </div>
 
           <!-- Rechnungsdetails -->
-          <div style="background: linear-gradient(135deg, #ecfeff 0%, #f0fdf4 100%); border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center;">
+          <div style="background: #f9fafb; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #e5e7eb;">
             <div>
-              <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Rechnungsnummer</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
               <div style="font-size: 14px; font-weight: 700; color: #111827;">${rechnungsnummer}</div>
             </div>
             <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Rechnungsdatum</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
               <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatDateGerman(rechnungsdatum)}</div>
             </div>
             <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Leistungszeitraum</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
               <div style="font-size: 14px; font-weight: 700; color: #111827;">${monatFormatiert}</div>
             </div>
           </div>
@@ -5097,23 +5097,23 @@ ${rechnungsstellerName}`
           <p style="color: #374151;">Sehr geehrte Damen und Herren,</p>
           <p style="color: #374151;">für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
 
-          ${positionenTabelle}
-          ${summenBlock}
+          ${positionenTabelleKlassisch}
+          ${summenBlockKlassisch}
 
           ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
 
           <!-- Zahlungsinfo Box -->
-          <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #f59e0b;">
-            <div style="font-size: 11px; text-transform: uppercase; color: #92400e; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
-            <p style="margin: 0 0 8px 0; color: #78350f;">Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
-            <div style="background: rgba(255,255,255,0.6); border-radius: 8px; padding: 12px; margin-top: 8px;">
-              <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #0d9488;">${iban}</span><br>
+          <div style="background: #f9fafb; padding: 20px; margin-top: 24px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
+            <p style="margin: 0 0 8px 0; color: #4b5563;">Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
+            <div style="margin-top: 8px;">
+              <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #1f2937;">${iban}</span><br>
               <strong style="color: #111827;">Kontoinhaber:</strong> <span style="color: #374151;">${rechnungsstellerName}</span>
             </div>
           </div>
 
           <p style="margin-top: 24px; color: #374151;">Vielen Dank für Ihr Vertrauen!</p>
-          <p style="color: #374151;">Mit sportlichen Grüßen<br><strong style="color: #0d9488;">${rechnungsstellerName}</strong></p>
+          <p style="color: #374151;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
         </body>
         </html>
       `
@@ -5212,8 +5212,8 @@ ${rechnungsstellerName}`
             </div>
             ` : ''}
             <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #10b981; margin-top: 6px;">
-              <span style="font-size: 14px; font-weight: 700; color: #0d9488;">Gesamtbetrag:</span>
-              <span style="font-size: 16px; font-weight: 700; color: #0d9488;">${summen.gesamtBrutto.toFixed(2)} €</span>
+              <span style="font-size: 14px; font-weight: 700; color: #1f2937;">Gesamtbetrag:</span>
+              <span style="font-size: 16px; font-weight: 700; color: #1f2937;">${summen.gesamtBrutto.toFixed(2)} €</span>
             </div>
           </div>
         `
@@ -5733,7 +5733,7 @@ ${rechnungsstellerName}`
       pdf.setFontSize(10)
       pdf.text('Vielen Dank für Ihr Vertrauen!', margin, y)
       y += 6
-      pdf.text('Mit sportlichen Grüßen', margin, y)
+      pdf.text('Mit freundlichen Grüßen', margin, y)
       y += 5
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(13, 148, 136)
@@ -9664,7 +9664,7 @@ function BuchhaltungView({
                     </div>
                   </div>
 
-                  <p style={{ marginTop: 24, color: '#374151' }}>Mit sportlichen Grüßen<br /><strong style={{ color: '#0d9488' }}>{profile?.name} {profile?.nachname}</strong></p>
+                  <p style={{ marginTop: 24, color: '#374151' }}>Mit freundlichen Grüßen<br /><strong style={{ color: '#0d9488' }}>{profile?.name} {profile?.nachname}</strong></p>
                 </div>
               </div>
             </div>
@@ -9688,39 +9688,39 @@ function BuchhaltungView({
                       </style>
                     </head>
                     <body>
-                      <!-- Header mit Farbverlauf -->
+                      <!-- Header -->
                       <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 30px 24px; text-align: center; border-radius: 0 0 20px 20px;">
-                        <h1 style="margin: 0; font-size: 32px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
+                        <h1 style="margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
                       </div>
 
                       <div style="padding: 24px;">
                         <!-- Adressen in Cards -->
                         <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
-                          <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 16px; border-left: 4px solid #0d9488;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
+                          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
+                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
                             <strong style="color: #111827;">${profile?.name || ''} ${profile?.nachname || ''}</strong><br>
                             <span style="color: #4b5563;">${(profile?.adresse || '').replace(/\n/g, '<br>')}</span>
                             ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile.steuernummer}</span>` : ''}
                           </div>
-                          <div style="flex: 1; background: #f8fafc; border-radius: 12px; padding: 16px; border-left: 4px solid #0891b2;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #0891b2; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
+                          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
+                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
                             <strong style="color: #111827;">${viewingRechnung.empfaenger_name}</strong><br>
                             <span style="color: #4b5563;">${(viewingRechnung.empfaenger_adresse || '').replace(/\n/g, '<br>')}</span>
                           </div>
                         </div>
 
                         <!-- Rechnungsdetails -->
-                        <div style="background: linear-gradient(135deg, #ecfeff 0%, #f0fdf4 100%); border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center;">
+                        <div style="background: #f9fafb; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #e5e7eb;">
                           <div>
-                            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Rechnungsnummer</div>
+                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">${viewingRechnung.rechnungsnummer}</div>
                           </div>
                           <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Rechnungsdatum</div>
+                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatDateGerman(viewingRechnung.rechnungsdatum)}</div>
                           </div>
                           <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #0d9488; font-weight: 600;">Leistungszeitraum</div>
+                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">${viewingRechnung.leistungszeitraum || '-'}</div>
                           </div>
                         </div>
@@ -9743,7 +9743,7 @@ function BuchhaltungView({
                                   <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${pos.beschreibung}</td>
                                   <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${pos.menge}</td>
                                   <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${pos.einzelpreis.toFixed(2)} €</td>
-                                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #0d9488;">${(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
+                                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #1f2937;">${(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
                                 </tr>
                               `).join('')}
                             </tbody>
@@ -9763,24 +9763,24 @@ function BuchhaltungView({
                           </div>
                           ` : ''}
                           <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #10b981; margin-top: 8px;">
-                            <span style="font-size: 16px; font-weight: 700; color: #0d9488;">Gesamtbetrag:</span>
-                            <span style="font-size: 18px; font-weight: 700; color: #0d9488;">${viewingRechnung.brutto_gesamt.toFixed(2)} €</span>
+                            <span style="font-size: 16px; font-weight: 700; color: #1f2937;">Gesamtbetrag:</span>
+                            <span style="font-size: 18px; font-weight: 700; color: #1f2937;">${viewingRechnung.brutto_gesamt.toFixed(2)} €</span>
                           </div>
                         </div>
 
                         ${viewingRechnung.ust_satz === 0 ? '<p style="font-style: italic; margin-top: 16px; color: #6b7280;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
 
                         <!-- Zahlungsinfo Box -->
-                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #f59e0b;">
-                          <div style="font-size: 11px; text-transform: uppercase; color: #92400e; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
-                          <p style="margin: 0 0 8px 0; color: #78350f;">Bitte überweisen Sie den Betrag innerhalb von ${viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
-                          <div style="background: rgba(255,255,255,0.6); border-radius: 8px; padding: 12px; margin-top: 8px;">
-                            <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #0d9488;">${profile?.iban || '-'}</span><br>
+                        <div style="background: #f9fafb; padding: 20px; margin-top: 24px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
+                          <div style="font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
+                          <p style="margin: 0 0 8px 0; color: #4b5563;">Bitte überweisen Sie den Betrag innerhalb von ${viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
+                          <div style="margin-top: 8px;">
+                            <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #1f2937;">${profile?.iban || '-'}</span><br>
                             <strong style="color: #111827;">Kontoinhaber:</strong> <span style="color: #374151;">${profile?.name || ''} ${profile?.nachname || ''}</span>
                           </div>
                         </div>
 
-                        <p style="margin-top: 24px; color: #374151;">Mit sportlichen Grüßen<br><strong style="color: #0d9488;">${profile?.name || ''} ${profile?.nachname || ''}</strong></p>
+                        <p style="margin-top: 24px; color: #374151;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${profile?.name || ''} ${profile?.nachname || ''}</strong></p>
                       </div>
                     </body>
                     </html>
