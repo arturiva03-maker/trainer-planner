@@ -32,7 +32,8 @@
       "Bash(printf:*)",
       "Bash(git restore:*)",
       "Bash(SUPABASE_ACCESS_TOKEN=sbp_5d1c31513f47d9f9411ee61e0f9d9447a32f7ff6 npx supabase db push:*)",
-      "Bash(SUPABASE_ACCESS_TOKEN=sbp_6b11f1da0cc5695191516ea03a294aaca7d59c40 npx supabase:*)"
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_6b11f1da0cc5695191516ea03a294aaca7d59c40 npx supabase:*)",
+      "Bash(git checkout:*)"
     ]
   },
   "alwaysAllowWrites": true,

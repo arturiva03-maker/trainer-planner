@@ -4628,7 +4628,7 @@ function InvoiceModal({
             <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
             <div style="font-weight: 600; color: #1f2937;">${rechnungsstellerName}</div>
             <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
-            ${profile?.steuernummer ? `<div style="color: #6b7280; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile.steuernummer}</div>` : ''}
+            ${profile?.steuernummer ? `<div style="color: #6b7280; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
             ${ustIdNr ? `<div style="color: #6b7280; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
           </div>
           <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
@@ -5068,7 +5068,7 @@ ${rechnungsstellerName}`
               <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
               <strong style="color: #111827;">${rechnungsstellerName}</strong><br>
               <span style="color: #4b5563;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</span>
-              ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile.steuernummer}</span>` : ''}
+              ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
               ${ustIdNr ? `<br><span style="color: #6b7280; font-size: 11px;">USt-IdNr: ${ustIdNr}</span>` : ''}
             </div>
             <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
@@ -5160,7 +5160,7 @@ ${rechnungsstellerName}`
 
       let pdfBlob: Blob
 
-      if (selectedPdfVorlage || customPdfHtml) {
+      if (true) { // Immer html2canvas
         // ============ MIT VORLAGE ODER BEARBEITETEM INHALT: HTML zu PDF mit html2canvas ============
 
         // HTML-Hilfsdaten erstellen - Sportliches Design mit Zebra-Stripes
@@ -5324,8 +5324,8 @@ ${rechnungsstellerName}`
             pdfBody = pdfBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value)
           }
         } else {
-          // Fallback: Standard-Layout (sollte nicht vorkommen)
-          pdfBody = '<p>Fehler: Kein PDF-Inhalt verfügbar</p>'
+          // Standard-Layout aus vorschauDaten verwenden
+          pdfBody = vorschauDaten.pdfHtml
         }
 
         // Container erstellen - SICHTBAR für html2canvas
@@ -5494,7 +5494,7 @@ ${rechnungsstellerName}`
       if (profile?.steuernummer) {
         pdf.setTextColor(107, 114, 128)
         pdf.setFontSize(8)
-        pdf.text(`Steuernr: ${profile.steuernummer}`, margin + 3, y)
+        pdf.text(`Steuernr: ${profile?.steuernummer}`, margin + 3, y)
         y += 3.5
       }
       if (ustIdNr) {
@@ -6501,7 +6501,7 @@ function ManuelleRechnungModal({
             <strong>Rechnungssteller:</strong><br>
             ${rechnungsstellerName}<br>
             ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
-            ${profile?.steuernummer ? `<br>Steuernummer: ${profile.steuernummer}` : ''}
+            ${profile?.steuernummer ? `<br>Steuernummer: ${profile?.steuernummer}` : ''}
             ${ustIdNrValue ? `<br>USt-IdNr: ${ustIdNrValue}` : ''}
           </div>
           <div class="section" style="text-align: right;">
@@ -9577,7 +9577,7 @@ function BuchhaltungView({
                       <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0d9488', fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>Rechnungssteller</div>
                       <strong style={{ color: '#111827' }}>{profile?.name} {profile?.nachname}</strong><br />
                       <span style={{ color: '#4b5563' }}>{profile?.adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</span>
-                      {profile?.steuernummer && <span style={{ color: '#6b7280', fontSize: 11 }}>Steuernr: {profile.steuernummer}<br /></span>}
+                      {profile?.steuernummer && <span style={{ color: '#6b7280', fontSize: 11 }}>Steuernr: {profile?.steuernummer}<br /></span>}
                     </div>
                     <div style={{ flex: 1, background: '#f8fafc', borderRadius: 12, padding: 16, borderLeft: '4px solid #0891b2' }}>
                       <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0891b2', fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>Rechnungsempfänger</div>
@@ -9700,7 +9700,7 @@ function BuchhaltungView({
                             <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
                             <strong style="color: #111827;">${profile?.name || ''} ${profile?.nachname || ''}</strong><br>
                             <span style="color: #4b5563;">${(profile?.adresse || '').replace(/\n/g, '<br>')}</span>
-                            ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile.steuernummer}</span>` : ''}
+                            ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
                           </div>
                           <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
                             <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
@@ -11343,7 +11343,7 @@ function WeiteresView({
                   {profile?.steuernummer && (
                     <>
                       <h4>Steuernummer</h4>
-                      <p>{profile.steuernummer}</p>
+                      <p>{profile?.steuernummer}</p>
                     </>
                   )}
 
