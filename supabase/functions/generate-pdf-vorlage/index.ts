@@ -74,9 +74,9 @@ serve(async (req) => {
   }
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY not configured')
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY')
+    if (!GOOGLE_API_KEY) {
+      throw new Error('GOOGLE_API_KEY not configured')
     }
 
     const { prompt, currentVorlage } = await req.json()
@@ -110,37 +110,41 @@ ${DEFAULT_VORLAGE}
       ? `Aktuelle Vorlage:\n${currentVorlage}\n\nAnfrage des Benutzers: ${prompt}`
       : `Anfrage des Benutzers: ${prompt}`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [
+        contents: [
           {
             role: 'user',
-            content: userPrompt
+            parts: [{ text: userPrompt }]
           }
-        ]
+        ],
+        system_instruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        generationConfig: {
+          temperature: 0.2,
+          topK: 1,
+          topP: 1,
+          maxOutputTokens: 8192,
+        }
       })
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Claude API error:', errorText)
-      throw new Error(`Claude API error: ${response.status}`)
+      console.error('Gemini API error:', errorText)
+      throw new Error(`Gemini API error: ${response.status}`)
     }
 
     const result = await response.json()
-    let htmlContent = result.content.find((c: any) => c.type === 'text')?.text
+    let htmlContent = result.candidates?.[0]?.content?.parts?.[0]?.text
 
     if (!htmlContent) {
-      throw new Error('No response from Claude')
+      throw new Error('No response from Gemini')
     }
 
     // Entferne eventuelle Markdown-Codeblöcke

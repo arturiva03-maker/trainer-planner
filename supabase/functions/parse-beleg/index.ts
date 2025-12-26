@@ -19,15 +19,14 @@ interface BelegData {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY not configured')
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY')
+    if (!GOOGLE_API_KEY) {
+      throw new Error('GOOGLE_API_KEY not configured')
     }
 
     const { imageBase64, mimeType } = await req.json()
@@ -36,47 +35,25 @@ serve(async (req) => {
       throw new Error('imageBase64 and mimeType are required')
     }
 
-    // Bestimme ob es ein PDF oder Bild ist
     const isPdf = mimeType === 'application/pdf'
 
-    // Content-Block erstellen (unterschiedlich für PDF vs Bild)
-    const mediaContent = isPdf
-      ? {
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: 'application/pdf',
-            data: imageBase64
-          }
-        }
-      : {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: mimeType,
-            data: imageBase64
-          }
-        }
-
-    // Claude API aufrufen mit Vision/Document
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Google Gemini API aufrufen
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              mediaContent,
-              {
-                type: 'text',
-                text: `Analysiere diesen Beleg/Quittung/Rechnung und extrahiere die folgenden Informationen.
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: isPdf ? 'application/pdf' : mimeType,
+                data: imageBase64
+              }
+            },
+            {
+              text: `Analysiere diesen Beleg/Quittung/Rechnung und extrahiere die folgenden Informationen.
 Antworte NUR mit einem validen JSON-Objekt (ohne Markdown-Codeblöcke), ohne zusätzlichen Text.
 
 Das JSON soll folgende Felder haben:
@@ -98,27 +75,29 @@ Das JSON soll folgende Felder haben:
 
 Beispiel-Antwort:
 {"datum":"2024-12-10","betrag":49.99,"beschreibung":"Büromaterial","kategorie":"buero","hatVorsteuer":true,"vorsteuerSatz":19,"haendler":"Staples","rechnungsnummer":"RE-2024-12345","rechnungsdatum":"2024-12-10"}`
-              }
-            ]
-          }
-        ]
+            }
+          ]
+        }],
+        generationConfig: {
+          response_mime_type: "application/json"
+        }
       })
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Claude API error:', errorText)
-      throw new Error(`Claude API error: ${response.status}`)
+      console.error('Gemini API error:', errorText)
+      throw new Error(`Gemini API error: ${response.status}`)
     }
 
     const result = await response.json()
-    const textContent = result.content.find((c: any) => c.type === 'text')?.text
+    const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text
 
     if (!textContent) {
-      throw new Error('No text response from Claude')
+      throw new Error('No text response from Gemini')
     }
 
-    // JSON parsen (Claude könnte Markdown-Codeblöcke zurückgeben)
+    // JSON parsen
     let jsonStr = textContent.trim()
     if (jsonStr.startsWith('```json')) {
       jsonStr = jsonStr.slice(7)

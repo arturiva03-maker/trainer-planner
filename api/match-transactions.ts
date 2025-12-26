@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import Anthropic from '@anthropic-ai/sdk'
 
 interface OffenerPosten {
   id: string
@@ -54,9 +53,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.GOOGLE_API_KEY?.trim()
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY nicht konfiguriert' })
+    return res.status(500).json({ error: 'GOOGLE_API_KEY nicht konfiguriert' })
   }
 
   try {
@@ -66,9 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Keine Transaktionen zum Matchen' })
     }
 
-    const client = new Anthropic({ apiKey })
-
-    // Formatiere die Daten für Claude
+    // Formatiere die Daten
     const offenePostenText = offenePosten.map(p => {
       const betragStr = p.betrag >= 0 ? `+${p.betrag.toFixed(2)}` : p.betrag.toFixed(2)
       return `- ID: ${p.id} | Typ: ${p.typ} | Datum: ${p.datum} | ${p.empfaenger_name} | ${betragStr} EUR | ${p.beschreibung || ''} ${p.rechnungsnummer ? `| RG: ${p.rechnungsnummer}` : ''}`
@@ -122,26 +119,43 @@ Confidence-Werte:
 - 50-69: Möglich (nur einer der Faktoren passt)
 - unter 50: Unsicher (lieber null zurückgeben)`
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }]
+    // Gemini API aufrufen mit dem funktionierenden Modellnamen
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          response_mime_type: "application/json"
+        }
+      })
     })
 
-    // Extrahiere die Antwort
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`)
+    }
+
+    const result = await response.json()
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
     // Parse JSON aus der Antwort
     let results: MatchResult[] = []
     try {
-      // Versuche das JSON zu extrahieren (auch wenn es in Markdown-Codeblocks ist)
+      // Gemini mit response_mime_type sollte direkt valides JSON liefern
+      results = JSON.parse(responseText)
+    } catch (parseError) {
+      // Fallback falls Markdown-Backticks enthalten sind
       const jsonMatch = responseText.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         results = JSON.parse(jsonMatch[0])
+      } else {
+        throw parseError
       }
-    } catch (parseError) {
-      console.error('JSON Parse Error:', parseError, 'Response:', responseText)
-      return res.status(500).json({ error: 'Konnte AI-Antwort nicht parsen', raw: responseText })
     }
 
     return res.status(200).json({
