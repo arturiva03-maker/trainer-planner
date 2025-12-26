@@ -4497,6 +4497,71 @@ function InvoiceModal({
       </table>
     `
 
+    // Klassische Positionen-Tabelle - Professionell ohne Farben
+    const positionenHtmlKlassisch = rechnungsPositionen.map((p, idx) => `
+      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.zeit}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.spielerName}</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
+      </tr>
+    `).join('')
+
+    const korrekturHtmlKlassisch = summen.korrektur !== 0 ? `
+      <tr style="background: #f9fafb;">
+        <td colspan="${korrekturColSpan}" style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><em>Korrektur</em></td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
+      </tr>
+    ` : ''
+
+    const positionenTabelleKlassisch = `
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
+        <thead>
+          <tr style="background: #1f2937;">
+            <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Datum</th>
+            <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Zeit</th>
+            <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Dauer</th>
+            ${hatMehrereSpieler ? '<th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Spieler</th>' : ''}
+            <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Tarif</th>
+            <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Netto</th>
+            ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
+            <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Brutto</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${positionenHtmlKlassisch}
+          ${korrekturHtmlKlassisch}
+        </tbody>
+      </table>
+    `
+
+    // Klassischer Summen-Block - Professionell ohne Farben
+    const summenBlockKlassisch = `
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+          <span>Nettobetrag:</span>
+          <span style="font-family: monospace;">${summen.gesamtNetto.toFixed(2)} €</span>
+        </div>
+        ${!kleinunternehmer ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+          <span>USt (19%):</span>
+          <span style="font-family: monospace;">${summen.gesamtUst.toFixed(2)} €</span>
+        </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; color: #1f2937;">
+          <span>Gesamtbetrag:</span>
+          <span style="font-family: monospace; font-size: 16px;">${summen.gesamtBrutto.toFixed(2)} €</span>
+        </div>
+      </div>
+    `
+
     // Spieler-spezifische Daten für SEPA
     const spielerIban = selectedSummary?.spieler.iban || ''
     const spielerMandatsreferenz = selectedSummary?.spieler.mandatsreferenz || ''
@@ -4529,6 +4594,8 @@ function InvoiceModal({
       '{{empfaenger_adresse_html}}': rechnungsempfaengerAdresse.replace(/\n/g, '<br>'),
       '{{kleinunternehmer_hinweis}}': kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : '',
       '{{summen_block}}': summenBlockHtml,
+      '{{positionen_tabelle_klassisch}}': positionenTabelleKlassisch,
+      '{{summen_block_klassisch}}': summenBlockKlassisch,
       '{{spieler_iban}}': maskiereIban(spielerIban),
       '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
       '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
