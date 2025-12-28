@@ -6656,19 +6656,40 @@ function ManuelleRechnungModal({
 
       try {
         const canvas = await html2canvas(container, {
-          scale: 1,
+          scale: 2,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
           width: 794,
-          windowWidth: 794
+          windowWidth: 794,
+          onclone: (clonedDoc) => {
+            // Force black color on all elements in cloned document (wie Standard-Rechnungen)
+            const clonedContainer = clonedDoc.getElementById('pdf-render-container')
+            if (clonedContainer) {
+              const allElements = clonedContainer.querySelectorAll('*')
+              allElements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('opacity', '1', 'important')
+              })
+              // Target tbody elements specifically
+              const tbodyElements = clonedContainer.querySelectorAll('tbody, tbody *, td, tr')
+              tbodyElements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('opacity', '1', 'important')
+              })
+            }
+          }
         })
 
         document.body.removeChild(container)
 
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-        // PNG für bessere Qualität
-        const imgData = canvas.toDataURL('image/png')
+        // JPEG mit hoher Qualität (wie Standard-Rechnungen)
+        const imgData = canvas.toDataURL('image/jpeg', 0.95)
         const pdfWidth = pdf.internal.pageSize.getWidth()
         const pdfHeight = pdf.internal.pageSize.getHeight()
         const imgWidth = canvas.width
@@ -6677,7 +6698,7 @@ function ManuelleRechnungModal({
         const imgX = (pdfWidth - imgWidth * ratio) / 2
         const imgY = 0
 
-        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+        pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
 
         const pdfBlob = pdf.output('blob')
         const reader = new FileReader()
