@@ -6544,15 +6544,15 @@ function ManuelleRechnungModal({
         <p style="color: #374151; margin-bottom: 24px;">${introText}</p>
 
         <!-- Positionen-Tabelle -->
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px; border: 1px solid #d1d5db;">
           <thead>
-            <tr style="background: #1f2937;">
-              <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
-              <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
-              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
-              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Netto</th>
-              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
-              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Brutto</th>
+            <tr style="background: #e5e7eb; border-bottom: 2px solid #9ca3af;">
+              <th style="padding: 10px 8px; text-align: left; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
+              <th style="padding: 10px 8px; text-align: left; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
+              <th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
+              <th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Netto</th>
+              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
+              <th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Brutto</th>
             </tr>
           </thead>
           <tbody>
@@ -6632,25 +6632,28 @@ function ManuelleRechnungModal({
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
       const bodyContent = bodyMatch ? bodyMatch[1] : html
 
-      // Style-Block für korrekte Farben (klassisches Design)
+      // Style-Block für schwarze Farben (wie Standard-Rechnungen)
       container.innerHTML = `
         <style>
+          #pdf-render-container,
           #pdf-render-container * {
-            color: #1f2937 !important;
-            -webkit-text-fill-color: #1f2937 !important;
+            color: #000 !important;
+            -webkit-text-fill-color: #000 !important;
           }
-          #pdf-render-container h1 {
-            color: #1f2937 !important;
-            -webkit-text-fill-color: #1f2937 !important;
-          }
-          #pdf-render-container table th {
-            color: #fff !important;
-            -webkit-text-fill-color: #fff !important;
-            background: #1f2937 !important;
-          }
-          #pdf-render-container table td {
-            color: #1f2937 !important;
-            -webkit-text-fill-color: #1f2937 !important;
+          #pdf-render-container table,
+          #pdf-render-container table *,
+          #pdf-render-container td,
+          #pdf-render-container th,
+          #pdf-render-container tr,
+          #pdf-render-container tbody,
+          #pdf-render-container tbody *,
+          #pdf-render-container tbody tr,
+          #pdf-render-container tbody td,
+          #pdf-render-container thead,
+          #pdf-render-container strong {
+            color: #000 !important;
+            -webkit-text-fill-color: #000 !important;
+            opacity: 1 !important;
           }
         </style>
         ${bodyContent}
@@ -6668,28 +6671,23 @@ function ManuelleRechnungModal({
           width: 794,
           windowWidth: 794,
           onclone: (clonedDoc) => {
+            // Force black color on all elements (wie Standard-Rechnungen)
             const clonedContainer = clonedDoc.getElementById('pdf-render-container')
             if (clonedContainer) {
-              // Alle Text-Elemente dunkelgrau (#1f2937)
-              const allTextElements = clonedContainer.querySelectorAll('p, span, div, td, strong, em')
-              allTextElements.forEach((el) => {
+              const allElements = clonedContainer.querySelectorAll('*')
+              allElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#1f2937', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#1f2937', 'important')
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('opacity', '1', 'important')
               })
-              // Tabellen-Header weiß auf dunklem Hintergrund
-              const theadElements = clonedContainer.querySelectorAll('thead th, thead th *')
-              theadElements.forEach((el) => {
+              // Extra: Target tbody elements specifically
+              const tbodyElements = clonedContainer.querySelectorAll('tbody, tbody *, td, tr, th')
+              tbodyElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#fff', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#fff', 'important')
-              })
-              // h1 dunkelgrau (klassisches Design)
-              const h1Elements = clonedContainer.querySelectorAll('h1')
-              h1Elements.forEach((el) => {
-                const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#1f2937', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#1f2937', 'important')
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('opacity', '1', 'important')
               })
             }
           }
