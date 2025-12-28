@@ -6470,12 +6470,12 @@ function ManuelleRechnungModal({
       const ust = gesamt - netto
       return `
         <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f0f0f0'};">
-          <td style="padding: 8px; border-bottom: 1px solid #999; color: #000000;">${idx + 1}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #999; color: #000000;">${p.beschreibung || '-'}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right; color: #000000;">${p.menge}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right; font-family: monospace; color: #000000;">${p.einzelpreis.toFixed(2)} €</td>
-          ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #999; text-align: right; font-family: monospace; color: #000000;">${ust.toFixed(2)} €</td>` : ''}
-          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right; font-family: monospace; font-weight: 600; color: #000000;">${gesamt.toFixed(2)} €</td>
+          <td style="padding: 8px; border-bottom: 1px solid #999;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important;">${idx + 1}</span></td>
+          <td style="padding: 8px; border-bottom: 1px solid #999;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important;">${p.beschreibung || '-'}</span></td>
+          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important;">${p.menge}</span></td>
+          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important; font-weight: 600;">${p.einzelpreis.toFixed(2)} €</span></td>
+          ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important; font-weight: 600;">${ust.toFixed(2)} €</span></td>` : ''}
+          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important; font-weight: 700;">${gesamt.toFixed(2)} €</span></td>
         </tr>
       `
     }).join('')
