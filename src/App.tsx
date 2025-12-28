@@ -6656,7 +6656,7 @@ function ManuelleRechnungModal({
 
       try {
         const canvas = await html2canvas(container, {
-          scale: 2,
+          scale: 1,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
