@@ -6507,7 +6507,7 @@ function ManuelleRechnungModal({
       </head>
       <body>
         <!-- Header -->
-        <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px;">
+        <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px; margin-left: -24px; margin-right: -24px; margin-top: -24px;">
           <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
         </div>
 
@@ -6611,44 +6611,52 @@ function ManuelleRechnungModal({
       // Für E-Mail-Versand: html2canvas verwenden
       const container = document.createElement('div')
       container.id = 'pdf-render-container'
-      container.style.cssText = 'position: fixed; top: 0; left: 0; width: 794px; background: white; z-index: 99999; padding: 0; margin: 0;'
-      container.innerHTML = html.replace(/<html>|<\/html>|<head>[\s\S]*?<\/head>|<body>|<\/body>|<!DOCTYPE html>/gi, '')
+      container.style.cssText = 'position: fixed; top: 0; left: 0; width: 794px; background: white; z-index: 99999; padding: 24px; margin: 0; font-family: Segoe UI, system-ui, -apple-system, sans-serif; font-size: 12px; color: #1f2937; line-height: 1.6;'
+
+      // Body-Inhalt extrahieren
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+      container.innerHTML = bodyMatch ? bodyMatch[1] : html
       document.body.appendChild(container)
 
       await new Promise(resolve => setTimeout(resolve, 300))
 
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        width: 794,
-        windowWidth: 794
-      })
+      try {
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: 794,
+          windowWidth: 794
+        })
 
-      document.body.removeChild(container)
+        document.body.removeChild(container)
 
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const imgData = canvas.toDataURL('image/png')
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
-      const imgX = (pdfWidth - imgWidth * ratio) / 2
-      const imgY = 0
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const imgData = canvas.toDataURL('image/png')
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+        const imgWidth = canvas.width
+        const imgHeight = canvas.height
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+        const imgX = (pdfWidth - imgWidth * ratio) / 2
+        const imgY = 0
 
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
 
-      const pdfBlob = pdf.output('blob')
-      const reader = new FileReader()
-      return new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1]
-          resolve(base64)
-        }
-        reader.readAsDataURL(pdfBlob)
-      })
+        const pdfBlob = pdf.output('blob')
+        const reader = new FileReader()
+        return new Promise<string>((resolve) => {
+          reader.onloadend = () => {
+            const base64 = (reader.result as string).split(',')[1]
+            resolve(base64)
+          }
+          reader.readAsDataURL(pdfBlob)
+        })
+      } catch (err) {
+        document.body.removeChild(container)
+        throw err
+      }
     } else {
       // Für Druck: Fenster öffnen wie bei Standard-Rechnungen
       const blob = new Blob([html], { type: 'text/html' })
