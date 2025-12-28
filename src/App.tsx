@@ -6507,7 +6507,7 @@ function ManuelleRechnungModal({
       </head>
       <body>
         <!-- Header -->
-        <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px; margin-left: -24px; margin-right: -24px; margin-top: -24px;">
+        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); margin: -24px -24px 24px -24px; padding: 24px; margin-left: -24px; margin-right: -24px; margin-top: -24px;">
           <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
         </div>
 
@@ -6551,7 +6551,7 @@ function ManuelleRechnungModal({
         <!-- Positionen-Tabelle -->
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
           <thead>
-            <tr style="background: #000000;">
+            <tr style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);">
               <th style="padding: 10px 8px; text-align: left; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
               <th style="padding: 10px 8px; text-align: left; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
               <th style="padding: 10px 8px; text-align: right; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
@@ -6666,20 +6666,22 @@ function ManuelleRechnungModal({
             // Force black color on all elements in cloned document (wie Standard-Rechnungen)
             const clonedContainer = clonedDoc.getElementById('pdf-render-container')
             if (clonedContainer) {
-              const allElements = clonedContainer.querySelectorAll('*')
-              allElements.forEach((el) => {
-                const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#000', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-                htmlEl.style.setProperty('opacity', '1', 'important')
-              })
-              // Target tbody elements specifically
-              const tbodyElements = clonedContainer.querySelectorAll('tbody, tbody *, td, tr')
+              // Target tbody elements specifically - nicht thead (Header soll weiß bleiben)
+              const tbodyElements = clonedContainer.querySelectorAll('tbody, tbody *, td, td *')
               tbodyElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
                 htmlEl.style.setProperty('color', '#000', 'important')
                 htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
                 htmlEl.style.setProperty('opacity', '1', 'important')
+              })
+              // Alle Paragraphen und divs außerhalb der Tabelle
+              const textElements = clonedContainer.querySelectorAll('p, div:not(thead *), span:not(thead *)')
+              textElements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                if (!htmlEl.closest('thead') && !htmlEl.closest('th')) {
+                  htmlEl.style.setProperty('color', '#000', 'important')
+                  htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                }
               })
             }
           }
