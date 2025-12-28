@@ -6663,25 +6663,28 @@ function ManuelleRechnungModal({
           width: 794,
           windowWidth: 794,
           onclone: (clonedDoc) => {
-            // Force black color on all elements in cloned document (wie Standard-Rechnungen)
             const clonedContainer = clonedDoc.getElementById('pdf-render-container')
             if (clonedContainer) {
-              // Target tbody elements specifically - nicht thead (Header soll weiß bleiben)
-              const tbodyElements = clonedContainer.querySelectorAll('tbody, tbody *, td, td *')
+              // Tabellen-Body Zellen schwarz
+              const tbodyElements = clonedContainer.querySelectorAll('tbody td, tbody td *')
               tbodyElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
                 htmlEl.style.setProperty('color', '#000', 'important')
                 htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-                htmlEl.style.setProperty('opacity', '1', 'important')
               })
-              // Alle Paragraphen und divs außerhalb der Tabelle
-              const textElements = clonedContainer.querySelectorAll('p, div:not(thead *), span:not(thead *)')
-              textElements.forEach((el) => {
+              // Tabellen-Header weiß halten
+              const theadElements = clonedContainer.querySelectorAll('thead th, thead th *')
+              theadElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
-                if (!htmlEl.closest('thead') && !htmlEl.closest('th')) {
-                  htmlEl.style.setProperty('color', '#000', 'important')
-                  htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
-                }
+                htmlEl.style.setProperty('color', '#fff', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#fff', 'important')
+              })
+              // Paragraphen schwarz (außer im Header h1)
+              const pElements = clonedContainer.querySelectorAll('p')
+              pElements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                htmlEl.style.setProperty('color', '#000', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
               })
             }
           }
