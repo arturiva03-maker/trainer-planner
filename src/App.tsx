@@ -6638,10 +6638,13 @@ function ManuelleRechnungModal({
             color: #000 !important;
             -webkit-text-fill-color: #000 !important;
           }
+          #pdf-render-container h1 {
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+          }
           #pdf-render-container table th {
             color: #fff !important;
             -webkit-text-fill-color: #fff !important;
-            background: #1f2937 !important;
           }
           #pdf-render-container table td {
             color: #000 !important;
@@ -6679,7 +6682,14 @@ function ManuelleRechnungModal({
                 htmlEl.style.setProperty('color', '#fff', 'important')
                 htmlEl.style.setProperty('-webkit-text-fill-color', '#fff', 'important')
               })
-              // Paragraphen schwarz (außer im Header h1)
+              // h1 Header weiß halten
+              const h1Elements = clonedContainer.querySelectorAll('h1')
+              h1Elements.forEach((el) => {
+                const htmlEl = el as HTMLElement
+                htmlEl.style.setProperty('color', '#fff', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#fff', 'important')
+              })
+              // Paragraphen schwarz
               const pElements = clonedContainer.querySelectorAll('p')
               pElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
