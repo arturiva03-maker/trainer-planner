@@ -6656,7 +6656,7 @@ function ManuelleRechnungModal({
 
       try {
         const canvas = await html2canvas(container, {
-          scale: 1.5,
+          scale: 2,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
@@ -6667,8 +6667,8 @@ function ManuelleRechnungModal({
         document.body.removeChild(container)
 
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-        // JPEG statt PNG für kleinere Dateigröße
-        const imgData = canvas.toDataURL('image/jpeg', 0.85)
+        // PNG für bessere Qualität
+        const imgData = canvas.toDataURL('image/png')
         const pdfWidth = pdf.internal.pageSize.getWidth()
         const pdfHeight = pdf.internal.pageSize.getHeight()
         const imgWidth = canvas.width
@@ -6677,7 +6677,7 @@ function ManuelleRechnungModal({
         const imgX = (pdfWidth - imgWidth * ratio) / 2
         const imgY = 0
 
-        pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
 
         const pdfBlob = pdf.output('blob')
         const reader = new FileReader()
