@@ -6463,19 +6463,19 @@ function ManuelleRechnungModal({
     const ustIdNr = profile?.ust_id_nr || ''
     const iban = profile?.iban || ''
 
-    // Positionen-Tabelle HTML
+    // Positionen-Tabelle HTML - mit stärkerem Kontrast
     const positionenHtml = rechnungData.positionen.map((p, idx) => {
       const gesamt = p.menge * p.einzelpreis
       const netto = kleinunternehmer ? gesamt : gesamt / (1 + rechnungData.ustSatz / 100)
       const ust = gesamt - netto
       return `
-        <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${idx + 1}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.beschreibung || '-'}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${p.menge}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.einzelpreis.toFixed(2)} €</td>
-          ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${ust.toFixed(2)} €</td>` : ''}
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${gesamt.toFixed(2)} €</td>
+        <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f3f4f6'};">
+          <td style="padding: 10px 8px; border: 1px solid #d1d5db; color: #374151;">${idx + 1}</td>
+          <td style="padding: 10px 8px; border: 1px solid #d1d5db; color: #111827;">${p.beschreibung || '-'}</td>
+          <td style="padding: 10px 8px; border: 1px solid #d1d5db; text-align: right; color: #374151;">${p.menge}</td>
+          <td style="padding: 10px 8px; border: 1px solid #d1d5db; text-align: right; font-family: monospace; color: #374151;">${p.einzelpreis.toFixed(2)} €</td>
+          ${!kleinunternehmer ? `<td style="padding: 10px 8px; border: 1px solid #d1d5db; text-align: right; font-family: monospace; color: #374151;">${ust.toFixed(2)} €</td>` : ''}
+          <td style="padding: 10px 8px; border: 1px solid #d1d5db; text-align: right; font-family: monospace; font-weight: 700; color: #111827;">${gesamt.toFixed(2)} €</td>
         </tr>
       `
     }).join('')
@@ -6566,18 +6566,18 @@ function ManuelleRechnungModal({
         </table>
 
         <!-- Summen-Block -->
-        <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+        <div style="background: #f3f4f6; border: 2px solid #d1d5db; padding: 16px; margin-top: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151; font-size: 13px;">
             <span>Nettobetrag:</span>
-            <span style="font-family: monospace;">${nettoGesamt.toFixed(2)} €</span>
+            <span style="font-family: monospace; font-weight: 500;">${nettoGesamt.toFixed(2)} €</span>
           </div>
           ${!kleinunternehmer ? `
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151; font-size: 13px;">
             <span>USt (${rechnungData.ustSatz}%):</span>
-            <span style="font-family: monospace;">${ustBetrag.toFixed(2)} €</span>
+            <span style="font-family: monospace; font-weight: 500;">${ustBetrag.toFixed(2)} €</span>
           </div>
           ` : ''}
-          <div style="display: flex; justify-content: space-between; padding-top: 8px; margin-top: 8px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px;">
+          <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 3px solid #1f2937; font-weight: bold; font-size: 16px; color: #111827;">
             <span>Gesamtbetrag:</span>
             <span style="font-family: monospace;">${bruttoGesamt.toFixed(2)} €</span>
           </div>
