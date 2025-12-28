@@ -3996,7 +3996,6 @@ function AbrechnungView({
           profile={profile}
           selectedMonth={selectedMonth}
           userId={userId}
-          pdfVorlagen={pdfVorlagen}
           onClose={() => setShowManuelleRechnungModal(false)}
           onSave={() => {
             setShowManuelleRechnungModal(false)
@@ -6353,14 +6352,12 @@ function ManuelleRechnungModal({
   profile,
   selectedMonth,
   userId,
-  pdfVorlagen,
   onClose,
   onSave
 }: {
   profile: TrainerProfile | null
   selectedMonth: string
   userId: string
-  pdfVorlagen: PdfVorlage[]
   onClose: () => void
   onSave: () => void
 }) {
@@ -6383,10 +6380,6 @@ function ManuelleRechnungModal({
 
   const [saving, setSaving] = useState(false)
   const [sendingEmail, setSendingEmail] = useState(false)
-  const [selectedPdfVorlageId, setSelectedPdfVorlageId] = useState<string>(() => {
-    const standardVorlage = pdfVorlagen.find(v => v.ist_standard)
-    return standardVorlage?.id || ''
-  })
 
   const addPosition = () => {
     setRechnungData(prev => ({
@@ -6993,25 +6986,6 @@ ${profile?.name || ''}`
             placeholder="Zusätzlicher Text auf der Rechnung..."
           />
         </div>
-
-        {/* PDF-Vorlage Auswahl */}
-        {pdfVorlagen.length > 0 && (
-          <div className="form-group" style={{ marginTop: 16 }}>
-            <label>PDF-Vorlage</label>
-            <select
-              className="form-control"
-              value={selectedPdfVorlageId}
-              onChange={(e) => setSelectedPdfVorlageId(e.target.value)}
-            >
-              <option value="">Standard-Vorlage</option>
-              {pdfVorlagen.map(v => (
-                <option key={v.id} value={v.id}>
-                  {v.name} {v.ist_standard ? '(bevorzugt)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Zusammenfassung */}
         <div style={{ background: 'var(--gray-100)', padding: 16, borderRadius: 'var(--radius)', marginTop: 24 }}>
