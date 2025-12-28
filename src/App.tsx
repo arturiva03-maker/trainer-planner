@@ -6456,317 +6456,190 @@ function ManuelleRechnungModal({
     }
   }
 
-  const generatePdf = async (returnBase64 = false) => {
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-
-    const pageWidth = 210
-    const pageHeight = 297
-    const margin = 15
-    const contentWidth = pageWidth - 2 * margin
-    let y = margin
-
-    // Hilfsfunktion für Text mit automatischem Seitenumbruch
-    const checkNewPage = (neededHeight: number) => {
-      if (y + neededHeight > pageHeight - margin) {
-        pdf.addPage()
-        y = margin
-      }
-    }
-
+  // HTML-Template für PDF generieren (wie bei Standard-Rechnungen)
+  const generatePdfHtml = () => {
     const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`.trim()
     const rechnungsstellerAdresse = profile?.adresse || ''
     const ustIdNr = profile?.ust_id_nr || ''
     const iban = profile?.iban || ''
 
-    // Header: RECHNUNG mit grauem Hintergrund
-    pdf.setFillColor(31, 41, 55) // Dark gray #1f2937
-    pdf.rect(0, 0, pageWidth, 25, 'F')
-    pdf.setFontSize(24)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(255, 255, 255)
-    pdf.text('RECHNUNG', pageWidth / 2, 17, { align: 'center' })
-    pdf.setTextColor(0, 0, 0)
-    y = 35
-
-    // Rechnungssteller (links)
-    pdf.setFillColor(248, 250, 252)
-    pdf.rect(margin, y - 3, 85, 28, 'F')
-    pdf.setDrawColor(55, 65, 81)
-    pdf.setLineWidth(1)
-    pdf.line(margin, y - 3, margin, y + 25)
-
-    pdf.setFontSize(8)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(107, 114, 128)
-    pdf.text('RECHNUNGSSTELLER', margin + 3, y + 1)
-    pdf.setTextColor(0, 0, 0)
-    y += 5
-    pdf.setFontSize(10)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text(rechnungsstellerName, margin + 3, y)
-    y += 4
-    pdf.setFontSize(9)
-    pdf.setFont('helvetica', 'normal')
-    rechnungsstellerAdresse.split('\n').forEach(line => {
-      pdf.text(line, margin + 3, y)
-      y += 3.5
-    })
-    if (profile?.steuernummer) {
-      pdf.setTextColor(107, 114, 128)
-      pdf.setFontSize(8)
-      pdf.text(`Steuernr: ${profile?.steuernummer}`, margin + 3, y)
-      y += 3.5
-    }
-    if (ustIdNr) {
-      pdf.setTextColor(107, 114, 128)
-      pdf.setFontSize(8)
-      pdf.text(`USt-IdNr: ${ustIdNr}`, margin + 3, y)
-      y += 3.5
-    }
-    pdf.setTextColor(0, 0, 0)
-
-    // Rechnungsempfänger (rechts oben)
-    let yRight = 35
-    pdf.setFillColor(248, 250, 252)
-    pdf.rect(pageWidth - margin - 85, yRight - 3, 85, 28, 'F')
-    pdf.setDrawColor(107, 114, 128) // Gray
-    pdf.setLineWidth(1)
-    pdf.line(pageWidth - margin - 85, yRight - 3, pageWidth - margin - 85, yRight + 25)
-
-    pdf.setFontSize(8)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(107, 114, 128)
-    pdf.text('RECHNUNGSEMPFÄNGER', pageWidth - margin - 82, yRight + 1)
-    pdf.setTextColor(0, 0, 0)
-    yRight += 5
-    pdf.setFontSize(10)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text(rechnungData.empfaengerName, pageWidth - margin - 82, yRight)
-    yRight += 4
-    pdf.setFontSize(9)
-    pdf.setFont('helvetica', 'normal')
-    if (rechnungData.empfaengerAdresse) {
-      rechnungData.empfaengerAdresse.split('\n').forEach(line => {
-        pdf.text(line, pageWidth - margin - 82, yRight)
-        yRight += 3.5
-      })
-    }
-
-    y = Math.max(y, yRight) + 10
-
-    // Rechnungsdetails - Info-Box
-    pdf.setFillColor(249, 250, 251) // Light gray
-    pdf.roundedRect(margin, y - 3, contentWidth, 14, 3, 3, 'F')
-
-    const detailWidth = contentWidth / 3
-    pdf.setFontSize(8)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(107, 114, 128)
-    pdf.text('RECHNUNGSNUMMER', margin + 5, y + 1)
-    pdf.text('RECHNUNGSDATUM', margin + detailWidth + 5, y + 1)
-    if (rechnungData.leistungszeitraum) {
-        pdf.text('LEISTUNGSZEITRAUM', margin + detailWidth * 2 + 5, y + 1)
-    }
-
-    pdf.setFontSize(11)
-    pdf.setTextColor(0, 0, 0)
-    pdf.text(rechnungData.rechnungsnummer, margin + 5, y + 7)
-    pdf.text(formatDateGerman(rechnungData.rechnungsdatum), margin + detailWidth + 5, y + 7)
-    if (rechnungData.leistungszeitraum) {
-        pdf.text(rechnungData.leistungszeitraum, margin + detailWidth * 2 + 5, y + 7)
-    }
-    y += 18
-
-    // Einleitungstext
-    pdf.setFontSize(10)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text('Sehr geehrte Damen und Herren,', margin, y)
-    y += 5
-    const introText = rechnungData.beschreibung 
-        ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:` 
-        : 'ich erlaube mir, folgende Rechnung zu stellen:'
-    const introLines = pdf.splitTextToSize(introText, contentWidth)
-    pdf.text(introLines, margin, y)
-    y += introLines.length * 4 + 6
-
-    // Tabelle Header
-    const colWidths = [10, 80, 25, 25, kleinunternehmer ? 0 : 20, 20]
-    const headers = ['Pos.', 'Beschreibung', 'Menge', 'Einzel', ...(kleinunternehmer ? [] : ['USt']), 'Gesamt']
-
-    // Tabellen-Header zeichnen
-    checkNewPage(10)
-    pdf.setFillColor(31, 41, 55) // Dark gray
-    pdf.roundedRect(margin, y - 4, contentWidth, 8, 2, 2, 'F')
-    pdf.setFontSize(8)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(255, 255, 255)
-
-    let xPos = margin + 2
-    headers.forEach((header, i) => {
-      if (colWidths[i] > 0) {
-        let align = 'left'
-        if (i >= 2) align = 'right' // Numbers right aligned
-        
-        if (align === 'right') {
-            pdf.text(header.toUpperCase(), xPos + colWidths[i] - 4, y, { align: 'right' })
-        } else {
-            pdf.text(header.toUpperCase(), xPos, y)
-        }
-        xPos += colWidths[i]
-      }
-    })
-    y += 6
-    pdf.setTextColor(0, 0, 0)
-
-    // Tabellen-Zeilen
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(8)
-
-    rechnungData.positionen.forEach((p, index) => {
-      checkNewPage(6)
-
-      // Zebra-Stripe Hintergrund
-      if (index % 2 === 0) {
-        pdf.setFillColor(249, 250, 251) // Light gray
-        pdf.rect(margin, y - 3, contentWidth, 5.5, 'F')
-      }
-
-      xPos = margin + 2
-      const gesamt = p.menge * p.einzelpreis // Einzelpreis ist Brutto
+    // Positionen-Tabelle HTML
+    const positionenHtml = rechnungData.positionen.map((p, idx) => {
+      const gesamt = p.menge * p.einzelpreis
       const netto = kleinunternehmer ? gesamt : gesamt / (1 + rechnungData.ustSatz / 100)
       const ust = gesamt - netto
-      
-      const row = [
-        (index + 1).toString(),
-        p.beschreibung || '-',
-        p.menge.toString(),
-        `${p.einzelpreis.toFixed(2)} €`,
-        ...(kleinunternehmer ? [] : [`${ust.toFixed(2)} €`]),
-        `${gesamt.toFixed(2)} €`
-      ]
+      return `
+        <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${idx + 1}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.beschreibung || '-'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${p.menge}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.einzelpreis.toFixed(2)} €</td>
+          ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${ust.toFixed(2)} €</td>` : ''}
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${gesamt.toFixed(2)} €</td>
+        </tr>
+      `
+    }).join('')
 
-      // Zeile mit Rahmen
-      pdf.setDrawColor(200, 200, 200)
-      pdf.line(margin, y + 1, margin + contentWidth, y + 1)
+    const introText = rechnungData.beschreibung
+      ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:`
+      : 'ich erlaube mir, folgende Rechnung zu stellen:'
 
-      row.forEach((cell, i) => {
-        if (colWidths[i] > 0) {
-            let align = 'left'
-            if (i >= 2) align = 'right'
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Rechnung ${rechnungData.rechnungsnummer}</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            padding: 24px;
+            line-height: 1.6;
+            font-size: 12px;
+            color: #1f2937;
+            background: #ffffff;
+          }
+          @media print {
+            body { padding: 20px; margin: 0; }
+            @page { size: A4; margin: 15mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Header -->
+        <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px;">
+          <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
+        </div>
 
-            if (align === 'right') {
-                pdf.text(cell, xPos + colWidths[i] - 4, y, { align: 'right' })
-            } else {
-                pdf.text(cell, xPos, y)
-            }
-            xPos += colWidths[i]
-        }
-      })
-      y += 5
-    })
+        <!-- Adressen in Cards -->
+        <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
+          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
+            <strong style="color: #111827;">${rechnungsstellerName}</strong><br>
+            <span style="color: #4b5563;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</span>
+            ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
+            ${ustIdNr ? `<br><span style="color: #6b7280; font-size: 11px;">USt-IdNr: ${ustIdNr}</span>` : ''}
+          </div>
+          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
+            <strong style="color: #111827;">${rechnungData.empfaengerName}</strong><br>
+            <span style="color: #4b5563;">${(rechnungData.empfaengerAdresse || '').replace(/\n/g, '<br>')}</span>
+          </div>
+        </div>
 
-    y += 6
-    checkNewPage(35)
+        <!-- Rechnungsdetails -->
+        <div style="background: #f9fafb; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #e5e7eb;">
+          <div>
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
+            <div style="font-size: 14px; font-weight: 700; color: #111827;">${rechnungData.rechnungsnummer}</div>
+          </div>
+          <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
+          </div>
+          ${rechnungData.leistungszeitraum ? `
+          <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #111827;">${rechnungData.leistungszeitraum}</div>
+          </div>
+          ` : ''}
+        </div>
 
-    // Summen-Box
-    pdf.setFillColor(249, 250, 251) // Light gray
-    pdf.setDrawColor(31, 41, 55) // Dark gray
-    pdf.setLineWidth(1)
-    const summenHeight = kleinunternehmer ? 18 : 24
-    pdf.roundedRect(margin, y - 3, contentWidth, summenHeight, 3, 3, 'F')
-    pdf.line(margin, y - 3, margin, y - 3 + summenHeight)
+        <p style="color: #374151;">Sehr geehrte Damen und Herren,</p>
+        <p style="color: #374151;">${introText}</p>
 
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(10)
-    pdf.text('Nettobetrag:', margin + 5, y + 2)
-    pdf.text(`${nettoGesamt.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
-    y += 5
+        <!-- Positionen-Tabelle -->
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
+          <thead>
+            <tr style="background: #1f2937;">
+              <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
+              <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
+              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
+              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Einzel</th>
+              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
+              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Gesamt</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${positionenHtml}
+          </tbody>
+        </table>
 
-    if (!kleinunternehmer) {
-      pdf.text(`USt (${rechnungData.ustSatz}%):`, margin + 5, y + 2)
-      pdf.text(`${ustBetrag.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
-      y += 5
-    }
+        <!-- Summen-Block -->
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+            <span>Nettobetrag:</span>
+            <span style="font-family: monospace;">${nettoGesamt.toFixed(2)} €</span>
+          </div>
+          ${!kleinunternehmer ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+            <span>USt (${rechnungData.ustSatz}%):</span>
+            <span style="font-family: monospace;">${ustBetrag.toFixed(2)} €</span>
+          </div>
+          ` : ''}
+          <div style="display: flex; justify-content: space-between; padding-top: 8px; margin-top: 8px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px;">
+            <span>Gesamtbetrag:</span>
+            <span style="font-family: monospace;">${bruttoGesamt.toFixed(2)} €</span>
+          </div>
+        </div>
 
-    pdf.setDrawColor(16, 185, 129)
-    pdf.line(margin + 5, y + 1, pageWidth - margin - 5, y + 1)
-    y += 4
+        ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
 
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(12)
-    pdf.setTextColor(107, 114, 128) // Teal
-    pdf.text('Gesamtbetrag:', margin + 5, y + 2)
-    pdf.text(`${bruttoGesamt.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
-    pdf.setTextColor(0, 0, 0)
-    y += 12
+        ${rechnungData.freitext ? `<p style="color: #374151; margin-top: 16px;">${rechnungData.freitext}</p>` : ''}
 
-    if (kleinunternehmer) {
-      pdf.setFont('helvetica', 'italic')
-      pdf.setFontSize(9)
-      pdf.setTextColor(107, 114, 128)
-      pdf.text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet.', margin, y)
-      pdf.setTextColor(0, 0, 0)
-      y += 6
-    }
-    
-    // Freitext
-    if (rechnungData.freitext) {
-        checkNewPage(20)
-        y += 5
-        const freitextLines = pdf.splitTextToSize(rechnungData.freitext, contentWidth)
-        pdf.text(freitextLines, margin, y)
-        y += freitextLines.length * 4 + 5
-    }
+        <!-- Zahlungsinfo Box -->
+        <div style="background: #f9fafb; padding: 20px; margin-top: 24px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
+          <p style="margin: 0 0 8px 0; color: #4b5563;">Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:</p>
+          <div style="margin-top: 8px;">
+            <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #1f2937;">${iban}</span><br>
+            <strong style="color: #111827;">Kontoinhaber:</strong> <span style="color: #374151;">${rechnungsstellerName}</span>
+          </div>
+        </div>
 
-    // Zahlungsinfo-Box
-    checkNewPage(40)
-    y += 4
-    pdf.setFillColor(249, 250, 251) // Light gray
-    pdf.setDrawColor(55, 65, 81) // Dark gray
-    pdf.setLineWidth(1)
-    pdf.roundedRect(margin, y - 3, contentWidth, 28, 3, 3, 'F')
-    pdf.line(margin, y - 3, margin, y + 25)
+        <p style="margin-top: 24px; color: #374151;">Vielen Dank für Ihr Vertrauen!</p>
+        <p style="color: #374151;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
+      </body>
+      </html>
+    `
+  }
 
-    pdf.setFontSize(8)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(31, 41, 55) // Dark gray
-    pdf.text('ZAHLUNGSINFORMATIONEN', margin + 5, y + 2)
-
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(9)
-    pdf.setTextColor(75, 85, 99)
-    pdf.text(`Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:`, margin + 5, y + 8)
-
-    // IBAN-Box
-    pdf.setFillColor(255, 255, 255, 0.6)
-    pdf.roundedRect(margin + 5, y + 11, contentWidth - 10, 12, 2, 2, 'F')
-
-    pdf.setTextColor(0, 0, 0)
-    pdf.setFontSize(10)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text('IBAN:', margin + 8, y + 16)
-    pdf.setFont('courier', 'normal')
-    pdf.setTextColor(107, 114, 128)
-    pdf.text(iban, margin + 22, y + 16)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(0, 0, 0)
-    pdf.text('Kontoinhaber:', margin + 8, y + 21)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text(rechnungsstellerName, margin + 35, y + 21)
-    y += 34
-
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(10)
-    pdf.text('Vielen Dank für Ihr Vertrauen!', margin, y)
-    y += 6
-    pdf.text('Mit freundlichen Grüßen', margin, y)
-    y += 5
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(107, 114, 128)
-    pdf.text(rechnungsstellerName, margin, y)
-    pdf.setTextColor(0, 0, 0)
+  const generatePdf = async (returnBase64 = false) => {
+    const html = generatePdfHtml()
 
     if (returnBase64) {
+      // Für E-Mail-Versand: html2canvas verwenden
+      const container = document.createElement('div')
+      container.id = 'pdf-render-container'
+      container.style.cssText = 'position: fixed; top: 0; left: 0; width: 794px; background: white; z-index: 99999; padding: 0; margin: 0;'
+      container.innerHTML = html.replace(/<html>|<\/html>|<head>[\s\S]*?<\/head>|<body>|<\/body>|<!DOCTYPE html>/gi, '')
+      document.body.appendChild(container)
+
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794
+      })
+
+      document.body.removeChild(container)
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const imgData = canvas.toDataURL('image/png')
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+      const imgX = (pdfWidth - imgWidth * ratio) / 2
+      const imgY = 0
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+
       const pdfBlob = pdf.output('blob')
       const reader = new FileReader()
       return new Promise<string>((resolve) => {
@@ -6777,7 +6650,16 @@ function ManuelleRechnungModal({
         reader.readAsDataURL(pdfBlob)
       })
     } else {
-      pdf.save(`Rechnung_${rechnungData.rechnungsnummer}.pdf`)
+      // Für Druck: Fenster öffnen wie bei Standard-Rechnungen
+      const blob = new Blob([html], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      const printWindow = window.open(url, '_blank')
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          URL.revokeObjectURL(url)
+        }
+      }
     }
   }
 
