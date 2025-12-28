@@ -6629,8 +6629,6 @@ function ManuelleRechnungModal({
       const netto = kleinunternehmer ? gesamt : gesamt / (1 + rechnungData.ustSatz / 100)
       const ust = gesamt - netto
       
-      const einzelNetto = kleinunternehmer ? p.einzelpreis : p.einzelpreis / (1 + rechnungData.ustSatz / 100)
-
       const row = [
         (index + 1).toString(),
         p.beschreibung || '-',
