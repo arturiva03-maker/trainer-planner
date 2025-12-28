@@ -2961,14 +2961,15 @@ function AbrechnungView({
         let spielerPreis = 0
 
         if (abrechnungsart === 'monatlich') {
-          // Monatlicher Tarif: nur einmal pro Serie pro Spieler berechnen
-          const serieKey = t.serie_id || t.id // Fallback auf Training-ID wenn keine Serie
-          if (!summary[spielerId].monatlicheSerien.has(serieKey)) {
-            summary[spielerId].monatlicheSerien.add(serieKey)
+          // Monatlicher Tarif: nur einmal pro Tarif pro Spieler pro Monat berechnen
+          // Verwende Tarif-ID als Key, damit alle Trainings mit gleichem monatlichen Tarif nur einmal gezählt werden
+          const monatlichKey = t.tarif_id || t.id
+          if (!summary[spielerId].monatlicheSerien.has(monatlichKey)) {
+            summary[spielerId].monatlicheSerien.add(monatlichKey)
             // Bei monatlich ist der Preis der Monatsbetrag (nicht pro Stunde)
             spielerPreis = preis
           }
-          // Sonst: spielerPreis bleibt 0, da Serie bereits berechnet
+          // Sonst: spielerPreis bleibt 0, da Tarif bereits berechnet
         } else {
           // Pro Training oder Pro Spieler
           const totalPreis = preis * duration
@@ -3728,10 +3729,10 @@ function AbrechnungView({
             let istMonatlicheSerieErstesTraining = false
 
             if (abrechnungsart === 'monatlich') {
-              // Monatlicher Tarif: nur einmal pro Serie berechnen
-              const serieKey = t.serie_id || t.id
-              if (!monatlicheSerienTracking.has(serieKey)) {
-                monatlicheSerienTracking.add(serieKey)
+              // Monatlicher Tarif: nur einmal pro Tarif pro Monat berechnen
+              const monatlichKey = t.tarif_id || t.id
+              if (!monatlicheSerienTracking.has(monatlichKey)) {
+                monatlicheSerienTracking.add(monatlichKey)
                 basisBetrag = preis // Monatsbetrag, nicht pro Stunde
                 istMonatlicheSerieErstesTraining = true
               }
@@ -4300,9 +4301,9 @@ function InvoiceModal({
 
       if (abrechnungsart === 'monatlich') {
         istMonatlich = true
-        // Monatlicher Tarif: nur einmal pro Serie pro Spieler berechnen
-        const serieKey = t.serie_id || t.id
-        const trackingKey = `${spielerId}|${serieKey}`
+        // Monatlicher Tarif: nur einmal pro Tarif pro Spieler berechnen
+        const monatlichKey = t.tarif_id || t.id
+        const trackingKey = `${spielerId}|${monatlichKey}`
         if (!monatlicheSerienTracking.has(trackingKey)) {
           monatlicheSerienTracking.add(trackingKey)
           einzelPreis = preis // Monatsbetrag, nicht pro Stunde
@@ -6456,19 +6457,19 @@ function ManuelleRechnungModal({
     const ustIdNr = profile?.ust_id_nr || ''
     const iban = profile?.iban || ''
 
-    // Positionen-Tabelle HTML
+    // Positionen-Tabelle HTML - mit schwarzem Text für maximale Lesbarkeit
     const positionenHtml = rechnungData.positionen.map((p, idx) => {
       const gesamt = p.menge * p.einzelpreis
       const netto = kleinunternehmer ? gesamt : gesamt / (1 + rechnungData.ustSatz / 100)
       const ust = gesamt - netto
       return `
-        <tr style="border-bottom: 1px solid #e5e7eb;">
-          <td style="padding: 10px 8px; color: #1f2937;">${idx + 1}</td>
-          <td style="padding: 10px 8px; color: #1f2937;">${p.beschreibung || '-'}</td>
-          <td style="padding: 10px 8px; text-align: right; color: #1f2937;">${p.menge}</td>
-          <td style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 500;">${netto.toFixed(2)} €</td>
-          ${!kleinunternehmer ? `<td style="padding: 10px 8px; text-align: right; color: #1f2937;">${ust.toFixed(2)} €</td>` : ''}
-          <td style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600;">${gesamt.toFixed(2)} €</td>
+        <tr style="border-bottom: 1px solid #000000; background: ${idx % 2 === 0 ? '#ffffff' : '#f5f5f5'};">
+          <td style="padding: 10px 8px; color: #000000 !important; -webkit-text-fill-color: #000000 !important;">${idx + 1}</td>
+          <td style="padding: 10px 8px; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 500;">${p.beschreibung || '-'}</td>
+          <td style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important;">${p.menge}</td>
+          <td style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 600;">${netto.toFixed(2)} €</td>
+          ${!kleinunternehmer ? `<td style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important;">${ust.toFixed(2)} €</td>` : ''}
+          <td style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700;">${gesamt.toFixed(2)} €</td>
         </tr>
       `
     }).join('')
@@ -6544,15 +6545,15 @@ function ManuelleRechnungModal({
         <p style="color: #374151; margin-bottom: 24px;">${introText}</p>
 
         <!-- Positionen-Tabelle -->
-        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px; border: 1px solid #d1d5db;">
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 12px; border: 2px solid #000000;">
           <thead>
-            <tr style="background: #e5e7eb; border-bottom: 2px solid #9ca3af;">
-              <th style="padding: 10px 8px; text-align: left; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
-              <th style="padding: 10px 8px; text-align: left; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
-              <th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
-              <th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Netto</th>
-              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
-              <th style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Brutto</th>
+            <tr style="background: #d1d5db; border-bottom: 2px solid #000000;">
+              <th style="padding: 10px 8px; text-align: left; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
+              <th style="padding: 10px 8px; text-align: left; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
+              <th style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
+              <th style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Netto</th>
+              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
+              <th style="padding: 10px 8px; text-align: right; color: #000000 !important; -webkit-text-fill-color: #000000 !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Brutto</th>
             </tr>
           </thead>
           <tbody>
@@ -7550,9 +7551,9 @@ function BuchhaltungView({
         let einzelPreis = 0
 
         if (abrechnungsart === 'monatlich') {
-          // Monatlicher Tarif: nur einmal pro Monat pro Serie pro Spieler
-          const serieKey = t.serie_id || t.id
-          const trackingKey = `${monat}|${spielerId}|${serieKey}`
+          // Monatlicher Tarif: nur einmal pro Monat pro Tarif pro Spieler
+          const monatlichKey = t.tarif_id || t.id
+          const trackingKey = `${monat}|${spielerId}|${monatlichKey}`
           if (!monatlicheSerienTracking.has(trackingKey)) {
             monatlicheSerienTracking.add(trackingKey)
             einzelPreis = preis // Monatsbetrag
