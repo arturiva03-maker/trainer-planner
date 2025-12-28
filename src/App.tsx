@@ -3077,56 +3077,18 @@ function AbrechnungView({
   const filteredSummary = useMemo(() => {
     let result = spielerSummary
 
-    // Bei Tag-Filter: Neu berechnen mit nur Trainings des Tages
+    // Bei Tag-Filter: Zeige nur Trainings des Tages, aber verwende die bereits berechneten Monats-Summen
+    // Bei monatlichen Tarifen: Der Betrag gilt für den ganzen Monat, nicht für einzelne Tage
     if (filterType === 'tag' && selectedTag) {
       result = result
         .filter(s => s.trainings.some(t => t.datum === selectedTag))
         .map(s => {
           const tagTrainings = s.trainings.filter(t => t.datum === selectedTag)
-          let summe = 0
-          let barSumme = 0
-          let bezahltSumme = 0
-          let offeneSumme = 0
-
-          tagTrainings.forEach(t => {
-            const tarif = tarife.find(ta => ta.id === t.tarif_id)
-            const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-            const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
-            // Bei proSpieler: Anzahl zahlungspflichtiger Spieler berücksichtigen
-            const entfernteMitBezahlung = (t.entfernte_spieler || []).filter(es => es.muss_bezahlen)
-            const zahlendeSpielerAnzahl = t.spieler_ids.length + entfernteMitBezahlung.length
-
-            let betrag = preis * duration
-            if (abrechnungsart === 'proSpieler') {
-              betrag = betrag / zahlendeSpielerAnzahl
-            }
-            // Training-Korrektur anwenden
-            betrag += (t.korrektur_betrag || 0)
-
-            summe += betrag
-
-            // Spieler-spezifischen Bezahlstatus verwenden
-            const paymentStatus = getSpielerPaymentStatus(s.spieler.id, t)
-
-            if (paymentStatus.barBezahlt) {
-              barSumme += betrag
-            } else if (paymentStatus.bezahlt) {
-              bezahltSumme += betrag
-            } else {
-              offeneSumme += betrag
-            }
-          })
-
+          // Behalte die Monats-Summen bei, zeige nur die Trainings des Tages
           return {
             ...s,
-            trainings: tagTrainings,
-            summe,
-            barSumme,
-            bezahltSumme,
-            offeneSumme,
-            bezahlt: offeneSumme <= 0
+            trainings: tagTrainings
+            // summe, barSumme, bezahltSumme, offeneSumme, bezahlt bleiben vom Monat
           }
         })
     }
