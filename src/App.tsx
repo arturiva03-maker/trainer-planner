@@ -3996,6 +3996,7 @@ function AbrechnungView({
           profile={profile}
           selectedMonth={selectedMonth}
           userId={userId}
+          pdfVorlagen={pdfVorlagen}
           onClose={() => setShowManuelleRechnungModal(false)}
           onSave={() => {
             setShowManuelleRechnungModal(false)
