@@ -6611,11 +6611,45 @@ function ManuelleRechnungModal({
       // Für E-Mail-Versand: html2canvas verwenden
       const container = document.createElement('div')
       container.id = 'pdf-render-container'
-      container.style.cssText = 'position: fixed; top: 0; left: 0; width: 794px; background: white; z-index: 99999; padding: 24px; margin: 0; font-family: Segoe UI, system-ui, -apple-system, sans-serif; font-size: 12px; color: #1f2937; line-height: 1.6;'
+      container.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 794px;
+        background: white;
+        z-index: 99999;
+        padding: 24px;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #000 !important;
+      `
 
       // Body-Inhalt extrahieren
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
-      container.innerHTML = bodyMatch ? bodyMatch[1] : html
+      const bodyContent = bodyMatch ? bodyMatch[1] : html
+
+      // Style-Block für schwarze Farben hinzufügen (wie bei Standard-Rechnungen)
+      container.innerHTML = `
+        <style>
+          #pdf-render-container,
+          #pdf-render-container * {
+            color: #000 !important;
+            -webkit-text-fill-color: #000 !important;
+          }
+          #pdf-render-container table th {
+            color: #fff !important;
+            -webkit-text-fill-color: #fff !important;
+            background: #1f2937 !important;
+          }
+          #pdf-render-container table td {
+            color: #000 !important;
+            -webkit-text-fill-color: #000 !important;
+          }
+        </style>
+        ${bodyContent}
+      `
       document.body.appendChild(container)
 
       await new Promise(resolve => setTimeout(resolve, 300))
