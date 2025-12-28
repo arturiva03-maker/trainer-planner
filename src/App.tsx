@@ -6374,10 +6374,12 @@ function ManuelleRechnungModal({
     ustSatz: kleinunternehmer ? 0 : 19,
     zahlungsziel: 14,
     freitext: '',
-    alsOffenPostenSpeichern: true
+    alsOffenPostenSpeichern: true,
+    email: '' // Email of the recipient
   })
 
   const [saving, setSaving] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   const addPosition = () => {
     setRechnungData(prev => ({
@@ -6447,140 +6449,410 @@ function ManuelleRechnungModal({
     }
   }
 
+  const generatePdf = async (returnBase64 = false) => {
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+    const pageWidth = 210
+    const pageHeight = 297
+    const margin = 15
+    const contentWidth = pageWidth - 2 * margin
+    let y = margin
+
+    // Hilfsfunktion für Text mit automatischem Seitenumbruch
+    const checkNewPage = (neededHeight: number) => {
+      if (y + neededHeight > pageHeight - margin) {
+        pdf.addPage()
+        y = margin
+      }
+    }
+
+    const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`.trim()
+    const rechnungsstellerAdresse = profile?.adresse || ''
+    const ustIdNr = profile?.ust_id_nr || ''
+    const iban = profile?.iban || ''
+
+    // Header: RECHNUNG mit grauem Hintergrund
+    pdf.setFillColor(31, 41, 55) // Dark gray #1f2937
+    pdf.rect(0, 0, pageWidth, 25, 'F')
+    pdf.setFontSize(24)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(255, 255, 255)
+    pdf.text('RECHNUNG', pageWidth / 2, 17, { align: 'center' })
+    pdf.setTextColor(0, 0, 0)
+    y = 35
+
+    // Rechnungssteller (links)
+    pdf.setFillColor(248, 250, 252)
+    pdf.rect(margin, y - 3, 85, 28, 'F')
+    pdf.setDrawColor(55, 65, 81)
+    pdf.setLineWidth(1)
+    pdf.line(margin, y - 3, margin, y + 25)
+
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(107, 114, 128)
+    pdf.text('RECHNUNGSSTELLER', margin + 3, y + 1)
+    pdf.setTextColor(0, 0, 0)
+    y += 5
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text(rechnungsstellerName, margin + 3, y)
+    y += 4
+    pdf.setFontSize(9)
+    pdf.setFont('helvetica', 'normal')
+    rechnungsstellerAdresse.split('\n').forEach(line => {
+      pdf.text(line, margin + 3, y)
+      y += 3.5
+    })
+    if (profile?.steuernummer) {
+      pdf.setTextColor(107, 114, 128)
+      pdf.setFontSize(8)
+      pdf.text(`Steuernr: ${profile?.steuernummer}`, margin + 3, y)
+      y += 3.5
+    }
+    if (ustIdNr) {
+      pdf.setTextColor(107, 114, 128)
+      pdf.setFontSize(8)
+      pdf.text(`USt-IdNr: ${ustIdNr}`, margin + 3, y)
+      y += 3.5
+    }
+    pdf.setTextColor(0, 0, 0)
+
+    // Rechnungsempfänger (rechts oben)
+    let yRight = 35
+    pdf.setFillColor(248, 250, 252)
+    pdf.rect(pageWidth - margin - 85, yRight - 3, 85, 28, 'F')
+    pdf.setDrawColor(107, 114, 128) // Gray
+    pdf.setLineWidth(1)
+    pdf.line(pageWidth - margin - 85, yRight - 3, pageWidth - margin - 85, yRight + 25)
+
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(107, 114, 128)
+    pdf.text('RECHNUNGSEMPFÄNGER', pageWidth - margin - 82, yRight + 1)
+    pdf.setTextColor(0, 0, 0)
+    yRight += 5
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text(rechnungData.empfaengerName, pageWidth - margin - 82, yRight)
+    yRight += 4
+    pdf.setFontSize(9)
+    pdf.setFont('helvetica', 'normal')
+    if (rechnungData.empfaengerAdresse) {
+      rechnungData.empfaengerAdresse.split('\n').forEach(line => {
+        pdf.text(line, pageWidth - margin - 82, yRight)
+        yRight += 3.5
+      })
+    }
+
+    y = Math.max(y, yRight) + 10
+
+    // Rechnungsdetails - Info-Box
+    pdf.setFillColor(249, 250, 251) // Light gray
+    pdf.roundedRect(margin, y - 3, contentWidth, 14, 3, 3, 'F')
+
+    const detailWidth = contentWidth / 3
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(107, 114, 128)
+    pdf.text('RECHNUNGSNUMMER', margin + 5, y + 1)
+    pdf.text('RECHNUNGSDATUM', margin + detailWidth + 5, y + 1)
+    if (rechnungData.leistungszeitraum) {
+        pdf.text('LEISTUNGSZEITRAUM', margin + detailWidth * 2 + 5, y + 1)
+    }
+
+    pdf.setFontSize(11)
+    pdf.setTextColor(0, 0, 0)
+    pdf.text(rechnungData.rechnungsnummer, margin + 5, y + 7)
+    pdf.text(formatDateGerman(rechnungData.rechnungsdatum), margin + detailWidth + 5, y + 7)
+    if (rechnungData.leistungszeitraum) {
+        pdf.text(rechnungData.leistungszeitraum, margin + detailWidth * 2 + 5, y + 7)
+    }
+    y += 18
+
+    // Einleitungstext
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text('Sehr geehrte Damen und Herren,', margin, y)
+    y += 5
+    const introText = rechnungData.beschreibung 
+        ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:` 
+        : 'ich erlaube mir, folgende Rechnung zu stellen:'
+    const introLines = pdf.splitTextToSize(introText, contentWidth)
+    pdf.text(introLines, margin, y)
+    y += introLines.length * 4 + 6
+
+    // Tabelle Header
+    const colWidths = [10, 80, 25, 25, kleinunternehmer ? 0 : 20, 20]
+    const headers = ['Pos.', 'Beschreibung', 'Menge', 'Einzel', ...(kleinunternehmer ? [] : ['USt']), 'Gesamt']
+
+    // Tabellen-Header zeichnen
+    checkNewPage(10)
+    pdf.setFillColor(31, 41, 55) // Dark gray
+    pdf.roundedRect(margin, y - 4, contentWidth, 8, 2, 2, 'F')
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(255, 255, 255)
+
+    let xPos = margin + 2
+    headers.forEach((header, i) => {
+      if (colWidths[i] > 0) {
+        let align = 'left'
+        if (i >= 2) align = 'right' // Numbers right aligned
+        
+        if (align === 'right') {
+            pdf.text(header.toUpperCase(), xPos + colWidths[i] - 4, y, { align: 'right' })
+        } else {
+            pdf.text(header.toUpperCase(), xPos, y)
+        }
+        xPos += colWidths[i]
+      }
+    })
+    y += 6
+    pdf.setTextColor(0, 0, 0)
+
+    // Tabellen-Zeilen
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8)
+
+    rechnungData.positionen.forEach((p, index) => {
+      checkNewPage(6)
+
+      // Zebra-Stripe Hintergrund
+      if (index % 2 === 0) {
+        pdf.setFillColor(249, 250, 251) // Light gray
+        pdf.rect(margin, y - 3, contentWidth, 5.5, 'F')
+      }
+
+      xPos = margin + 2
+      const gesamt = p.menge * p.einzelpreis // Einzelpreis ist Brutto
+      const netto = kleinunternehmer ? gesamt : gesamt / (1 + rechnungData.ustSatz / 100)
+      const ust = gesamt - netto
+      
+      const einzelNetto = kleinunternehmer ? p.einzelpreis : p.einzelpreis / (1 + rechnungData.ustSatz / 100)
+
+      const row = [
+        (index + 1).toString(),
+        p.beschreibung || '-',
+        p.menge.toString(),
+        `${p.einzelpreis.toFixed(2)} €`,
+        ...(kleinunternehmer ? [] : [`${ust.toFixed(2)} €`]),
+        `${gesamt.toFixed(2)} €`
+      ]
+
+      // Zeile mit Rahmen
+      pdf.setDrawColor(200, 200, 200)
+      pdf.line(margin, y + 1, margin + contentWidth, y + 1)
+
+      row.forEach((cell, i) => {
+        if (colWidths[i] > 0) {
+            let align = 'left'
+            if (i >= 2) align = 'right'
+
+            if (align === 'right') {
+                pdf.text(cell, xPos + colWidths[i] - 4, y, { align: 'right' })
+            } else {
+                pdf.text(cell, xPos, y)
+            }
+            xPos += colWidths[i]
+        }
+      })
+      y += 5
+    })
+
+    y += 6
+    checkNewPage(35)
+
+    // Summen-Box
+    pdf.setFillColor(249, 250, 251) // Light gray
+    pdf.setDrawColor(31, 41, 55) // Dark gray
+    pdf.setLineWidth(1)
+    const summenHeight = kleinunternehmer ? 18 : 24
+    pdf.roundedRect(margin, y - 3, contentWidth, summenHeight, 3, 3, 'F')
+    pdf.line(margin, y - 3, margin, y - 3 + summenHeight)
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    pdf.text('Nettobetrag:', margin + 5, y + 2)
+    pdf.text(`${nettoGesamt.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
+    y += 5
+
+    if (!kleinunternehmer) {
+      pdf.text(`USt (${rechnungData.ustSatz}%):`, margin + 5, y + 2)
+      pdf.text(`${ustBetrag.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
+      y += 5
+    }
+
+    pdf.setDrawColor(16, 185, 129)
+    pdf.line(margin + 5, y + 1, pageWidth - margin - 5, y + 1)
+    y += 4
+
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(12)
+    pdf.setTextColor(107, 114, 128) // Teal
+    pdf.text('Gesamtbetrag:', margin + 5, y + 2)
+    pdf.text(`${bruttoGesamt.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
+    pdf.setTextColor(0, 0, 0)
+    y += 12
+
+    if (kleinunternehmer) {
+      pdf.setFont('helvetica', 'italic')
+      pdf.setFontSize(9)
+      pdf.setTextColor(107, 114, 128)
+      pdf.text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet.', margin, y)
+      pdf.setTextColor(0, 0, 0)
+      y += 6
+    }
+    
+    // Freitext
+    if (rechnungData.freitext) {
+        checkNewPage(20)
+        y += 5
+        const freitextLines = pdf.splitTextToSize(rechnungData.freitext, contentWidth)
+        pdf.text(freitextLines, margin, y)
+        y += freitextLines.length * 4 + 5
+    }
+
+    // Zahlungsinfo-Box
+    checkNewPage(40)
+    y += 4
+    pdf.setFillColor(249, 250, 251) // Light gray
+    pdf.setDrawColor(55, 65, 81) // Dark gray
+    pdf.setLineWidth(1)
+    pdf.roundedRect(margin, y - 3, contentWidth, 28, 3, 3, 'F')
+    pdf.line(margin, y - 3, margin, y + 25)
+
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(31, 41, 55) // Dark gray
+    pdf.text('ZAHLUNGSINFORMATIONEN', margin + 5, y + 2)
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.setTextColor(75, 85, 99)
+    pdf.text(`Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:`, margin + 5, y + 8)
+
+    // IBAN-Box
+    pdf.setFillColor(255, 255, 255, 0.6)
+    pdf.roundedRect(margin + 5, y + 11, contentWidth - 10, 12, 2, 2, 'F')
+
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(10)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('IBAN:', margin + 8, y + 16)
+    pdf.setFont('courier', 'normal')
+    pdf.setTextColor(107, 114, 128)
+    pdf.text(iban, margin + 22, y + 16)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(0, 0, 0)
+    pdf.text('Kontoinhaber:', margin + 8, y + 21)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(rechnungsstellerName, margin + 35, y + 21)
+    y += 34
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    pdf.text('Vielen Dank für Ihr Vertrauen!', margin, y)
+    y += 6
+    pdf.text('Mit freundlichen Grüßen', margin, y)
+    y += 5
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(107, 114, 128)
+    pdf.text(rechnungsstellerName, margin, y)
+    pdf.setTextColor(0, 0, 0)
+
+    if (returnBase64) {
+      const pdfBlob = pdf.output('blob')
+      const reader = new FileReader()
+      return new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1]
+          resolve(base64)
+        }
+        reader.readAsDataURL(pdfBlob)
+      })
+    } else {
+      pdf.save(`Rechnung_${rechnungData.rechnungsnummer}.pdf`)
+    }
+  }
+
   const generateAndSavePDF = async () => {
     // Zuerst speichern
     if (rechnungData.alsOffenPostenSpeichern) {
       await saveRechnung()
     }
-
-    // Dann PDF generieren
-    const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`
-    const rechnungsstellerAdresse = profile?.adresse || ''
-    const ustIdNrValue = profile?.ust_id_nr || ''
-    const ibanValue = profile?.iban || ''
-
-    const positionenHtml = rechnungData.positionen.map((p, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${p.beschreibung || '-'}</td>
-        <td style="text-align: right">${p.menge}</td>
-        <td style="text-align: right">${p.einzelpreis.toFixed(2)} EUR</td>
-        <td style="text-align: right">${(p.menge * p.einzelpreis).toFixed(2)} EUR</td>
-      </tr>
-    `).join('')
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Rechnung ${rechnungData.rechnungsnummer}</title>
-        <style>
-          body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; font-size: 12px; }
-          h1 { text-align: center; margin-bottom: 30px; font-size: 24px; }
-          .section { margin-bottom: 20px; }
-          .flex { display: flex; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background: #f5f5f5; font-size: 11px; }
-          .total { text-align: right; margin-top: 20px; }
-          .total-row { display: flex; justify-content: flex-end; gap: 40px; margin: 4px 0; }
-          .total-row.highlight { font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 2px solid #333; padding-top: 8px; }
-          .footer { margin-top: 40px; }
-          @media print {
-            body { padding: 20px; margin: 0; }
-            @page { size: A4; margin: 15mm; }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>RECHNUNG</h1>
-
-        <div class="flex">
-          <div class="section">
-            <strong>Rechnungssteller:</strong><br>
-            ${rechnungsstellerName}<br>
-            ${rechnungsstellerAdresse.replace(/\n/g, '<br>')}
-            ${profile?.steuernummer ? `<br>Steuernummer: ${profile?.steuernummer}` : ''}
-            ${ustIdNrValue ? `<br>USt-IdNr: ${ustIdNrValue}` : ''}
-          </div>
-          <div class="section" style="text-align: right;">
-            <strong>Rechnungsempfänger:</strong><br>
-            ${rechnungData.empfaengerName}<br>
-            ${rechnungData.empfaengerAdresse.replace(/\n/g, '<br>')}
-          </div>
-        </div>
-
-        <div class="section">
-          <strong>Rechnungsnummer:</strong> ${rechnungData.rechnungsnummer}<br>
-          <strong>Rechnungsdatum:</strong> ${formatDateGerman(rechnungData.rechnungsdatum)}<br>
-          ${rechnungData.leistungszeitraum ? `<strong>Leistungszeitraum:</strong> ${rechnungData.leistungszeitraum}<br>` : ''}
-        </div>
-
-        <p>Sehr geehrte Damen und Herren,</p>
-        <p>${rechnungData.beschreibung ? `für ${rechnungData.beschreibung} erlaube ich mir, folgende Rechnung zu stellen:` : 'ich erlaube mir, folgende Rechnung zu stellen:'}</p>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Pos.</th>
-              <th>Beschreibung</th>
-              <th style="text-align: right">Menge</th>
-              <th style="text-align: right">Einzelpreis</th>
-              <th style="text-align: right">Gesamt</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${positionenHtml}
-          </tbody>
-        </table>
-
-        <div class="total">
-          <div class="total-row">
-            <span>Nettobetrag:</span>
-            <span>${nettoGesamt.toFixed(2)} EUR</span>
-          </div>
-          ${!kleinunternehmer && rechnungData.ustSatz > 0 ? `
-          <div class="total-row">
-            <span>USt (${rechnungData.ustSatz}%):</span>
-            <span>${ustBetrag.toFixed(2)} EUR</span>
-          </div>
-          ` : ''}
-          <div class="total-row highlight">
-            <span>Gesamtbetrag:</span>
-            <span>${bruttoGesamt.toFixed(2)} EUR</span>
-          </div>
-        </div>
-
-        ${kleinunternehmer ? '<p><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
-
-        ${rechnungData.freitext ? `<p>${rechnungData.freitext.replace(/\n/g, '<br>')}</p>` : ''}
-
-        <div class="footer">
-          <p>Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:</p>
-          <p>
-            <strong>IBAN:</strong> ${ibanValue}<br>
-            <strong>Kontoinhaber:</strong> ${rechnungsstellerName}
-          </p>
-          <p>Vielen Dank für Ihr Vertrauen.</p>
-          <p>Mit freundlichen Grüßen<br>${rechnungsstellerName}</p>
-        </div>
-      </body>
-      </html>
-    `
-
-    const blob = new Blob([html], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const printWindow = window.open(url, '_blank')
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print()
-        URL.revokeObjectURL(url)
-      }
-    }
-
+    await generatePdf(false)
+    
     if (!rechnungData.alsOffenPostenSpeichern) {
       onClose()
+    }
+  }
+
+  const sendEmail = async () => {
+    if (!rechnungData.email) {
+      alert('Bitte eine E-Mail-Adresse angeben.')
+      return
+    }
+
+    if (!profile?.smtp_host) {
+        alert('SMTP-Server ist nicht konfiguriert. Bitte in den Einstellungen vornehmen.')
+        return
+    }
+
+    setSendingEmail(true)
+    try {
+      if (rechnungData.alsOffenPostenSpeichern) {
+        await saveRechnung()
+      }
+
+      const pdfBase64 = await generatePdf(true)
+
+      const emailBetreff = `Rechnung ${rechnungData.rechnungsnummer}`
+      const emailText = `Sehr geehrte Damen und Herren,
+
+anbei erhalten Sie die Rechnung Nr. ${rechnungData.rechnungsnummer}.
+
+Gesamtbetrag: ${bruttoGesamt.toFixed(2)} €
+
+Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen.
+
+Mit freundlichen Grüßen
+${profile?.name || ''}`
+
+      const response = await fetch('/api/send-invoice-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtp: {
+            host: profile.smtp_host,
+            port: profile.smtp_port || 587,
+            secure: profile.smtp_secure ?? true,
+            user: profile.smtp_user,
+            pass: profile.smtp_pass,
+            fromEmail: profile.smtp_from_email || profile.smtp_user,
+            fromName: profile.smtp_from_name || `${profile.name} ${profile.nachname || ''}`.trim()
+          },
+          to: rechnungData.email,
+          subject: emailBetreff,
+          text: emailText,
+          pdfBase64,
+          pdfFilename: `Rechnung_${rechnungData.rechnungsnummer}.pdf`
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        alert(`Rechnung erfolgreich an ${rechnungData.email} gesendet!`)
+        onClose()
+      } else {
+        alert('Fehler beim E-Mail-Versand: ' + result.error)
+      }
+    } catch (err) {
+      console.error('Fehler:', err)
+      alert('Fehler beim Senden der E-Mail')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -6645,6 +6917,17 @@ function ManuelleRechnungModal({
             rows={2}
             placeholder="Straße, PLZ Ort"
           />
+        </div>
+
+        <div className="form-group">
+            <label>Empfänger E-Mail (für Versand)</label>
+            <input
+              type="email"
+              className="form-control"
+              value={rechnungData.email}
+              onChange={e => setRechnungData(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="email@beispiel.de"
+            />
         </div>
 
         <div className="form-group">
@@ -6785,21 +7068,21 @@ function ManuelleRechnungModal({
           >
             Abbrechen
           </button>
-          {rechnungData.alsOffenPostenSpeichern && (
-            <button
-              className="btn btn-secondary"
+          
+          <button
+              className="btn btn-success"
               style={{ flex: 1 }}
-              onClick={saveRechnung}
-              disabled={saving || !rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
-            >
-              {saving ? 'Speichern...' : 'Nur speichern'}
-            </button>
-          )}
+              onClick={sendEmail}
+              disabled={saving || sendingEmail || !rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
+          >
+              {sendingEmail ? 'Sende...' : 'Speichern & Email'}
+          </button>
+          
           <button
             className="btn btn-primary"
             style={{ flex: 1 }}
             onClick={generateAndSavePDF}
-            disabled={saving || !rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
+            disabled={saving || sendingEmail || !rechnungData.empfaengerName || rechnungData.positionen.every(p => p.einzelpreis === 0)}
           >
             {rechnungData.alsOffenPostenSpeichern ? 'Speichern & PDF' : 'PDF erstellen'}
           </button>
