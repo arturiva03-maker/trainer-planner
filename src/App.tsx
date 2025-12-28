@@ -6449,26 +6449,26 @@ function ManuelleRechnungModal({
     }
   }
 
-  // HTML-Template für PDF generieren (wie bei Standard-Rechnungen)
+  // HTML-Template für PDF generieren - Klassisches Design wie Standard-Rechnungen
   const generatePdfHtml = () => {
     const rechnungsstellerName = `${profile?.name || ''}${profile?.nachname ? ' ' + profile.nachname : ''}`.trim()
     const rechnungsstellerAdresse = profile?.adresse || ''
     const ustIdNr = profile?.ust_id_nr || ''
     const iban = profile?.iban || ''
 
-    // Positionen-Tabelle HTML - mit schwarzem Text für bessere Lesbarkeit
+    // Positionen-Tabelle HTML
     const positionenHtml = rechnungData.positionen.map((p, idx) => {
       const gesamt = p.menge * p.einzelpreis
       const netto = kleinunternehmer ? gesamt : gesamt / (1 + rechnungData.ustSatz / 100)
       const ust = gesamt - netto
       return `
-        <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f0f0f0'};">
-          <td style="padding: 8px; border-bottom: 1px solid #999;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important;">${idx + 1}</span></td>
-          <td style="padding: 8px; border-bottom: 1px solid #999;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important;">${p.beschreibung || '-'}</span></td>
-          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important;">${p.menge}</span></td>
-          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important; font-weight: 600;">${p.einzelpreis.toFixed(2)} €</span></td>
-          ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important; font-weight: 600;">${ust.toFixed(2)} €</span></td>` : ''}
-          <td style="padding: 8px; border-bottom: 1px solid #999; text-align: right;"><span style="color: #000 !important; -webkit-text-fill-color: #000 !important; font-weight: 700;">${gesamt.toFixed(2)} €</span></td>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 10px 8px; color: #1f2937;">${idx + 1}</td>
+          <td style="padding: 10px 8px; color: #1f2937;">${p.beschreibung || '-'}</td>
+          <td style="padding: 10px 8px; text-align: right; color: #1f2937;">${p.menge}</td>
+          <td style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 500;">${netto.toFixed(2)} €</td>
+          ${!kleinunternehmer ? `<td style="padding: 10px 8px; text-align: right; color: #1f2937;">${ust.toFixed(2)} €</td>` : ''}
+          <td style="padding: 10px 8px; text-align: right; color: #1f2937; font-weight: 600;">${gesamt.toFixed(2)} €</td>
         </tr>
       `
     }).join('')
@@ -6486,7 +6486,7 @@ function ManuelleRechnungModal({
         <style>
           body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            padding: 24px;
+            padding: 40px;
             line-height: 1.6;
             font-size: 12px;
             color: #1f2937;
@@ -6499,58 +6499,60 @@ function ManuelleRechnungModal({
         </style>
       </head>
       <body>
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); margin: -24px -24px 24px -24px; padding: 24px; margin-left: -24px; margin-right: -24px; margin-top: -24px;">
-          <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
+        <!-- Header - Klassisch wie Mini-Tennis -->
+        <div style="margin-bottom: 24px;">
+          <h1 style="margin: 0 0 8px 0; font-size: 32px; font-weight: 400; color: #1f2937; letter-spacing: 4px;">RECHNUNG</h1>
+          <div style="height: 3px; background: #1f2937; width: 100%;"></div>
         </div>
 
-        <!-- Adressen in Cards -->
-        <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
-          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
-            <strong style="color: #111827;">${rechnungsstellerName}</strong><br>
-            <span style="color: #4b5563;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</span>
-            ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
-            ${ustIdNr ? `<br><span style="color: #6b7280; font-size: 11px;">USt-IdNr: ${ustIdNr}</span>` : ''}
+        <!-- Adressbereich -->
+        <div style="display: flex; justify-content: space-between; margin-bottom: 32px; gap: 40px;">
+          <div style="flex: 1;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungssteller</div>
+            <div style="font-weight: 600; color: #1f2937;">${rechnungsstellerName}</div>
+            <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
+            ${profile?.steuernummer ? `<div style="color: #6b7280; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
+            ${ustIdNr ? `<div style="color: #6b7280; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
           </div>
-          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
-            <strong style="color: #111827;">${rechnungData.empfaengerName}</strong><br>
-            <span style="color: #4b5563;">${(rechnungData.empfaengerAdresse || '').replace(/\n/g, '<br>')}</span>
+          <div style="flex: 1; text-align: right;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungsempfänger</div>
+            <div style="font-weight: 600; color: #1f2937;">${rechnungData.empfaengerName}</div>
+            <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${(rechnungData.empfaengerAdresse || '').replace(/\n/g, '<br>')}</div>
           </div>
         </div>
 
-        <!-- Rechnungsdetails -->
-        <div style="background: #f9fafb; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #e5e7eb;">
-          <div>
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${rechnungData.rechnungsnummer}</div>
+        <!-- Rechnungsdetails - graue Boxen -->
+        <div style="display: flex; gap: 12px; margin-bottom: 32px;">
+          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.5px;">Rechnungsnummer</div>
+            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 6px;">${rechnungData.rechnungsnummer}</div>
           </div>
-          <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
+          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.5px;">Rechnungsdatum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 6px;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
           </div>
           ${rechnungData.leistungszeitraum ? `
-          <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #111827;">${rechnungData.leistungszeitraum}</div>
+          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.5px;">Leistungszeitraum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 6px;">${rechnungData.leistungszeitraum}</div>
           </div>
           ` : ''}
         </div>
 
-        <p style="color: #374151;">Sehr geehrte Damen und Herren,</p>
-        <p style="color: #374151;">${introText}</p>
+        <!-- Anrede -->
+        <p style="color: #374151; margin-bottom: 8px;">Sehr geehrte Damen und Herren,</p>
+        <p style="color: #374151; margin-bottom: 24px;">${introText}</p>
 
         <!-- Positionen-Tabelle -->
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
           <thead>
-            <tr style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);">
-              <th style="padding: 10px 8px; text-align: left; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
-              <th style="padding: 10px 8px; text-align: left; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
-              <th style="padding: 10px 8px; text-align: right; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
-              <th style="padding: 10px 8px; text-align: right; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Einzel</th>
-              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
-              <th style="padding: 10px 8px; text-align: right; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Gesamt</th>
+            <tr style="background: #1f2937;">
+              <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Pos.</th>
+              <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
+              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
+              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Netto</th>
+              ${!kleinunternehmer ? '<th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">USt</th>' : ''}
+              <th style="padding: 10px 8px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Brutto</th>
             </tr>
           </thead>
           <tbody>
@@ -6559,39 +6561,46 @@ function ManuelleRechnungModal({
         </table>
 
         <!-- Summen-Block -->
-        <div style="background: #f0f0f0; border: 2px solid #999; padding: 16px; margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #000000;">
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
             <span>Nettobetrag:</span>
-            <span style="font-family: monospace;">${nettoGesamt.toFixed(2)} €</span>
+            <span style="font-family: monospace; color: #1f2937;">${nettoGesamt.toFixed(2)} €</span>
           </div>
           ${!kleinunternehmer ? `
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #000000;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
             <span>USt (${rechnungData.ustSatz}%):</span>
-            <span style="font-family: monospace;">${ustBetrag.toFixed(2)} €</span>
+            <span style="font-family: monospace; color: #1f2937;">${ustBetrag.toFixed(2)} €</span>
           </div>
           ` : ''}
-          <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 3px solid #000000; font-weight: bold; font-size: 14px; color: #000000;">
+          <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; color: #1f2937;">
             <span>Gesamtbetrag:</span>
             <span style="font-family: monospace; font-size: 16px;">${bruttoGesamt.toFixed(2)} €</span>
           </div>
         </div>
 
-        ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+        ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px; font-size: 11px;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
 
         ${rechnungData.freitext ? `<p style="color: #374151; margin-top: 16px;">${rechnungData.freitext}</p>` : ''}
 
-        <!-- Zahlungsinfo Box -->
-        <div style="background: #f9fafb; padding: 20px; margin-top: 24px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
-          <div style="font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
-          <p style="margin: 0 0 8px 0; color: #4b5563;">Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen auf folgendes Konto:</p>
-          <div style="margin-top: 8px;">
-            <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #1f2937;">${iban}</span><br>
-            <strong style="color: #111827;">Kontoinhaber:</strong> <span style="color: #374151;">${rechnungsstellerName}</span>
+        <!-- Zahlungshinweis -->
+        <div style="margin-top: 32px; background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
+          <div style="font-weight: 600; color: #1f2937; margin-bottom: 12px;">Zahlungsinformationen</div>
+          <div style="display: flex; gap: 24px; color: #4b5563; font-size: 12px;">
+            <div>
+              <span style="font-weight: 600; color: #1f2937;">IBAN:</span> ${iban}<br>
+              <span style="font-weight: 600; color: #1f2937;">Kontoinhaber:</span> ${rechnungsstellerName}
+            </div>
+            <div style="color: #6b7280;">
+              Bitte überweisen Sie den Betrag<br>innerhalb von <strong>${rechnungData.zahlungsziel} Tagen</strong>.
+            </div>
           </div>
         </div>
 
-        <p style="margin-top: 24px; color: #374151;">Vielen Dank für Ihr Vertrauen!</p>
-        <p style="color: #374151;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
+        <!-- Abschluss -->
+        <div style="margin-top: 32px; color: #374151;">
+          <p>Vielen Dank für Ihr Vertrauen!</p>
+          <p style="margin-top: 16px;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
+        </div>
       </body>
       </html>
     `
@@ -6623,25 +6632,25 @@ function ManuelleRechnungModal({
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
       const bodyContent = bodyMatch ? bodyMatch[1] : html
 
-      // Style-Block für schwarze Farben hinzufügen (wie bei Standard-Rechnungen)
+      // Style-Block für korrekte Farben (klassisches Design)
       container.innerHTML = `
         <style>
-          #pdf-render-container,
           #pdf-render-container * {
-            color: #000 !important;
-            -webkit-text-fill-color: #000 !important;
+            color: #1f2937 !important;
+            -webkit-text-fill-color: #1f2937 !important;
           }
           #pdf-render-container h1 {
-            color: #fff !important;
-            -webkit-text-fill-color: #fff !important;
+            color: #1f2937 !important;
+            -webkit-text-fill-color: #1f2937 !important;
           }
           #pdf-render-container table th {
             color: #fff !important;
             -webkit-text-fill-color: #fff !important;
+            background: #1f2937 !important;
           }
           #pdf-render-container table td {
-            color: #000 !important;
-            -webkit-text-fill-color: #000 !important;
+            color: #1f2937 !important;
+            -webkit-text-fill-color: #1f2937 !important;
           }
         </style>
         ${bodyContent}
@@ -6661,33 +6670,26 @@ function ManuelleRechnungModal({
           onclone: (clonedDoc) => {
             const clonedContainer = clonedDoc.getElementById('pdf-render-container')
             if (clonedContainer) {
-              // Tabellen-Body Zellen schwarz
-              const tbodyElements = clonedContainer.querySelectorAll('tbody td, tbody td *')
-              tbodyElements.forEach((el) => {
+              // Alle Text-Elemente dunkelgrau (#1f2937)
+              const allTextElements = clonedContainer.querySelectorAll('p, span, div, td, strong, em')
+              allTextElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#000', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('color', '#1f2937', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#1f2937', 'important')
               })
-              // Tabellen-Header weiß halten
+              // Tabellen-Header weiß auf dunklem Hintergrund
               const theadElements = clonedContainer.querySelectorAll('thead th, thead th *')
               theadElements.forEach((el) => {
                 const htmlEl = el as HTMLElement
                 htmlEl.style.setProperty('color', '#fff', 'important')
                 htmlEl.style.setProperty('-webkit-text-fill-color', '#fff', 'important')
               })
-              // h1 Header weiß halten
+              // h1 dunkelgrau (klassisches Design)
               const h1Elements = clonedContainer.querySelectorAll('h1')
               h1Elements.forEach((el) => {
                 const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#fff', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#fff', 'important')
-              })
-              // Paragraphen schwarz
-              const pElements = clonedContainer.querySelectorAll('p')
-              pElements.forEach((el) => {
-                const htmlEl = el as HTMLElement
-                htmlEl.style.setProperty('color', '#000', 'important')
-                htmlEl.style.setProperty('-webkit-text-fill-color', '#000', 'important')
+                htmlEl.style.setProperty('color', '#1f2937', 'important')
+                htmlEl.style.setProperty('-webkit-text-fill-color', '#1f2937', 'important')
               })
             }
           }
