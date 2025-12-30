@@ -5734,7 +5734,7 @@ ${rechnungsstellerName}`
       }
 
       // Header: RECHNUNG mit grauem Hintergrund
-      pdf.setFillColor(45, 41, 38) // Dark gray #1A2F2F
+      pdf.setFillColor(26, 47, 47) // Dark gray #1A2F2F
       pdf.rect(0, 0, pageWidth, 25, 'F')
       pdf.setFontSize(24)
       pdf.setFont('helvetica', 'bold')
@@ -5752,7 +5752,7 @@ ${rechnungsstellerName}`
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 99, 94)
+      pdf.setTextColor(95, 114, 114)
       pdf.text('RECHNUNGSSTELLER', margin + 3, y + 1)
       pdf.setTextColor(0, 0, 0)
       y += 5
@@ -5767,13 +5767,13 @@ ${rechnungsstellerName}`
         y += 3.5
       })
       if (profile?.steuernummer) {
-        pdf.setTextColor(107, 99, 94)
+        pdf.setTextColor(95, 114, 114)
         pdf.setFontSize(8)
         pdf.text(`Steuernr: ${profile?.steuernummer}`, margin + 3, y)
         y += 3.5
       }
       if (ustIdNr) {
-        pdf.setTextColor(107, 99, 94)
+        pdf.setTextColor(95, 114, 114)
         pdf.setFontSize(8)
         pdf.text(`USt-IdNr: ${ustIdNr}`, margin + 3, y)
         y += 3.5
@@ -5790,7 +5790,7 @@ ${rechnungsstellerName}`
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 99, 94)
+      pdf.setTextColor(95, 114, 114)
       pdf.text('RECHNUNGSEMPFÄNGER', pageWidth - margin - 82, yRight + 1)
       pdf.setTextColor(0, 0, 0)
       yRight += 5
@@ -5814,7 +5814,7 @@ ${rechnungsstellerName}`
       const detailWidth = contentWidth / 3
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 99, 94)
+      pdf.setTextColor(95, 114, 114)
       pdf.text('RECHNUNGSNUMMER', margin + 5, y + 1)
       pdf.text('RECHNUNGSDATUM', margin + detailWidth + 5, y + 1)
       pdf.text('LEISTUNGSZEITRAUM', margin + detailWidth * 2 + 5, y + 1)
@@ -5845,7 +5845,7 @@ ${rechnungsstellerName}`
 
       // Tabellen-Header zeichnen mit grauem Hintergrund
       checkNewPage(10)
-      pdf.setFillColor(45, 41, 38) // Dark gray
+      pdf.setFillColor(26, 47, 47) // Dark gray
       pdf.roundedRect(margin, y - 4, contentWidth, 8, 2, 2, 'F')
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
@@ -5945,13 +5945,13 @@ ${rechnungsstellerName}`
         y += 5
       }
 
-      pdf.setDrawColor(199, 91, 56)
+      pdf.setDrawColor(26, 127, 127)
       pdf.line(margin + 5, y + 1, pageWidth - margin - 5, y + 1)
       y += 4
 
       pdf.setFont('helvetica', 'bold')
       pdf.setFontSize(12)
-      pdf.setTextColor(107, 99, 94) // Teal
+      pdf.setTextColor(95, 114, 114) // Teal
       pdf.text('Gesamtbetrag:', margin + 5, y + 2)
       pdf.text(`${summen.gesamtBrutto.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
       pdf.setTextColor(0, 0, 0)
@@ -5961,7 +5961,7 @@ ${rechnungsstellerName}`
       if (kleinunternehmer) {
         pdf.setFont('helvetica', 'italic')
         pdf.setFontSize(9)
-        pdf.setTextColor(107, 99, 94)
+        pdf.setTextColor(95, 114, 114)
         pdf.text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet.', margin, y)
         pdf.setTextColor(0, 0, 0)
         y += 6
@@ -5983,7 +5983,7 @@ ${rechnungsstellerName}`
 
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(9)
-      pdf.setTextColor(74, 69, 67)
+      pdf.setTextColor(61, 79, 79)
       pdf.text('Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:', margin + 5, y + 8)
 
       // IBAN-Box
@@ -5995,7 +5995,7 @@ ${rechnungsstellerName}`
       pdf.setFont('helvetica', 'bold')
       pdf.text('IBAN:', margin + 8, y + 16)
       pdf.setFont('courier', 'normal')
-      pdf.setTextColor(107, 99, 94)
+      pdf.setTextColor(95, 114, 114)
       pdf.text(iban, margin + 22, y + 16)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(0, 0, 0)
@@ -6011,7 +6011,7 @@ ${rechnungsstellerName}`
       pdf.text('Mit freundlichen Grüßen', margin, y)
       y += 5
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 99, 94)
+      pdf.setTextColor(95, 114, 114)
       pdf.text(rechnungsstellerName, margin, y)
       pdf.setTextColor(0, 0, 0)
 
