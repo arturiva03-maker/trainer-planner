@@ -6416,6 +6416,22 @@ function ManuelleRechnungModal({
 
   const [saving, setSaving] = useState(false)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [emailText, setEmailText] = useState('')
+
+  // E-Mail-Text generieren/aktualisieren wenn sich Rechnungsdaten ändern
+  const generateEmailText = () => {
+    return `Sehr geehrte Damen und Herren,
+
+anbei erhalten Sie die Rechnung Nr. ${rechnungData.rechnungsnummer}.
+
+Gesamtbetrag: ${bruttoGesamt.toFixed(2)} €
+
+Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen.
+
+Mit freundlichen Grüßen
+${profile?.name || ''}`
+  }
 
   const addPosition = () => {
     setRechnungData(prev => ({
@@ -6803,16 +6819,7 @@ function ManuelleRechnungModal({
       const pdfBase64 = await generatePdf(true)
 
       const emailBetreff = `Rechnung ${rechnungData.rechnungsnummer}`
-      const emailText = `Sehr geehrte Damen und Herren,
-
-anbei erhalten Sie die Rechnung Nr. ${rechnungData.rechnungsnummer}.
-
-Gesamtbetrag: ${bruttoGesamt.toFixed(2)} €
-
-Bitte überweisen Sie den Betrag innerhalb von ${rechnungData.zahlungsziel} Tagen.
-
-Mit freundlichen Grüßen
-${profile?.name || ''}`
+      const finalEmailText = emailText || generateEmailText()
 
       const response = await fetch('/api/send-invoice-email', {
         method: 'POST',
@@ -6829,7 +6836,7 @@ ${profile?.name || ''}`
           },
           to: rechnungData.email,
           subject: emailBetreff,
-          text: emailText,
+          text: finalEmailText,
           pdfBase64,
           pdfFilename: `Rechnung_${rechnungData.rechnungsnummer}.pdf`
         })
@@ -7055,6 +7062,54 @@ ${profile?.name || ''}`
           </label>
         </div>
 
+        {/* Vorschau Button */}
+        <div style={{ marginTop: 16 }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              if (!emailText) setEmailText(generateEmailText())
+              setShowPreview(!showPreview)
+            }}
+            style={{ width: '100%' }}
+          >
+            {showPreview ? 'Vorschau ausblenden' : 'Vorschau anzeigen'}
+          </button>
+        </div>
+
+        {/* Vorschau-Bereich */}
+        {showPreview && (
+          <div style={{ marginTop: 16, border: '1px solid var(--gray-200)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+            {/* E-Mail-Text bearbeitbar */}
+            <div style={{ padding: 16, borderBottom: '1px solid var(--gray-200)', background: 'var(--gray-50)' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: 14 }}>E-Mail-Text (bearbeitbar)</h4>
+              <textarea
+                className="form-control"
+                value={emailText || generateEmailText()}
+                onChange={e => setEmailText(e.target.value)}
+                rows={8}
+                style={{ fontFamily: 'monospace', fontSize: 13 }}
+              />
+            </div>
+
+            {/* Rechnungs-Vorschau */}
+            <div style={{ padding: 16 }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: 14 }}>Rechnungs-Vorschau</h4>
+              <div
+                style={{
+                  background: 'white',
+                  border: '1px solid var(--gray-200)',
+                  borderRadius: 4,
+                  padding: 20,
+                  fontSize: 11,
+                  maxHeight: 400,
+                  overflow: 'auto'
+                }}
+                dangerouslySetInnerHTML={{ __html: generatePdfHtml().replace(/<html>|<\/html>|<head>[\s\S]*?<\/head>|<body[^>]*>|<\/body>/gi, '') }}
+              />
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
           <button
             className="btn btn-secondary"
@@ -7063,7 +7118,7 @@ ${profile?.name || ''}`
           >
             Abbrechen
           </button>
-          
+
           <button
               className="btn btn-success"
               style={{ flex: 1 }}
@@ -7072,7 +7127,7 @@ ${profile?.name || ''}`
           >
               {sendingEmail ? 'Sende...' : 'Speichern & Email'}
           </button>
-          
+
           <button
             className="btn btn-primary"
             style={{ flex: 1 }}
@@ -9351,15 +9406,8 @@ function BuchhaltungView({
                     </tr>
                   </thead>
                   <tbody>
-                    {offenePosten.map(p => {
-                      const fullRechnung = manuelleRechnungen.find(r => r.id === p.id)
-                      return (
-                      <tr
-                        key={p.id}
-                        onClick={() => fullRechnung && setViewingRechnung(fullRechnung)}
-                        style={{ cursor: 'pointer' }}
-                        className="clickable-row"
-                      >
+                    {offenePosten.map(p => (
+                      <tr key={p.id}>
                         <td>{formatDateGerman(p.datum)}</td>
                         <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{p.empfaenger_name}</td>
                         <td>
@@ -9393,7 +9441,7 @@ function BuchhaltungView({
                           </button>
                         </td>
                       </tr>
-                    )})}
+                    ))}
                   </tbody>
                 </table>
               </div>
