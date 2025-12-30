@@ -1,6 +1,6 @@
 -- Mini-Tennis Vorlage auf Standard-Design aktualisieren
 UPDATE pdf_vorlagen
-SET inhalt = '<!-- Header mit farbigem Balken -->
+SET inhalt = $HTML$<!-- Header mit farbigem Balken -->
 <div style="background: #8B7D76; margin: -24px -24px 24px -24px; padding: 24px;">
   <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px;">RECHNUNG</h1>
 </div>
@@ -11,7 +11,7 @@ SET inhalt = '<!-- Header mit farbigem Balken -->
     <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
     <div style="font-weight: 600; color: #2D2926;">{{trainer_name}}</div>
     <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">{{trainer_adresse_html}}</div>
-    {{#if trainer_steuernummer}}<div style="color: #6B635E; font-size: 10px; margin-top: 8px;">Steuernummer: {{trainer_steuernummer}}</div>{{/if}}
+    {{trainer_steuernummer_block}}
   </div>
   <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #6B635E;">
     <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
@@ -65,5 +65,5 @@ SET inhalt = '<!-- Header mit farbigem Balken -->
 <div style="margin-top: 32px; color: #4A4543;">
   <p>Vielen Dank für Ihr Vertrauen!</p>
   <p style="margin-top: 24px;">Mit freundlichen Grüßen<br><strong style="color: #2D2926;">{{trainer_name}}</strong></p>
-</div>'
+</div>$HTML$
 WHERE name ILIKE '%mini%tennis%' OR name ILIKE '%mini-tennis%';

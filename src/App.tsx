@@ -4635,6 +4635,7 @@ function InvoiceModal({
       '{{spieler_iban}}': maskiereIban(spielerIban),
       '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
       '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
+      '{{trainer_steuernummer_block}}': profile?.steuernummer ? `<div style="color: #6B635E; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile.steuernummer}</div>` : '',
     }
 
     // Funktion zum Ersetzen der Platzhalter
@@ -4994,6 +4995,7 @@ ${rechnungsstellerName}`
       '{{spieler_iban}}': maskiereIban(spielerIban),
       '{{spieler_mandatsreferenz}}': spielerMandatsreferenz,
       '{{spieler_unterschriftsdatum}}': spielerUnterschriftsdatum,
+      '{{trainer_steuernummer_block}}': profile?.steuernummer ? `<div style="color: #6B635E; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile.steuernummer}</div>` : '',
     }
 
     // Funktion zum Ersetzen der Platzhalter
