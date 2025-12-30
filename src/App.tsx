@@ -3321,6 +3321,71 @@ function AbrechnungView({
     onUpdate()
   }
 
+  // Alle Trainings eines Spielers im Monat als bar bezahlt markieren
+  const toggleAlleBarBezahlt = async (spielerId: string) => {
+    preserveScroll()
+    const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
+    if (!spielerData) return
+
+    // Optimistisches Update - sofort alle UI aktualisieren
+    const updatedPayments: SpielerTrainingPayment[] = []
+    const newPayments: SpielerTrainingPayment[] = []
+
+    for (const training of spielerData.trainings) {
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === training.id && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
+        updatedPayments.push({ ...existingPayment, bezahlt: true, bar_bezahlt: true })
+      } else {
+        newPayments.push({
+          id: `temp-${training.id}-${spielerId}`,
+          user_id: userId,
+          training_id: training.id,
+          spieler_id: spielerId,
+          bezahlt: true,
+          bar_bezahlt: true,
+          created_at: new Date().toISOString()
+        })
+      }
+    }
+
+    setSpielerPayments(prev => {
+      const updated = prev.map(p => {
+        const match = updatedPayments.find(up => up.id === p.id)
+        return match || p
+      })
+      return [...updated, ...newPayments]
+    })
+
+    // Datenbank-Operationen
+    for (const training of spielerData.trainings) {
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === training.id && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
+        await supabase
+          .from('spieler_training_payments')
+          .update({ bezahlt: true, bar_bezahlt: true })
+          .eq('id', existingPayment.id)
+      } else {
+        await supabase
+          .from('spieler_training_payments')
+          .insert({
+            user_id: userId,
+            training_id: training.id,
+            spieler_id: spielerId,
+            bezahlt: true,
+            bar_bezahlt: true
+          })
+      }
+    }
+
+    onUpdate()
+  }
+
   // Einzelnes Training für einen Spieler als bezahlt markieren
   const toggleTrainingBezahlt = async (trainingId: string, spielerId: string, currentStatus: boolean) => {
     preserveScroll()
@@ -3826,15 +3891,30 @@ function AbrechnungView({
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleAlleBezahlt(item.spieler.id, item.bezahlt)
-                      }}
-                    >
-                      {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleAlleBezahlt(item.spieler.id, item.bezahlt)
+                        }}
+                      >
+                        {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
+                      </button>
+                      {!item.bezahlt && (
+                        <button
+                          className="btn btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleAlleBarBezahlt(item.spieler.id)
+                          }}
+                          style={{ background: 'var(--warning)', color: '#000', borderColor: 'var(--warning)' }}
+                          title="Alle Trainings als bar bezahlt markieren"
+                        >
+                          Bar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -3924,6 +4004,18 @@ function AbrechnungView({
                 >
                   {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
                 </button>
+                {!item.bezahlt && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleAlleBarBezahlt(item.spieler.id)
+                    }}
+                    style={{ background: 'var(--warning)', color: '#000', borderColor: 'var(--warning)' }}
+                  >
+                    Alle bar
+                  </button>
+                )}
               </div>
             </div>
           ))}
