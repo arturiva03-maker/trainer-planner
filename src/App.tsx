@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from './supabaseClient'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -39,50 +39,22 @@ import {
   formatQuartal
 } from './utils'
 
-// ============ SCROLL PRESERVATION HOOK ============
-// Globaler Hook um Scroll-Position bei State-Updates zu erhalten
-const useScrollPreservation = () => {
-  const scrollPositionRef = useRef<number>(0)
-  const shouldRestoreRef = useRef<boolean>(false)
+// ============ SCROLL PRESERVATION ============
+// Einfacher globaler Mechanismus um Scroll-Position bei State-Updates zu erhalten
+let savedScrollPosition: number | null = null
 
-  // Speichere aktuelle Scroll-Position
-  const saveScrollPosition = useCallback(() => {
-    scrollPositionRef.current = window.scrollY
-    shouldRestoreRef.current = true
-  }, [])
-
-  // Stelle Scroll-Position nach dem Render wieder her
-  useLayoutEffect(() => {
-    if (shouldRestoreRef.current) {
-      window.scrollTo(0, scrollPositionRef.current)
-      shouldRestoreRef.current = false
-    }
-  })
-
-  // Wrapper für Funktionen, die die Scroll-Position erhalten sollen
-  const withScrollPreservation = useCallback(<T extends (...args: unknown[]) => unknown>(fn: T): T => {
-    return ((...args: Parameters<T>) => {
-      saveScrollPosition()
-      return fn(...args)
-    }) as T
-  }, [saveScrollPosition])
-
-  return { saveScrollPosition, withScrollPreservation }
-}
-
-// ============ SCROLL CONTEXT ============
-// Für globale Nutzung in der gesamten App
-let globalSaveScrollPosition: (() => void) | null = null
-
-const setGlobalScrollSaver = (saver: () => void) => {
-  globalSaveScrollPosition = saver
-}
-
-// Aufrufbar von überall, um Scroll-Position vor State-Updates zu speichern
+// Speichert die aktuelle Scroll-Position und stellt sie nach dem nächsten Render wieder her
 const preserveScroll = () => {
-  if (globalSaveScrollPosition) {
-    globalSaveScrollPosition()
-  }
+  savedScrollPosition = window.scrollY
+  // Stelle Position nach kurzem Delay wieder her (nach React-Render)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (savedScrollPosition !== null) {
+        window.scrollTo(0, savedScrollPosition)
+        savedScrollPosition = null
+      }
+    })
+  })
 }
 
 // Tennis Logo Icon Component - Terrakotta racket with ball
@@ -433,15 +405,6 @@ function App() {
     confirmText: string
     variant: 'danger' | 'warning' | 'primary'
   }>({ isOpen: false, title: '', message: '', confirmText: 'Löschen', variant: 'danger' })
-
-  // Scroll Preservation Hook initialisieren
-  const { saveScrollPosition } = useScrollPreservation()
-
-  // Globale Scroll-Funktion registrieren
-  useEffect(() => {
-    setGlobalScrollSaver(saveScrollPosition)
-    return () => { globalSaveScrollPosition = null }
-  }, [saveScrollPosition])
 
   // URL-Detection für öffentliche Formulare
   useEffect(() => {
