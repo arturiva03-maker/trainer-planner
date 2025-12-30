@@ -1,37 +1,39 @@
 :root {
-  --primary: #C75B38;
-  --primary-hover: #A84C2E;
-  --primary-light: #F5E6E0;
+  /* Petrol-Farbschema */
+  --primary: #1A7F7F;
+  --primary-hover: #135C5C;
+  --primary-light: #E6F2F2;
   --success: #155724;
   --success-light: #D4EDDA;
   --danger: #721C24;
   --danger-light: #F8D7DA;
   --warning: #856404;
   --warning-light: #FFF3CD;
-  /* Status-spezifische Farben */
-  --status-geplant-bg: #E8E4DF;
-  --status-geplant-text: #4A4543;
+  /* Status-spezifische Farben (funktional) */
+  --status-geplant-bg: #E8EDED;
+  --status-geplant-text: #3D4F4F;
   --status-durchgefuehrt-bg: #D4EDDA;
   --status-durchgefuehrt-text: #155724;
   --status-abgesagt-bg: #F8D7DA;
   --status-abgesagt-text: #721C24;
-  --status-bezahlt-bg: #F5E6E0;
-  --status-bezahlt-text: #C75B38;
-  --gray-50: #FAF8F5;
-  --gray-100: #F5F3F0;
-  --gray-200: #E8E4DF;
-  --gray-300: #D5D0CB;
-  --gray-400: #9A938D;
-  --gray-500: #6B635E;
-  --gray-600: #4A4543;
-  --gray-700: #4A4543;
-  --gray-800: #2D2926;
-  --gray-900: #2D2926;
+  --status-bezahlt-bg: #E6F2F2;
+  --status-bezahlt-text: #1A7F7F;
+  /* Grautöne (Petrol-getönt) */
+  --gray-50: #F7FAFA;
+  --gray-100: #EEF3F3;
+  --gray-200: #D4DEDE;
+  --gray-300: #B8C5C5;
+  --gray-400: #5F7272;
+  --gray-500: #5F7272;
+  --gray-600: #3D4F4F;
+  --gray-700: #3D4F4F;
+  --gray-800: #1A2F2F;
+  --gray-900: #1A2F2F;
   --sidebar-width: 280px;
   --header-height: 60px;
   --radius: 8px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow: 0 1px 3px rgba(26, 47, 47, 0.1);
+  --shadow-lg: 0 4px 6px rgba(26, 47, 47, 0.1);
 }
 
 /* Spinner Animation */
@@ -64,7 +66,7 @@ body {
 .auth-container {
   min-height: 100vh;
   display: flex;
-  background: linear-gradient(135deg, #4A4543 0%, #6B635E 50%, #8B7D76 100%);
+  background: linear-gradient(135deg, #1A2F2F 0%, #2A4545 50%, #3D5F5F 100%);
   position: relative;
   overflow: hidden;
 }
