@@ -39,23 +39,23 @@ import {
   formatQuartal
 } from './utils'
 
-// Tennis Logo Icon Component - Pink racket with ball
+// Tennis Logo Icon Component - Terrakotta racket with ball
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
     {/* Racket head */}
-    <ellipse cx="26" cy="22" rx="18" ry="20" stroke="#ec4899" strokeWidth="3" fill="none"/>
+    <ellipse cx="26" cy="22" rx="18" ry="20" stroke="#C75B38" strokeWidth="3" fill="none"/>
     {/* Racket strings horizontal */}
-    <line x1="10" y1="16" x2="42" y2="16" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="9" y1="22" x2="43" y2="22" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="10" y1="28" x2="42" y2="28" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="10" y1="16" x2="42" y2="16" stroke="#C75B38" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="9" y1="22" x2="43" y2="22" stroke="#C75B38" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="10" y1="28" x2="42" y2="28" stroke="#C75B38" strokeWidth="1.5" opacity="0.6"/>
     {/* Racket strings vertical */}
-    <line x1="18" y1="4" x2="18" y2="40" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="26" y1="2" x2="26" y2="42" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="34" y1="4" x2="34" y2="40" stroke="#ec4899" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="18" y1="4" x2="18" y2="40" stroke="#C75B38" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="26" y1="2" x2="26" y2="42" stroke="#C75B38" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="34" y1="4" x2="34" y2="40" stroke="#C75B38" strokeWidth="1.5" opacity="0.6"/>
     {/* Racket handle */}
-    <rect x="22" y="40" width="8" height="20" rx="2" fill="#ec4899"/>
-    <rect x="22" y="44" width="8" height="3" fill="#db2777"/>
-    <rect x="22" y="50" width="8" height="3" fill="#db2777"/>
+    <rect x="22" y="40" width="8" height="20" rx="2" fill="#C75B38"/>
+    <rect x="22" y="44" width="8" height="3" fill="#A84C2E"/>
+    <rect x="22" y="50" width="8" height="3" fill="#A84C2E"/>
     {/* Tennis ball */}
     <circle cx="50" cy="14" r="10" fill="#a3e635"/>
     <path d="M43 8 Q50 14 43 20" stroke="white" strokeWidth="2" fill="none"/>
@@ -718,7 +718,6 @@ function MainApp({ user }: { user: User }) {
                 spielerPayments={spielerPayments}
                 setSpielerPayments={setSpielerPayments}
                 profile={profile}
-                manuelleRechnungen={manuelleRechnungen}
                 pdfVorlagen={pdfVorlagen}
                 onUpdate={loadAllData}
                 onNavigateToTraining={handleNavigateToTraining}
@@ -2843,7 +2842,6 @@ function AbrechnungView({
   spielerPayments,
   setSpielerPayments,
   profile,
-  manuelleRechnungen,
   pdfVorlagen,
   onUpdate,
   onNavigateToTraining,
@@ -2856,7 +2854,6 @@ function AbrechnungView({
   spielerPayments: SpielerTrainingPayment[]
   setSpielerPayments: React.Dispatch<React.SetStateAction<SpielerTrainingPayment[]>>
   profile: TrainerProfile | null
-  manuelleRechnungen: ManuelleRechnung[]
   pdfVorlagen: PdfVorlage[]
   onUpdate: () => void
   onNavigateToTraining: (training: Training) => void
@@ -3077,20 +3074,87 @@ function AbrechnungView({
   const filteredSummary = useMemo(() => {
     let result = spielerSummary
 
-    // Bei Tag-Filter: Zeige nur Trainings des Tages, aber verwende die bereits berechneten Monats-Summen
-    // Bei monatlichen Tarifen: Der Betrag gilt für den ganzen Monat, nicht für einzelne Tage
+    // Bei Tag-Filter: Zeige nur Trainings des Tages mit korrekten Tages-Summen
     if (filterType === 'tag' && selectedTag) {
       result = result
         .filter(s => s.trainings.some(t => t.datum === selectedTag))
         .map(s => {
           const tagTrainings = s.trainings.filter(t => t.datum === selectedTag)
-          // Behalte die Monats-Summen bei, zeige nur die Trainings des Tages
+
+          // Bestimme welches Training das ERSTE des Monats für jeden monatlichen Tarif ist
+          const alleTrainingsSortiert = [...s.trainings].sort((a, b) => a.datum.localeCompare(b.datum))
+          const monatlicheErstesTraining = new Map<string, string>() // tarifKey -> erstes training.id
+          alleTrainingsSortiert.forEach(t => {
+            const tarif = tarife.find(ta => ta.id === t.tarif_id)
+            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+            if (abrechnungsart === 'monatlich') {
+              const monatlichKey = t.tarif_id || t.id
+              if (!monatlicheErstesTraining.has(monatlichKey)) {
+                monatlicheErstesTraining.set(monatlichKey, t.id)
+              }
+            }
+          })
+
+          // Berechne Summen nur für die Trainings des gewählten Tages
+          let tagSumme = 0
+          let tagBarSumme = 0
+          let tagBezahltSumme = 0
+          let tagOffeneSumme = 0
+
+          tagTrainings.forEach(t => {
+            const tarif = tarife.find(ta => ta.id === t.tarif_id)
+            const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+            const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+            let spielerPreis = 0
+
+            if (abrechnungsart === 'monatlich') {
+              // Monatlicher Tarif: nur wenn dieses Training das ERSTE des Monats ist
+              const monatlichKey = t.tarif_id || t.id
+              const erstesTrainingId = monatlicheErstesTraining.get(monatlichKey)
+              if (t.id === erstesTrainingId) {
+                spielerPreis = preis
+              }
+              // Sonst: 0€ da inkl. im Monatstarif
+            } else {
+              spielerPreis = preis * duration
+              if (abrechnungsart === 'proSpieler') {
+                const zahlendeSpielerAnzahl = t.spieler_ids.length + (t.entfernte_spieler?.filter(e => e.muss_bezahlen).length || 0)
+                spielerPreis = spielerPreis / zahlendeSpielerAnzahl
+              }
+            }
+
+            // Korrektur anwenden
+            spielerPreis += (t.korrektur_betrag || 0)
+
+            tagSumme += spielerPreis
+
+            // Bezahlstatus
+            const paymentStatus = getSpielerPaymentStatus(s.spieler.id, t)
+            if (spielerPreis > 0) {
+              if (paymentStatus.barBezahlt) {
+                tagBarSumme += spielerPreis
+              } else if (paymentStatus.bezahlt) {
+                tagBezahltSumme += spielerPreis
+              } else {
+                tagOffeneSumme += spielerPreis
+              }
+            }
+          })
+
           return {
             ...s,
-            trainings: tagTrainings
-            // summe, barSumme, bezahltSumme, offeneSumme, bezahlt bleiben vom Monat
+            trainings: tagTrainings,
+            summe: tagSumme,
+            barSumme: tagBarSumme,
+            bezahltSumme: tagBezahltSumme,
+            offeneSumme: tagOffeneSumme
+            // bezahlt bleibt vom Original (Monatsstatus)
           }
         })
+        // Filtere Spieler heraus die keine Trainings am Tag haben
+        .filter(s => s.trainings.length > 0)
     }
 
     // Status-Filter (bezahlt/offen/bar)
@@ -3112,12 +3176,7 @@ function AbrechnungView({
     }
 
     return result
-  }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag, tarife])
-
-  // Manuelle Rechnungen des ausgewählten Monats
-  const monthManuelleRechnungen = useMemo(() => {
-    return manuelleRechnungen.filter(r => r.monat === selectedMonth)
-  }, [manuelleRechnungen, selectedMonth])
+  }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag, tarife, getSpielerPaymentStatus])
 
   const stats = useMemo(() => {
     // Trainings-Stats
@@ -3126,19 +3185,15 @@ function AbrechnungView({
     const trainingsBezahlt = trainingsBar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
     const trainingsOffen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
 
-    // Manuelle Rechnungen Stats
-    const manuelleTotal = monthManuelleRechnungen.reduce((sum, r) => sum + r.brutto_gesamt, 0)
-    const manuelleBar = monthManuelleRechnungen.filter(r => r.bar_bezahlt).reduce((sum, r) => sum + r.brutto_gesamt, 0)
-    const manuelleBezahlt = monthManuelleRechnungen.filter(r => r.bezahlt || r.bar_bezahlt).reduce((sum, r) => sum + r.brutto_gesamt, 0)
-    const manuelleOffen = monthManuelleRechnungen.filter(r => !r.bezahlt && !r.bar_bezahlt).reduce((sum, r) => sum + r.brutto_gesamt, 0)
-
+    // Stats zeigen NUR Trainings, keine manuellen Rechnungen
+    // Manuelle Rechnungen werden separat in Buchhaltung > Offene Posten verwaltet
     return {
-      total: trainingsTotal + manuelleTotal,
-      bar: trainingsBar + manuelleBar,
-      bezahlt: trainingsBezahlt + manuelleBezahlt,
-      offen: trainingsOffen + manuelleOffen
+      total: trainingsTotal,
+      bar: trainingsBar,
+      bezahlt: trainingsBezahlt,
+      offen: trainingsOffen
     }
-  }, [filteredSummary, monthManuelleRechnungen])
+  }, [filteredSummary])
 
   // Alle Trainings eines Spielers im Monat als bezahlt/offen markieren
   const toggleAlleBezahlt = async (spielerId: string, currentStatus: boolean) => {
@@ -3672,15 +3727,31 @@ function AbrechnungView({
         const detail = spielerSummary.find(s => s.spieler.id === selectedSpielerDetail)
         if (!detail) return null
 
+        // WICHTIG: Erst alle Trainings des Monats sortieren und monatliche Tarife tracken
+        // damit wir wissen, welches Training das ERSTE des monatlichen Tarifs ist
+        const alleTrainingsSortiert = [...detail.trainings].sort((a, b) => a.datum.localeCompare(b.datum))
+
+        // Tracking über ALLE Trainings des Monats, um zu wissen welches das erste ist
+        const monatlicheErstesTraining = new Map<string, string>() // tarifKey -> erstes training.id
+        alleTrainingsSortiert.forEach(t => {
+          const tarif = tarife.find(ta => ta.id === t.tarif_id)
+          const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+          if (abrechnungsart === 'monatlich') {
+            const monatlichKey = t.tarif_id || t.id
+            if (!monatlicheErstesTraining.has(monatlichKey)) {
+              monatlicheErstesTraining.set(monatlichKey, t.id)
+            }
+          }
+        })
+
         // Filtere Trainings nach Tag wenn Tag-Filter aktiv
         const gefilterteTrainings = filterType === 'tag' && selectedTag
           ? detail.trainings.filter(t => t.datum === selectedTag)
           : detail.trainings
 
-        // Berechne Betrag pro Training (mit Tracking für monatliche Tarife)
-        const monatlicheSerienTracking = new Set<string>()
+        // Berechne Betrag pro Training (mit korrektem monatlichen Tracking)
         const trainingsDetail = gefilterteTrainings
-          .sort((a, b) => a.datum.localeCompare(b.datum)) // Sortiere zuerst nach Datum
+          .sort((a, b) => a.datum.localeCompare(b.datum))
           .map(t => {
             const tarif = tarife.find(ta => ta.id === t.tarif_id)
             const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
@@ -3692,12 +3763,14 @@ function AbrechnungView({
 
             if (abrechnungsart === 'monatlich') {
               // Monatlicher Tarif: nur einmal pro Tarif pro Monat berechnen
+              // Prüfe ob dieses Training das ERSTE des Monats für diesen Tarif ist
               const monatlichKey = t.tarif_id || t.id
-              if (!monatlicheSerienTracking.has(monatlichKey)) {
-                monatlicheSerienTracking.add(monatlichKey)
+              const erstesTrainingId = monatlicheErstesTraining.get(monatlichKey)
+              if (t.id === erstesTrainingId) {
                 basisBetrag = preis // Monatsbetrag, nicht pro Stunde
                 istMonatlicheSerieErstesTraining = true
               }
+              // Sonst: basisBetrag bleibt 0, da Tarif bereits beim ersten Training berechnet
             } else {
               basisBetrag = preis * duration
               if (abrechnungsart === 'proSpieler') {
@@ -4391,27 +4464,27 @@ function InvoiceModal({
 
     // Positionen-Tabelle HTML - Sportliches Design mit Zebra-Streifen
     const positionenHtml = rechnungsPositionen.map((p, idx) => `
-      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f0fdfa'};">
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${p.zeit}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
-        ${hatMehrereSpieler ? `<td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${p.spielerName}</td>` : ''}
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
+      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#FAF8F5'};">
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF;">${p.zeit}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td style="padding: 10px; border-bottom: 1px solid #E8E4DF;">${p.spielerName}</td>` : ''}
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 10px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
       </tr>
     `).join('')
 
     // Korrekturzeile falls vorhanden - Sportliches Design
     const korrekturColSpan = hatMehrereSpieler ? 4 : 3
     const korrekturHtml = summen.korrektur !== 0 ? `
-      <tr style="background: ${summen.korrektur < 0 ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'};">
-        <td colspan="${korrekturColSpan}" style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><em>Korrektur</em></td>
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
-        <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
+      <tr style="background: ${summen.korrektur < 0 ? 'linear-gradient(135deg, #F5E6E0 0%, #F5E6E0 100%)' : 'linear-gradient(135deg, #FAF8F5 0%, #F5E6E0 100%)'};">
+        <td colspan="${korrekturColSpan}" style="padding: 10px; border-bottom: 1px solid #E8E4DF;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF;"><em>Korrektur</em></td>
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 10px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="padding: 10px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
       </tr>
     ` : ''
 
@@ -4420,18 +4493,18 @@ function InvoiceModal({
 
     // Summen-Block - Sportliches Design
     const summenBlockHtml = `
-      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #10b981;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151;">
+      <div style="background: linear-gradient(135deg, #FAF8F5 0%, #F5E6E0 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #C75B38;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #4A4543;">
           <span>Nettobetrag:</span>
           <span style="font-family: monospace;">${summen.gesamtNetto.toFixed(2)} €</span>
         </div>
         ${!kleinunternehmer ? `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #4A4543;">
           <span>USt (19%):</span>
           <span style="font-family: monospace;">${summen.gesamtUst.toFixed(2)} €</span>
         </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; padding-top: 12px; margin-top: 12px; border-top: 2px solid #10b981; font-weight: bold; font-size: 16px; color: #065f46;">
+        <div style="display: flex; justify-content: space-between; padding-top: 12px; margin-top: 12px; border-top: 2px solid #C75B38; font-weight: bold; font-size: 16px; color: #2D2926;">
           <span>Gesamtbetrag:</span>
           <span style="font-family: monospace; font-size: 18px;">${summen.gesamtBrutto.toFixed(2)} €</span>
         </div>
@@ -4442,7 +4515,7 @@ function InvoiceModal({
     const positionenTabelle = `
       <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 20px 0; font-size: 11px; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
         <thead>
-          <tr style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);">
+          <tr style="background: linear-gradient(135deg, #C75B38 0%, #A84C2E 100%);">
             <th style="padding: 12px 10px; text-align: left; color: white; font-weight: 600;">Datum</th>
             <th style="padding: 12px 10px; text-align: left; color: white; font-weight: 600;">Zeit</th>
             <th style="padding: 12px 10px; text-align: left; color: white; font-weight: 600;">Dauer</th>
@@ -4462,32 +4535,32 @@ function InvoiceModal({
 
     // Klassische Positionen-Tabelle - Professionell ohne Farben
     const positionenHtmlKlassisch = rechnungsPositionen.map((p, idx) => `
-      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.zeit}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
-        ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.spielerName}</td>` : ''}
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
+      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#FAF8F5'};">
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.zeit}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.spielerName}</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
       </tr>
     `).join('')
 
     const korrekturHtmlKlassisch = summen.korrektur !== 0 ? `
-      <tr style="background: #f9fafb;">
-        <td colspan="${korrekturColSpan}" style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><em>Korrektur</em></td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
+      <tr style="background: #FAF8F5;">
+        <td colspan="${korrekturColSpan}" style="padding: 8px; border-bottom: 1px solid #E8E4DF;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;"><em>Korrektur</em></td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
       </tr>
     ` : ''
 
     const positionenTabelleKlassisch = `
       <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
         <thead>
-          <tr style="background: #1f2937;">
+          <tr style="background: #2D2926;">
             <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Datum</th>
             <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Zeit</th>
             <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Dauer</th>
@@ -4507,18 +4580,18 @@ function InvoiceModal({
 
     // Klassischer Summen-Block - Professionell ohne Farben
     const summenBlockKlassisch = `
-      <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+      <div style="background: #FAF8F5; border: 1px solid #E8E4DF; padding: 16px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
           <span>Nettobetrag:</span>
           <span style="font-family: monospace;">${summen.gesamtNetto.toFixed(2)} €</span>
         </div>
         ${!kleinunternehmer ? `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
           <span>USt (19%):</span>
           <span style="font-family: monospace;">${summen.gesamtUst.toFixed(2)} €</span>
         </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; color: #1f2937;">
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #2D2926; font-weight: bold; font-size: 14px; color: #2D2926;">
           <span>Gesamtbetrag:</span>
           <span style="font-family: monospace; font-size: 16px;">${summen.gesamtBrutto.toFixed(2)} €</span>
         </div>
@@ -4581,45 +4654,45 @@ function InvoiceModal({
       // Standard PDF-Layout - Professionelles Design
       pdfHtml = `
         <!-- Header -->
-        <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px;">
+        <div style="background: #2D2926; margin: -24px -24px 24px -24px; padding: 24px;">
           <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; ">RECHNUNG</h1>
         </div>
 
         <!-- Adressbereich -->
         <div style="display: flex; justify-content: space-between; margin-bottom: 24px; gap: 20px;">
-          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
-            <div style="font-weight: 600; color: #1f2937;">${rechnungsstellerName}</div>
-            <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
-            ${profile?.steuernummer ? `<div style="color: #6b7280; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
-            ${ustIdNr ? `<div style="color: #6b7280; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
+          <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #4A4543;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
+            <div style="font-weight: 600; color: #2D2926;">${rechnungsstellerName}</div>
+            <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
+            ${profile?.steuernummer ? `<div style="color: #6B635E; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
+            ${ustIdNr ? `<div style="color: #6B635E; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
           </div>
-          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
-            <div style="font-weight: 600; color: #1f2937;">${rechnungsempfaengerName}</div>
-            <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #6B635E;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
+            <div style="font-weight: 600; color: #2D2926;">${rechnungsempfaengerName}</div>
+            <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}</div>
           </div>
         </div>
 
         <!-- Rechnungsdetails -->
         <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-          <div style="flex: 1; background: #f9fafb; padding: 12px 16px; text-align: center; border: 1px solid #e5e7eb;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
-            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 4px;">${rechnungsnummer}</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 12px 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Rechnungsnummer</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 4px;">${rechnungsnummer}</div>
           </div>
-          <div style="flex: 1; background: #f9fafb; padding: 12px 16px; text-align: center; border: 1px solid #e5e7eb;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 4px;">${formatDateGerman(rechnungsdatum)}</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 12px 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Rechnungsdatum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 4px;">${formatDateGerman(rechnungsdatum)}</div>
           </div>
-          <div style="flex: 1; background: #f9fafb; padding: 12px 16px; text-align: center; border: 1px solid #e5e7eb;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 4px;">${monatFormatiert}</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 12px 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Leistungszeitraum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 4px;">${monatFormatiert}</div>
           </div>
         </div>
 
         <!-- Anrede -->
-        <p style="color: #374151; margin-bottom: 8px;">Sehr geehrte Damen und Herren,</p>
-        <p style="color: #374151; margin-bottom: 20px;">für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
+        <p style="color: #4A4543; margin-bottom: 8px;">Sehr geehrte Damen und Herren,</p>
+        <p style="color: #4A4543; margin-bottom: 20px;">für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
 
         <!-- Positionen -->
         ${positionenTabelleKlassisch}
@@ -4627,26 +4700,26 @@ function InvoiceModal({
         <!-- Summen -->
         ${summenBlockKlassisch}
 
-        ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px; font-size: 11px;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
+        ${kleinunternehmer ? '<p style="color: #6B635E; font-style: italic; margin-top: 16px; font-size: 11px;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
 
         <!-- Zahlungshinweis -->
-        <div style="margin-top: 32px; background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
-          <div style="font-weight: 600; color: #1f2937; margin-bottom: 12px;">Zahlungsinformationen</div>
-          <div style="display: flex; gap: 24px; color: #4b5563; font-size: 12px;">
+        <div style="margin-top: 32px; background: #FAF8F5; padding: 20px; border: 1px solid #E8E4DF; border-left: 3px solid #4A4543;">
+          <div style="font-weight: 600; color: #2D2926; margin-bottom: 12px;">Zahlungsinformationen</div>
+          <div style="display: flex; gap: 24px; color: #4A4543; font-size: 12px;">
             <div>
               <span style="font-weight: 600;">IBAN:</span> ${iban}<br>
               <span style="font-weight: 600;">Kontoinhaber:</span> ${rechnungsstellerName}
             </div>
-            <div style="color: #6b7280;">
+            <div style="color: #6B635E;">
               Bitte überweisen Sie den Betrag<br>innerhalb von <strong>14 Tagen</strong>.
             </div>
           </div>
         </div>
 
         <!-- Abschluss -->
-        <div style="margin-top: 32px; color: #374151;">
+        <div style="margin-top: 32px; color: #4A4543;">
           <p>Vielen Dank für Ihr Vertrauen und die gute Zusammenarbeit!</p>
-          <p style="margin-top: 24px;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
+          <p style="margin-top: 24px;">Mit freundlichen Grüßen<br><strong style="color: #2D2926;">${rechnungsstellerName}</strong></p>
         </div>
       `
     }
@@ -4739,27 +4812,27 @@ ${rechnungsstellerName}`
 
     // Erstelle Tabellenzeilen für jede Position - Sportliches Design mit Zebra-Stripes
     const positionenHtml = rechnungsPositionen.map((p, index) => `
-      <tr style="background: ${index % 2 === 0 ? '#f0fdf4' : 'white'};">
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${p.zeit}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
-        ${hatMehrereSpieler ? `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${p.spielerName}</td>` : ''}
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right">${p.netto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #1f2937;">${p.brutto.toFixed(2)} €</td>
+      <tr style="background: ${index % 2 === 0 ? '#FAF8F5' : 'white'};">
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF;">${p.zeit}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td style="padding: 12px; border-bottom: 1px solid #E8E4DF;">${p.spielerName}</td>` : ''}
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF; text-align: right">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 12px; border-bottom: 1px solid #E8E4DF; text-align: right">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF; text-align: right; font-weight: 600; color: #2D2926;">${p.brutto.toFixed(2)} €</td>
       </tr>
     `).join('')
 
     // Korrekturzeile falls vorhanden - Sportliches Design
     const korrekturColSpan = hatMehrereSpieler ? 4 : 3
     const korrekturHtml = summen.korrektur !== 0 ? `
-      <tr style="background: linear-gradient(135deg, ${summen.korrektur < 0 ? '#fef2f2' : '#f0fdf4'} 0%, ${summen.korrektur < 0 ? '#fee2e2' : '#dcfce7'} 100%);">
-        <td colspan="${korrekturColSpan}" style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><em style="color: ${summen.korrektur < 0 ? '#dc2626' : '#16a34a'};">${korrekturGrund || 'Manuelle Korrektur'}</em></td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><em>Korrektur</em></td>
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right">${summen.korrekturNetto >= 0 ? '' : ''}${summen.korrekturNetto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
-        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${summen.korrektur >= 0 ? '' : ''}${summen.korrektur.toFixed(2)} €</td>
+      <tr style="background: linear-gradient(135deg, ${summen.korrektur < 0 ? '#F5E6E0' : '#FAF8F5'} 0%, ${summen.korrektur < 0 ? '#F5E6E0' : '#F5E6E0'} 100%);">
+        <td colspan="${korrekturColSpan}" style="padding: 12px; border-bottom: 1px solid #E8E4DF;"><em style="color: ${summen.korrektur < 0 ? '#B54332' : '#C75B38'};">${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF;"><em>Korrektur</em></td>
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF; text-align: right">${summen.korrekturNetto >= 0 ? '' : ''}${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 12px; border-bottom: 1px solid #E8E4DF; text-align: right">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="padding: 12px; border-bottom: 1px solid #E8E4DF; text-align: right; font-weight: 600;">${summen.korrektur >= 0 ? '' : ''}${summen.korrektur.toFixed(2)} €</td>
       </tr>
     ` : ''
 
@@ -4767,7 +4840,7 @@ ${rechnungsstellerName}`
     const positionenTabelle = `
       <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 20px 0; font-size: 11px; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
         <thead>
-          <tr style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);">
+          <tr style="background: linear-gradient(135deg, #C75B38 0%, #A84C2E 100%);">
             <th style="padding: 14px 12px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Datum</th>
             <th style="padding: 14px 12px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Zeit</th>
             <th style="padding: 14px 12px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Dauer</th>
@@ -4787,52 +4860,52 @@ ${rechnungsstellerName}`
 
     // Summen-Block als HTML - Sportliches Design
     const summenBlock = `
-      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #10b981;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151;">
+      <div style="background: linear-gradient(135deg, #FAF8F5 0%, #F5E6E0 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #C75B38;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #4A4543;">
           <span>Nettobetrag:</span>
           <span style="font-weight: 500;">${summen.gesamtNetto.toFixed(2)} €</span>
         </div>
         ${!kleinunternehmer ? `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #4A4543;">
           <span>USt (19%):</span>
           <span style="font-weight: 500;">${summen.gesamtUst.toFixed(2)} €</span>
         </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #10b981; margin-top: 8px;">
-          <span style="font-size: 16px; font-weight: 700; color: #1f2937;">Gesamtbetrag:</span>
-          <span style="font-size: 18px; font-weight: 700; color: #1f2937;">${summen.gesamtBrutto.toFixed(2)} €</span>
+        <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #C75B38; margin-top: 8px;">
+          <span style="font-size: 16px; font-weight: 700; color: #2D2926;">Gesamtbetrag:</span>
+          <span style="font-size: 18px; font-weight: 700; color: #2D2926;">${summen.gesamtBrutto.toFixed(2)} €</span>
         </div>
       </div>
     `
 
     // Klassische Positionen-Tabelle - Professionell ohne Farben
     const positionenHtmlKlassisch = rechnungsPositionen.map((p, idx) => `
-      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.zeit}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
-        ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.spielerName}</td>` : ''}
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
+      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#FAF8F5'};">
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.zeit}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+        ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.spielerName}</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${p.netto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${p.ust.toFixed(2)} €</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600;">${p.brutto.toFixed(2)} €</td>
       </tr>
     `).join('')
 
     const korrekturHtmlKlassisch = summen.korrektur !== 0 ? `
-      <tr style="background: #f9fafb;">
-        <td colspan="${korrekturColSpan}" style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><em>Korrektur</em></td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
-        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
+      <tr style="background: #FAF8F5;">
+        <td colspan="${korrekturColSpan}" style="padding: 8px; border-bottom: 1px solid #E8E4DF;"><em>${korrekturGrund || 'Manuelle Korrektur'}</em></td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF;"><em>Korrektur</em></td>
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${summen.korrekturNetto.toFixed(2)} €</td>
+        ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace;">${summen.korrekturUst.toFixed(2)} €</td>` : ''}
+        <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600;">${summen.korrektur.toFixed(2)} €</td>
       </tr>
     ` : ''
 
     const positionenTabelleKlassisch = `
       <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11px;">
         <thead>
-          <tr style="background: #1f2937;">
+          <tr style="background: #2D2926;">
             <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Datum</th>
             <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Zeit</th>
             <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Dauer</th>
@@ -4852,18 +4925,18 @@ ${rechnungsstellerName}`
 
     // Klassischer Summen-Block - Professionell ohne Farben
     const summenBlockKlassisch = `
-      <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+      <div style="background: #FAF8F5; border: 1px solid #E8E4DF; padding: 16px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
           <span>Nettobetrag:</span>
           <span style="font-family: monospace;">${summen.gesamtNetto.toFixed(2)} €</span>
         </div>
         ${!kleinunternehmer ? `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
           <span>USt (19%):</span>
           <span style="font-family: monospace;">${summen.gesamtUst.toFixed(2)} €</span>
         </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; color: #1f2937;">
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #2D2926; font-weight: bold; font-size: 14px; color: #2D2926;">
           <span>Gesamtbetrag:</span>
           <span style="font-family: monospace; font-size: 16px;">${summen.gesamtBrutto.toFixed(2)} €</span>
         </div>
@@ -5010,7 +5083,7 @@ ${rechnungsstellerName}`
               padding: 24px;
               line-height: 1.6;
               font-size: 12px;
-              color: #1f2937;
+              color: #2D2926;
               background: #ffffff;
             }
             @media print {
@@ -5021,62 +5094,62 @@ ${rechnungsstellerName}`
         </head>
         <body>
           <!-- Header -->
-          <div style="background: #1f2937; margin: -24px -24px 24px -24px; padding: 24px;">
+          <div style="background: #2D2926; margin: -24px -24px 24px -24px; padding: 24px;">
             <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
           </div>
 
           <!-- Adressen in Cards -->
           <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
-            <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
-              <strong style="color: #111827;">${rechnungsstellerName}</strong><br>
-              <span style="color: #4b5563;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</span>
-              ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
-              ${ustIdNr ? `<br><span style="color: #6b7280; font-size: 11px;">USt-IdNr: ${ustIdNr}</span>` : ''}
+            <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #4A4543;">
+              <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
+              <strong style="color: #2D2926;">${rechnungsstellerName}</strong><br>
+              <span style="color: #4A4543;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</span>
+              ${profile?.steuernummer ? `<br><span style="color: #6B635E; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
+              ${ustIdNr ? `<br><span style="color: #6B635E; font-size: 11px;">USt-IdNr: ${ustIdNr}</span>` : ''}
             </div>
-            <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
-              <strong style="color: #111827;">${rechnungsempfaengerName}</strong><br>
-              <span style="color: #4b5563;">${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}</span>
+            <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #6B635E;">
+              <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
+              <strong style="color: #2D2926;">${rechnungsempfaengerName}</strong><br>
+              <span style="color: #4A4543;">${rechnungsempfaengerAdresse.replace(/\n/g, '<br>')}</span>
             </div>
           </div>
 
           <!-- Rechnungsdetails -->
-          <div style="background: #f9fafb; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #e5e7eb;">
+          <div style="background: #FAF8F5; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #E8E4DF;">
             <div>
-              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
-              <div style="font-size: 14px; font-weight: 700; color: #111827;">${rechnungsnummer}</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Rechnungsnummer</div>
+              <div style="font-size: 14px; font-weight: 700; color: #2D2926;">${rechnungsnummer}</div>
             </div>
             <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
-              <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatDateGerman(rechnungsdatum)}</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Rechnungsdatum</div>
+              <div style="font-size: 14px; font-weight: 700; color: #2D2926;">${formatDateGerman(rechnungsdatum)}</div>
             </div>
             <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-              <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
-              <div style="font-size: 14px; font-weight: 700; color: #111827;">${monatFormatiert}</div>
+              <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Leistungszeitraum</div>
+              <div style="font-size: 14px; font-weight: 700; color: #2D2926;">${monatFormatiert}</div>
             </div>
           </div>
 
-          <p style="color: #374151;">Sehr geehrte Damen und Herren,</p>
-          <p style="color: #374151;">für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
+          <p style="color: #4A4543;">Sehr geehrte Damen und Herren,</p>
+          <p style="color: #4A4543;">für die im Leistungszeitraum erbrachten Trainerstunden erlaube ich mir, folgende Rechnung zu stellen:</p>
 
           ${positionenTabelleKlassisch}
           ${summenBlockKlassisch}
 
-          ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
+          ${kleinunternehmer ? '<p style="color: #6B635E; font-style: italic; margin-top: 16px;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
 
           <!-- Zahlungsinfo Box -->
-          <div style="background: #f9fafb; padding: 20px; margin-top: 24px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
-            <div style="font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
-            <p style="margin: 0 0 8px 0; color: #4b5563;">Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
+          <div style="background: #FAF8F5; padding: 20px; margin-top: 24px; border: 1px solid #E8E4DF; border-left: 3px solid #4A4543;">
+            <div style="font-size: 11px; text-transform: uppercase; color: #2D2926; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
+            <p style="margin: 0 0 8px 0; color: #4A4543;">Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:</p>
             <div style="margin-top: 8px;">
-              <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #1f2937;">${iban}</span><br>
-              <strong style="color: #111827;">Kontoinhaber:</strong> <span style="color: #374151;">${rechnungsstellerName}</span>
+              <strong style="color: #2D2926;">IBAN:</strong> <span style="font-family: monospace; color: #2D2926;">${iban}</span><br>
+              <strong style="color: #2D2926;">Kontoinhaber:</strong> <span style="color: #4A4543;">${rechnungsstellerName}</span>
             </div>
           </div>
 
-          <p style="margin-top: 24px; color: #374151;">Vielen Dank für Ihr Vertrauen!</p>
-          <p style="color: #374151;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
+          <p style="margin-top: 24px; color: #4A4543;">Vielen Dank für Ihr Vertrauen!</p>
+          <p style="color: #4A4543;">Mit freundlichen Grüßen<br><strong style="color: #2D2926;">${rechnungsstellerName}</strong></p>
         </body>
         </html>
       `
@@ -5128,15 +5201,15 @@ ${rechnungsstellerName}`
 
         // HTML-Hilfsdaten erstellen - Sportliches Design mit Zebra-Stripes
         const positionenHtml = rechnungsPositionen.map((p, index) => `
-          <tr style="background: ${index % 2 === 0 ? '#f0fdf4' : '#ffffff'} !important;">
-            <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937 !important;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-            <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937 !important;">${p.zeit}</td>
-            <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937 !important;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
-            ${hatMehrereSpieler ? `<td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937 !important;">${p.spielerName}</td>` : ''}
-            <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937 !important;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
-            <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #1f2937 !important;">${p.netto.toFixed(2)} €</td>
-            ${!kleinunternehmer ? `<td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #1f2937 !important;">${p.ust.toFixed(2)} €</td>` : ''}
-            <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #0d9488 !important;">${p.brutto.toFixed(2)} €</td>
+          <tr style="background: ${index % 2 === 0 ? '#FAF8F5' : '#ffffff'} !important;">
+            <td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926 !important;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+            <td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926 !important;">${p.zeit}</td>
+            <td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926 !important;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+            ${hatMehrereSpieler ? `<td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926 !important;">${p.spielerName}</td>` : ''}
+            <td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926 !important;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+            <td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; text-align: right; color: #2D2926 !important;">${p.netto.toFixed(2)} €</td>
+            ${!kleinunternehmer ? `<td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; text-align: right; color: #2D2926 !important;">${p.ust.toFixed(2)} €</td>` : ''}
+            <td style="padding: 10px 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-weight: 600; color: #C75B38 !important;">${p.brutto.toFixed(2)} €</td>
           </tr>
         `).join('')
 
@@ -5144,7 +5217,7 @@ ${rechnungsstellerName}`
           <div class="positionen-tabelle-wrapper" style="overflow-x: auto;">
           <table style="width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 10px; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <thead>
-              <tr style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);">
+              <tr style="background: linear-gradient(135deg, #C75B38 0%, #A84C2E 100%);">
                 <th style="padding: 12px 8px; text-align: left; color: white !important; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; width: 18%;">Datum</th>
                 <th style="padding: 12px 8px; text-align: left; color: white !important; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; width: 14%;">Zeit</th>
                 <th style="padding: 12px 8px; text-align: left; color: white !important; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; width: 12%;">Dauer</th>
@@ -5163,42 +5236,42 @@ ${rechnungsstellerName}`
         `
 
         const summenBlock = `
-          <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%); border-radius: 12px; padding: 16px; margin-top: 20px; border-left: 4px solid #10b981;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #374151;">
+          <div style="background: linear-gradient(135deg, #FAF8F5 0%, #F5E6E0 100%); border-radius: 12px; padding: 16px; margin-top: 20px; border-left: 4px solid #C75B38;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
               <span>Nettobetrag:</span>
               <span style="font-weight: 500;">${summen.gesamtNetto.toFixed(2)} €</span>
             </div>
             ${!kleinunternehmer ? `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #374151;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
               <span>USt (19%):</span>
               <span style="font-weight: 500;">${summen.gesamtUst.toFixed(2)} €</span>
             </div>
             ` : ''}
-            <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #10b981; margin-top: 6px;">
-              <span style="font-size: 14px; font-weight: 700; color: #1f2937;">Gesamtbetrag:</span>
-              <span style="font-size: 16px; font-weight: 700; color: #1f2937;">${summen.gesamtBrutto.toFixed(2)} €</span>
+            <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #C75B38; margin-top: 6px;">
+              <span style="font-size: 14px; font-weight: 700; color: #2D2926;">Gesamtbetrag:</span>
+              <span style="font-size: 16px; font-weight: 700; color: #2D2926;">${summen.gesamtBrutto.toFixed(2)} €</span>
             </div>
           </div>
         `
 
         // Klassische Varianten ohne Farben
         const positionenHtmlKlassisch = rechnungsPositionen.map((p, idx) => `
-          <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${p.zeit}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
-            ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${p.spielerName}</td>` : ''}
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; color: #1f2937;">${p.netto.toFixed(2)} €</td>
-            ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; color: #1f2937;">${p.ust.toFixed(2)} €</td>` : ''}
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-family: monospace; font-weight: 600; color: #1f2937;">${p.brutto.toFixed(2)} €</td>
+          <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#FAF8F5'};">
+            <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926;">${p.istMonatlich ? p.datum : formatDateGerman(p.datum)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926;">${p.zeit}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926;">${p.istMonatlich ? 'Monatsbeitrag' : `${p.dauer.toFixed(1)} Std.`}</td>
+            ${hatMehrereSpieler ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926;">${p.spielerName}</td>` : ''}
+            <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; color: #2D2926;">${p.tarifName}${p.istMonatlich ? ' (mtl.)' : ''}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; color: #2D2926;">${p.netto.toFixed(2)} €</td>
+            ${!kleinunternehmer ? `<td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; color: #2D2926;">${p.ust.toFixed(2)} €</td>` : ''}
+            <td style="padding: 8px; border-bottom: 1px solid #E8E4DF; text-align: right; font-family: monospace; font-weight: 600; color: #2D2926;">${p.brutto.toFixed(2)} €</td>
           </tr>
         `).join('')
 
         const positionenTabelleKlassisch = `
           <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 10px;">
             <thead>
-              <tr style="background: #1f2937;">
+              <tr style="background: #2D2926;">
                 <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px;">Datum</th>
                 <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px;">Zeit</th>
                 <th style="padding: 10px 8px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px;">Dauer</th>
@@ -5216,18 +5289,18 @@ ${rechnungsstellerName}`
         `
 
         const summenBlockKlassisch = `
-          <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+          <div style="background: #FAF8F5; border: 1px solid #E8E4DF; padding: 16px; margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
               <span>Nettobetrag:</span>
               <span style="font-family: monospace;">${summen.gesamtNetto.toFixed(2)} €</span>
             </div>
             ${!kleinunternehmer ? `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
               <span>USt (19%):</span>
               <span style="font-family: monospace;">${summen.gesamtUst.toFixed(2)} €</span>
             </div>
             ` : ''}
-            <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; color: #1f2937;">
+            <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #2D2926; font-weight: bold; font-size: 14px; color: #2D2926;">
               <span>Gesamtbetrag:</span>
               <span style="font-family: monospace; font-size: 16px;">${summen.gesamtBrutto.toFixed(2)} €</span>
             </div>
@@ -5422,7 +5495,7 @@ ${rechnungsstellerName}`
       }
 
       // Header: RECHNUNG mit grauem Hintergrund
-      pdf.setFillColor(31, 41, 55) // Dark gray #1f2937
+      pdf.setFillColor(45, 41, 38) // Dark gray #2D2926
       pdf.rect(0, 0, pageWidth, 25, 'F')
       pdf.setFontSize(24)
       pdf.setFont('helvetica', 'bold')
@@ -5432,15 +5505,15 @@ ${rechnungsstellerName}`
       y = 35
 
       // Rechnungssteller (links) - Card-Style professionell
-      pdf.setFillColor(248, 250, 252)
+      pdf.setFillColor(250, 248, 245)
       pdf.rect(margin, y - 3, 85, 28, 'F')
-      pdf.setDrawColor(55, 65, 81)
+      pdf.setDrawColor(74, 69, 67)
       pdf.setLineWidth(1)
       pdf.line(margin, y - 3, margin, y + 25)
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 114, 128)
+      pdf.setTextColor(107, 99, 94)
       pdf.text('RECHNUNGSSTELLER', margin + 3, y + 1)
       pdf.setTextColor(0, 0, 0)
       y += 5
@@ -5455,13 +5528,13 @@ ${rechnungsstellerName}`
         y += 3.5
       })
       if (profile?.steuernummer) {
-        pdf.setTextColor(107, 114, 128)
+        pdf.setTextColor(107, 99, 94)
         pdf.setFontSize(8)
         pdf.text(`Steuernr: ${profile?.steuernummer}`, margin + 3, y)
         y += 3.5
       }
       if (ustIdNr) {
-        pdf.setTextColor(107, 114, 128)
+        pdf.setTextColor(107, 99, 94)
         pdf.setFontSize(8)
         pdf.text(`USt-IdNr: ${ustIdNr}`, margin + 3, y)
         y += 3.5
@@ -5470,15 +5543,15 @@ ${rechnungsstellerName}`
 
       // Rechnungsempfänger (rechts oben) - Card-Style professionell
       let yRight = 35
-      pdf.setFillColor(248, 250, 252)
+      pdf.setFillColor(250, 248, 245)
       pdf.rect(pageWidth - margin - 85, yRight - 3, 85, 28, 'F')
-      pdf.setDrawColor(107, 114, 128) // Gray
+      pdf.setDrawColor(107, 99, 94) // Gray
       pdf.setLineWidth(1)
       pdf.line(pageWidth - margin - 85, yRight - 3, pageWidth - margin - 85, yRight + 25)
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 114, 128)
+      pdf.setTextColor(107, 99, 94)
       pdf.text('RECHNUNGSEMPFÄNGER', pageWidth - margin - 82, yRight + 1)
       pdf.setTextColor(0, 0, 0)
       yRight += 5
@@ -5496,13 +5569,13 @@ ${rechnungsstellerName}`
       y = Math.max(y, yRight) + 10
 
       // Rechnungsdetails - Info-Box
-      pdf.setFillColor(249, 250, 251) // Light gray
+      pdf.setFillColor(250, 248, 245) // Light gray
       pdf.roundedRect(margin, y - 3, contentWidth, 14, 3, 3, 'F')
 
       const detailWidth = contentWidth / 3
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 114, 128)
+      pdf.setTextColor(107, 99, 94)
       pdf.text('RECHNUNGSNUMMER', margin + 5, y + 1)
       pdf.text('RECHNUNGSDATUM', margin + detailWidth + 5, y + 1)
       pdf.text('LEISTUNGSZEITRAUM', margin + detailWidth * 2 + 5, y + 1)
@@ -5533,7 +5606,7 @@ ${rechnungsstellerName}`
 
       // Tabellen-Header zeichnen mit grauem Hintergrund
       checkNewPage(10)
-      pdf.setFillColor(31, 41, 55) // Dark gray
+      pdf.setFillColor(45, 41, 38) // Dark gray
       pdf.roundedRect(margin, y - 4, contentWidth, 8, 2, 2, 'F')
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
@@ -5558,7 +5631,7 @@ ${rechnungsstellerName}`
 
         // Zebra-Stripe Hintergrund
         if (index % 2 === 0) {
-          pdf.setFillColor(249, 250, 251) // Light gray
+          pdf.setFillColor(250, 248, 245) // Light gray
           pdf.rect(margin, y - 3, contentWidth, 5.5, 'F')
         }
 
@@ -5585,7 +5658,7 @@ ${rechnungsstellerName}`
             ]
 
         // Zeile mit Rahmen
-        pdf.setDrawColor(200, 200, 200)
+        pdf.setDrawColor(232, 228, 223)
         pdf.line(margin, y + 1, margin + contentWidth, y + 1)
 
         row.forEach((cell, i) => {
@@ -5601,10 +5674,10 @@ ${rechnungsstellerName}`
       if (summen.korrektur !== 0) {
         checkNewPage(8)
         y += 2
-        pdf.setFillColor(summen.korrektur < 0 ? 254 : 240, summen.korrektur < 0 ? 242 : 253, summen.korrektur < 0 ? 242 : 244)
+        pdf.setFillColor(245, 230, 224)
         pdf.rect(margin, y - 3, contentWidth, 6, 'F')
         pdf.setFont('helvetica', 'italic')
-        pdf.setTextColor(summen.korrektur < 0 ? 220 : 22, summen.korrektur < 0 ? 38 : 163, summen.korrektur < 0 ? 38 : 74)
+        pdf.setTextColor(summen.korrektur < 0 ? 181 : 199, summen.korrektur < 0 ? 67 : 91, summen.korrektur < 0 ? 50 : 56)
         pdf.text(`Korrektur (${korrekturGrund || 'manuell'}): ${summen.korrektur >= 0 ? '+' : ''}${summen.korrektur.toFixed(2)} €`, margin + 2, y)
         pdf.setTextColor(0, 0, 0)
         y += 5
@@ -5614,8 +5687,8 @@ ${rechnungsstellerName}`
       checkNewPage(35)
 
       // Summen-Box - Professionell grau
-      pdf.setFillColor(249, 250, 251) // Light gray
-      pdf.setDrawColor(31, 41, 55) // Dark gray
+      pdf.setFillColor(250, 248, 245) // Light gray
+      pdf.setDrawColor(45, 41, 38) // Dark gray
       pdf.setLineWidth(1)
       const summenHeight = kleinunternehmer ? 18 : 24
       pdf.roundedRect(margin, y - 3, contentWidth, summenHeight, 3, 3, 'F')
@@ -5633,13 +5706,13 @@ ${rechnungsstellerName}`
         y += 5
       }
 
-      pdf.setDrawColor(16, 185, 129)
+      pdf.setDrawColor(199, 91, 56)
       pdf.line(margin + 5, y + 1, pageWidth - margin - 5, y + 1)
       y += 4
 
       pdf.setFont('helvetica', 'bold')
       pdf.setFontSize(12)
-      pdf.setTextColor(107, 114, 128) // Teal
+      pdf.setTextColor(107, 99, 94) // Teal
       pdf.text('Gesamtbetrag:', margin + 5, y + 2)
       pdf.text(`${summen.gesamtBrutto.toFixed(2)} €`, pageWidth - margin - 5, y + 2, { align: 'right' })
       pdf.setTextColor(0, 0, 0)
@@ -5649,7 +5722,7 @@ ${rechnungsstellerName}`
       if (kleinunternehmer) {
         pdf.setFont('helvetica', 'italic')
         pdf.setFontSize(9)
-        pdf.setTextColor(107, 114, 128)
+        pdf.setTextColor(107, 99, 94)
         pdf.text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet.', margin, y)
         pdf.setTextColor(0, 0, 0)
         y += 6
@@ -5658,20 +5731,20 @@ ${rechnungsstellerName}`
       // Zahlungsinfo-Box - Professionell grau
       checkNewPage(40)
       y += 4
-      pdf.setFillColor(249, 250, 251) // Light gray
-      pdf.setDrawColor(55, 65, 81) // Dark gray
+      pdf.setFillColor(250, 248, 245) // Light gray
+      pdf.setDrawColor(74, 69, 67) // Dark gray
       pdf.setLineWidth(1)
       pdf.roundedRect(margin, y - 3, contentWidth, 28, 3, 3, 'F')
       pdf.line(margin, y - 3, margin, y + 25)
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(31, 41, 55) // Dark gray
+      pdf.setTextColor(45, 41, 38) // Dark gray
       pdf.text('ZAHLUNGSINFORMATIONEN', margin + 5, y + 2)
 
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(9)
-      pdf.setTextColor(75, 85, 99)
+      pdf.setTextColor(74, 69, 67)
       pdf.text('Bitte überweisen Sie den Betrag innerhalb von 14 Tagen auf folgendes Konto:', margin + 5, y + 8)
 
       // IBAN-Box
@@ -5683,7 +5756,7 @@ ${rechnungsstellerName}`
       pdf.setFont('helvetica', 'bold')
       pdf.text('IBAN:', margin + 8, y + 16)
       pdf.setFont('courier', 'normal')
-      pdf.setTextColor(107, 114, 128)
+      pdf.setTextColor(107, 99, 94)
       pdf.text(iban, margin + 22, y + 16)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(0, 0, 0)
@@ -5699,7 +5772,7 @@ ${rechnungsstellerName}`
       pdf.text('Mit freundlichen Grüßen', margin, y)
       y += 5
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(107, 114, 128)
+      pdf.setTextColor(107, 99, 94)
       pdf.text(rechnungsstellerName, margin, y)
       pdf.setTextColor(0, 0, 0)
 
@@ -6452,7 +6525,7 @@ function ManuelleRechnungModal({
             padding: 40px;
             line-height: 1.6;
             font-size: 12px;
-            color: #1f2937;
+            color: #2D2926;
             background: #ffffff;
           }
           @media print {
@@ -6464,47 +6537,47 @@ function ManuelleRechnungModal({
       <body>
         <!-- Header - Klassisch wie Mini-Tennis -->
         <div style="margin-bottom: 24px;">
-          <h1 style="margin: 0 0 8px 0; font-size: 32px; font-weight: 400; color: #1f2937; letter-spacing: 4px;">RECHNUNG</h1>
-          <div style="height: 3px; background: #1f2937; width: 100%;"></div>
+          <h1 style="margin: 0 0 8px 0; font-size: 32px; font-weight: 400; color: #2D2926; letter-spacing: 4px;">RECHNUNG</h1>
+          <div style="height: 3px; background: #2D2926; width: 100%;"></div>
         </div>
 
         <!-- Adressbereich -->
         <div style="display: flex; justify-content: space-between; margin-bottom: 32px; gap: 40px;">
           <div style="flex: 1;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungssteller</div>
-            <div style="font-weight: 600; color: #1f2937;">${rechnungsstellerName}</div>
-            <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
-            ${profile?.steuernummer ? `<div style="color: #6b7280; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
-            ${ustIdNr ? `<div style="color: #6b7280; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungssteller</div>
+            <div style="font-weight: 600; color: #2D2926;">${rechnungsstellerName}</div>
+            <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
+            ${profile?.steuernummer ? `<div style="color: #6B635E; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
+            ${ustIdNr ? `<div style="color: #6B635E; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
           </div>
           <div style="flex: 1; text-align: right;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungsempfänger</div>
-            <div style="font-weight: 600; color: #1f2937;">${rechnungData.empfaengerName}</div>
-            <div style="color: #4b5563; font-size: 11px; margin-top: 4px;">${(rechnungData.empfaengerAdresse || '').replace(/\n/g, '<br>')}</div>
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungsempfänger</div>
+            <div style="font-weight: 600; color: #2D2926;">${rechnungData.empfaengerName}</div>
+            <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">${(rechnungData.empfaengerAdresse || '').replace(/\n/g, '<br>')}</div>
           </div>
         </div>
 
         <!-- Rechnungsdetails - graue Boxen -->
         <div style="display: flex; gap: 12px; margin-bottom: 32px;">
-          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #e5e7eb;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.5px;">Rechnungsnummer</div>
-            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 6px;">${rechnungData.rechnungsnummer}</div>
+          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; letter-spacing: 0.5px;">Rechnungsnummer</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 6px;">${rechnungData.rechnungsnummer}</div>
           </div>
-          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #e5e7eb;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.5px;">Rechnungsdatum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 6px;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
+          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; letter-spacing: 0.5px;">Rechnungsdatum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 6px;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
           </div>
           ${rechnungData.leistungszeitraum ? `
-          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #e5e7eb;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.5px;">Leistungszeitraum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #1f2937; margin-top: 6px;">${rechnungData.leistungszeitraum}</div>
+          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; letter-spacing: 0.5px;">Leistungszeitraum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 6px;">${rechnungData.leistungszeitraum}</div>
           </div>
           ` : ''}
         </div>
 
         <!-- Anrede -->
-        <p style="color: #374151; margin-bottom: 8px;">Sehr geehrte Damen und Herren,</p>
-        <p style="color: #374151; margin-bottom: 24px;">${introText}</p>
+        <p style="color: #4A4543; margin-bottom: 8px;">Sehr geehrte Damen und Herren,</p>
+        <p style="color: #4A4543; margin-bottom: 24px;">${introText}</p>
 
         <!-- Positionen-Tabelle -->
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 12px; border: 2px solid #000000;">
@@ -6524,45 +6597,45 @@ function ManuelleRechnungModal({
         </table>
 
         <!-- Summen-Block -->
-        <div style="background: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+        <div style="background: #FAF8F5; border: 1px solid #E8E4DF; padding: 16px; margin-top: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
             <span>Nettobetrag:</span>
-            <span style="font-family: monospace; color: #1f2937;">${nettoGesamt.toFixed(2)} €</span>
+            <span style="font-family: monospace; color: #2D2926;">${nettoGesamt.toFixed(2)} €</span>
           </div>
           ${!kleinunternehmer ? `
-          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4b5563;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #4A4543;">
             <span>USt (${rechnungData.ustSatz}%):</span>
-            <span style="font-family: monospace; color: #1f2937;">${ustBetrag.toFixed(2)} €</span>
+            <span style="font-family: monospace; color: #2D2926;">${ustBetrag.toFixed(2)} €</span>
           </div>
           ` : ''}
-          <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #1f2937; font-weight: bold; font-size: 14px; color: #1f2937;">
+          <div style="display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 2px solid #2D2926; font-weight: bold; font-size: 14px; color: #2D2926;">
             <span>Gesamtbetrag:</span>
             <span style="font-family: monospace; font-size: 16px;">${bruttoGesamt.toFixed(2)} €</span>
           </div>
         </div>
 
-        ${kleinunternehmer ? '<p style="color: #6b7280; font-style: italic; margin-top: 16px; font-size: 11px;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
+        ${kleinunternehmer ? '<p style="color: #6B635E; font-style: italic; margin-top: 16px; font-size: 11px;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
 
-        ${rechnungData.freitext ? `<p style="color: #374151; margin-top: 16px;">${rechnungData.freitext}</p>` : ''}
+        ${rechnungData.freitext ? `<p style="color: #4A4543; margin-top: 16px;">${rechnungData.freitext}</p>` : ''}
 
         <!-- Zahlungshinweis -->
-        <div style="margin-top: 32px; background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
-          <div style="font-weight: 600; color: #1f2937; margin-bottom: 12px;">Zahlungsinformationen</div>
-          <div style="display: flex; gap: 24px; color: #4b5563; font-size: 12px;">
+        <div style="margin-top: 32px; background: #FAF8F5; padding: 20px; border: 1px solid #E8E4DF; border-left: 3px solid #4A4543;">
+          <div style="font-weight: 600; color: #2D2926; margin-bottom: 12px;">Zahlungsinformationen</div>
+          <div style="display: flex; gap: 24px; color: #4A4543; font-size: 12px;">
             <div>
-              <span style="font-weight: 600; color: #1f2937;">IBAN:</span> ${iban}<br>
-              <span style="font-weight: 600; color: #1f2937;">Kontoinhaber:</span> ${rechnungsstellerName}
+              <span style="font-weight: 600; color: #2D2926;">IBAN:</span> ${iban}<br>
+              <span style="font-weight: 600; color: #2D2926;">Kontoinhaber:</span> ${rechnungsstellerName}
             </div>
-            <div style="color: #6b7280;">
+            <div style="color: #6B635E;">
               Bitte überweisen Sie den Betrag<br>innerhalb von <strong>${rechnungData.zahlungsziel} Tagen</strong>.
             </div>
           </div>
         </div>
 
         <!-- Abschluss -->
-        <div style="margin-top: 32px; color: #374151;">
+        <div style="margin-top: 32px; color: #4A4543;">
           <p>Vielen Dank für Ihr Vertrauen!</p>
-          <p style="margin-top: 16px;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${rechnungsstellerName}</strong></p>
+          <p style="margin-top: 16px;">Mit freundlichen Grüßen<br><strong style="color: #2D2926;">${rechnungsstellerName}</strong></p>
         </div>
       </body>
       </html>
@@ -9420,7 +9493,7 @@ function BuchhaltungView({
                     const zugeordnetesKonto = buchungskonten.find(k => k.id === tx.buchungskonto_id)
                     return (
                       <tr key={tx.id} style={{
-                        background: tx.ai_suggestion_status === 'pending' ? 'var(--blue-50)' : undefined
+                        background: tx.ai_suggestion_status === 'pending' ? '#FAF8F5' : undefined
                       }}>
                         <td>{formatDateGerman(tx.booking_date)}</td>
                         <td style={{ maxWidth: 300 }}>
@@ -9761,115 +9834,117 @@ function BuchhaltungView({
               <button className="modal-close" onClick={() => setViewingRechnung(null)}>×</button>
             </div>
             <div className="modal-body">
+              {/* Klassisches schwarz-weißes Design wie versendete Rechnungen */}
               <div style={{
                 background: '#fff',
-                border: '1px solid var(--gray-300)',
-                borderRadius: 12,
-                overflow: 'hidden',
+                border: '1px solid #000',
                 fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
                 fontSize: 12,
-                lineHeight: 1.6
+                lineHeight: 1.6,
+                color: '#000'
               }}>
-                {/* Header mit Farbverlauf */}
-                <div style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)', padding: '24px', textAlign: 'center' }}>
-                  <h1 style={{ margin: 0, fontSize: 28, color: 'white', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase' }}>Rechnung</h1>
-                </div>
-
                 <div style={{ padding: 24 }}>
-                  {/* Adressen in Cards */}
+                  {/* Header - RECHNUNG mit Unterstrich */}
+                  <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                    <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#000', borderBottom: '2px solid #000', display: 'inline-block', paddingBottom: 8 }}>RECHNUNG</h1>
+                  </div>
+
+                  {/* Adressen */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, marginBottom: 24 }}>
-                    <div style={{ flex: 1, background: '#f8fafc', borderRadius: 12, padding: 16, borderLeft: '4px solid #0d9488' }}>
-                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0d9488', fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>Rechnungssteller</div>
-                      <strong style={{ color: '#111827' }}>{profile?.name} {profile?.nachname}</strong><br />
-                      <span style={{ color: '#4b5563' }}>{profile?.adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</span>
-                      {profile?.steuernummer && <span style={{ color: '#6b7280', fontSize: 11 }}>Steuernr: {profile?.steuernummer}<br /></span>}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#666', fontWeight: 600, marginBottom: 4 }}>Rechnungssteller</div>
+                      <strong>{profile?.name} {profile?.nachname}</strong><br />
+                      <span>{profile?.adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</span>
+                      {profile?.steuernummer && <span style={{ fontSize: 11 }}>Steuernr: {profile?.steuernummer}</span>}
                     </div>
-                    <div style={{ flex: 1, background: '#f8fafc', borderRadius: 12, padding: 16, borderLeft: '4px solid #0891b2' }}>
-                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0891b2', fontWeight: 600, marginBottom: 8, letterSpacing: 0.5 }}>Rechnungsempfänger</div>
-                      <strong style={{ color: '#111827' }}>{viewingRechnung.empfaenger_name}</strong><br />
-                      <span style={{ color: '#4b5563' }}>{viewingRechnung.empfaenger_adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#666', fontWeight: 600, marginBottom: 4 }}>Rechnungsempfänger</div>
+                      <strong>{viewingRechnung.empfaenger_name}</strong><br />
+                      <span>{viewingRechnung.empfaenger_adresse?.split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}</span>
                     </div>
                   </div>
 
-                  {/* Rechnungsdetails */}
-                  <div style={{ background: 'linear-gradient(135deg, #ecfeff 0%, #f0fdf4 100%)', borderRadius: 12, padding: 16, marginBottom: 24, display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+                  {/* Rechnungsdetails in grauer Box */}
+                  <div style={{ background: '#f5f5f5', padding: 12, marginBottom: 24, display: 'flex', justifyContent: 'space-between', border: '1px solid #ddd' }}>
                     <div>
-                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0d9488', fontWeight: 600 }}>Rechnungsnummer</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{viewingRechnung.rechnungsnummer}</div>
+                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#666', fontWeight: 600 }}>Rechnungsnummer</div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{viewingRechnung.rechnungsnummer}</div>
                     </div>
-                    <div style={{ borderLeft: '2px solid #d1d5db', paddingLeft: 24 }}>
-                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0d9488', fontWeight: 600 }}>Rechnungsdatum</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{formatDateGerman(viewingRechnung.rechnungsdatum)}</div>
+                    <div>
+                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#666', fontWeight: 600 }}>Rechnungsdatum</div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{formatDateGerman(viewingRechnung.rechnungsdatum)}</div>
                     </div>
-                    <div style={{ borderLeft: '2px solid #d1d5db', paddingLeft: 24 }}>
-                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#0d9488', fontWeight: 600 }}>Leistungszeitraum</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{viewingRechnung.leistungszeitraum}</div>
+                    <div>
+                      <div style={{ fontSize: 10, textTransform: 'uppercase', color: '#666', fontWeight: 600 }}>Leistungszeitraum</div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{viewingRechnung.leistungszeitraum || '-'}</div>
                     </div>
                   </div>
 
                   {viewingRechnung.beschreibung && (
-                    <p style={{ marginBottom: 16, color: '#374151' }}>{viewingRechnung.beschreibung}</p>
+                    <p style={{ marginBottom: 16 }}>{viewingRechnung.beschreibung}</p>
                   )}
 
-                  {/* Positionen-Tabelle - Sportliches Design */}
+                  {/* Positionen-Tabelle - Klassisch */}
                   {viewingRechnung.positionen && viewingRechnung.positionen.length > 0 && (
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, marginBottom: 20, borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20 }}>
                       <thead>
-                        <tr style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0891b2 100%)' }}>
-                          <th style={{ padding: '12px', textAlign: 'left', color: 'white', fontWeight: 600, textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>Beschreibung</th>
-                          <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontWeight: 600, textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>Menge</th>
-                          <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontWeight: 600, textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>Einzelpreis</th>
-                          <th style={{ padding: '12px', textAlign: 'right', color: 'white', fontWeight: 600, textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>Gesamt</th>
+                        <tr style={{ background: '#e5e5e5' }}>
+                          <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #000' }}>Pos.</th>
+                          <th style={{ padding: 10, textAlign: 'left', fontWeight: 600, borderBottom: '2px solid #000' }}>Beschreibung</th>
+                          <th style={{ padding: 10, textAlign: 'right', fontWeight: 600, borderBottom: '2px solid #000' }}>Menge</th>
+                          <th style={{ padding: 10, textAlign: 'right', fontWeight: 600, borderBottom: '2px solid #000' }}>Einzelpreis</th>
+                          <th style={{ padding: 10, textAlign: 'right', fontWeight: 600, borderBottom: '2px solid #000' }}>Gesamt</th>
                         </tr>
                       </thead>
                       <tbody>
                         {viewingRechnung.positionen.map((pos: { beschreibung: string; menge: number; einzelpreis: number }, i: number) => (
-                          <tr key={i} style={{ background: i % 2 === 0 ? '#f0fdf4' : 'white' }}>
-                            <td style={{ padding: 12, borderBottom: '1px solid #e5e7eb' }}>{pos.beschreibung}</td>
-                            <td style={{ padding: 12, borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>{pos.menge}</td>
-                            <td style={{ padding: 12, borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>{pos.einzelpreis.toFixed(2)} €</td>
-                            <td style={{ padding: 12, borderBottom: '1px solid #e5e7eb', textAlign: 'right', fontWeight: 600, color: '#0d9488' }}>{(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
+                          <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+                            <td style={{ padding: 10, borderBottom: '1px solid #ddd' }}>{i + 1}</td>
+                            <td style={{ padding: 10, borderBottom: '1px solid #ddd' }}>{pos.beschreibung}</td>
+                            <td style={{ padding: 10, borderBottom: '1px solid #ddd', textAlign: 'right' }}>{pos.menge}</td>
+                            <td style={{ padding: 10, borderBottom: '1px solid #ddd', textAlign: 'right' }}>{pos.einzelpreis.toFixed(2)} €</td>
+                            <td style={{ padding: 10, borderBottom: '1px solid #ddd', textAlign: 'right', fontWeight: 600 }}>{(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   )}
 
-                  {/* Summen - Sportliches Design */}
-                  <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%)', borderRadius: 12, padding: 20, marginTop: 24, borderLeft: '4px solid #10b981' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#374151' }}>
+                  {/* Summen - Klassisch */}
+                  <div style={{ marginLeft: 'auto', width: 250, marginTop: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span>Nettobetrag:</span>
                       <span style={{ fontWeight: 500 }}>{viewingRechnung.netto_gesamt.toFixed(2)} €</span>
                     </div>
                     {viewingRechnung.ust_satz > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#374151' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                         <span>USt ({viewingRechnung.ust_satz}%):</span>
                         <span style={{ fontWeight: 500 }}>{viewingRechnung.ust_betrag.toFixed(2)} €</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12, borderTop: '2px solid #10b981', marginTop: 8 }}>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: '#0d9488' }}>Gesamtbetrag:</span>
-                      <span style={{ fontSize: 18, fontWeight: 700, color: '#0d9488' }}>{viewingRechnung.brutto_gesamt.toFixed(2)} €</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #000', marginTop: 8 }}>
+                      <span style={{ fontWeight: 700 }}>Gesamtbetrag:</span>
+                      <span style={{ fontWeight: 700 }}>{viewingRechnung.brutto_gesamt.toFixed(2)} €</span>
                     </div>
                   </div>
 
                   {viewingRechnung.ust_satz === 0 && (
-                    <p style={{ fontStyle: 'italic', marginTop: 16, color: '#6b7280' }}>
+                    <p style={{ fontStyle: 'italic', marginTop: 16, color: '#666' }}>
                       Gemäß §19 UStG wird keine Umsatzsteuer berechnet.
                     </p>
                   )}
 
-                  {/* Zahlungsinfo Box */}
-                  <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', borderRadius: 12, padding: 20, marginTop: 24, borderLeft: '4px solid #f59e0b' }}>
-                    <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#92400e', fontWeight: 600, marginBottom: 12 }}>Zahlungsinformationen</div>
-                    <p style={{ margin: '0 0 8px 0', color: '#78350f' }}>Bitte überweisen Sie den Betrag innerhalb von {viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
-                    <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 8, padding: 12, marginTop: 8 }}>
-                      <strong style={{ color: '#111827' }}>IBAN:</strong> <span style={{ fontFamily: 'monospace', color: '#0d9488' }}>{profile?.iban}</span><br />
-                      <strong style={{ color: '#111827' }}>Kontoinhaber:</strong> <span style={{ color: '#374151' }}>{profile?.name} {profile?.nachname}</span>
+                  {/* Zahlungsinfo Box - Klassisch */}
+                  <div style={{ background: '#f5f5f5', padding: 16, marginTop: 24, border: '1px solid #ddd' }}>
+                    <div style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>Zahlungsinformationen</div>
+                    <p style={{ margin: '0 0 8px 0' }}>Bitte überweisen Sie den Betrag innerhalb von {viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
+                    <div>
+                      <strong>IBAN:</strong> <span style={{ fontFamily: 'monospace' }}>{profile?.iban}</span><br />
+                      <strong>Kontoinhaber:</strong> {profile?.name} {profile?.nachname}
                     </div>
                   </div>
 
-                  <p style={{ marginTop: 24, color: '#374151' }}>Mit freundlichen Grüßen<br /><strong style={{ color: '#0d9488' }}>{profile?.name} {profile?.nachname}</strong></p>
+                  <p style={{ marginTop: 24 }}>Mit freundlichen Grüßen<br /><strong>{profile?.name} {profile?.nachname}</strong></p>
                 </div>
               </div>
             </div>
@@ -9880,7 +9955,7 @@ function BuchhaltungView({
               <button
                 className="btn btn-primary"
                 onClick={async () => {
-                  // PDF zum Drucken generieren - Sportliches Design
+                  // PDF zum Drucken - Klassisches Design
                   const html = `
                     <!DOCTYPE html>
                     <html>
@@ -9888,105 +9963,105 @@ function BuchhaltungView({
                       <meta charset="utf-8">
                       <title>Rechnung ${viewingRechnung.rechnungsnummer}</title>
                       <style>
-                        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 0; line-height: 1.6; font-size: 12px; color: #1f2937; }
+                        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 24px; line-height: 1.6; font-size: 12px; color: #000; }
                         @media print { body { padding: 0; } @page { size: A4; margin: 15mm; } }
                       </style>
                     </head>
                     <body>
                       <!-- Header -->
-                      <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 30px 24px; text-align: center; border-radius: 0 0 20px 20px;">
-                        <h1 style="margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">Rechnung</h1>
+                      <div style="text-align: center; margin-bottom: 24px;">
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; border-bottom: 2px solid #000; display: inline-block; padding-bottom: 8px;">RECHNUNG</h1>
                       </div>
 
-                      <div style="padding: 24px;">
-                        <!-- Adressen in Cards -->
-                        <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
-                          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #374151;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungssteller</div>
-                            <strong style="color: #111827;">${profile?.name || ''} ${profile?.nachname || ''}</strong><br>
-                            <span style="color: #4b5563;">${(profile?.adresse || '').replace(/\n/g, '<br>')}</span>
-                            ${profile?.steuernummer ? `<br><span style="color: #6b7280; font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
-                          </div>
-                          <div style="flex: 1; background: #f9fafb; padding: 16px; border-left: 3px solid #6b7280;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px;">Rechnungsempfänger</div>
-                            <strong style="color: #111827;">${viewingRechnung.empfaenger_name}</strong><br>
-                            <span style="color: #4b5563;">${(viewingRechnung.empfaenger_adresse || '').replace(/\n/g, '<br>')}</span>
-                          </div>
+                      <!-- Adressen -->
+                      <div style="display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px;">
+                        <div style="flex: 1;">
+                          <div style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 600; margin-bottom: 4px;">Rechnungssteller</div>
+                          <strong>${profile?.name || ''} ${profile?.nachname || ''}</strong><br>
+                          ${(profile?.adresse || '').replace(/\n/g, '<br>')}
+                          ${profile?.steuernummer ? `<br><span style="font-size: 11px;">Steuernr: ${profile?.steuernummer}</span>` : ''}
                         </div>
-
-                        <!-- Rechnungsdetails -->
-                        <div style="background: #f9fafb; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-around; text-align: center; border: 1px solid #e5e7eb;">
-                          <div>
-                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsnummer</div>
-                            <div style="font-size: 14px; font-weight: 700; color: #111827;">${viewingRechnung.rechnungsnummer}</div>
-                          </div>
-                          <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Rechnungsdatum</div>
-                            <div style="font-size: 14px; font-weight: 700; color: #111827;">${formatDateGerman(viewingRechnung.rechnungsdatum)}</div>
-                          </div>
-                          <div style="border-left: 2px solid #d1d5db; padding-left: 24px;">
-                            <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 600;">Leistungszeitraum</div>
-                            <div style="font-size: 14px; font-weight: 700; color: #111827;">${viewingRechnung.leistungszeitraum || '-'}</div>
-                          </div>
+                        <div style="flex: 1;">
+                          <div style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 600; margin-bottom: 4px;">Rechnungsempfänger</div>
+                          <strong>${viewingRechnung.empfaenger_name}</strong><br>
+                          ${(viewingRechnung.empfaenger_adresse || '').replace(/\n/g, '<br>')}
                         </div>
+                      </div>
 
-                        ${viewingRechnung.beschreibung ? `<p style="color: #374151;">${viewingRechnung.beschreibung}</p>` : ''}
+                      <!-- Rechnungsdetails -->
+                      <div style="background: #f5f5f5; padding: 12px; margin-bottom: 24px; display: flex; justify-content: space-between; border: 1px solid #ddd;">
+                        <div>
+                          <div style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 600;">Rechnungsnummer</div>
+                          <div style="font-size: 14px; font-weight: 700;">${viewingRechnung.rechnungsnummer}</div>
+                        </div>
+                        <div>
+                          <div style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 600;">Rechnungsdatum</div>
+                          <div style="font-size: 14px; font-weight: 700;">${formatDateGerman(viewingRechnung.rechnungsdatum)}</div>
+                        </div>
+                        <div>
+                          <div style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 600;">Leistungszeitraum</div>
+                          <div style="font-size: 14px; font-weight: 700;">${viewingRechnung.leistungszeitraum || '-'}</div>
+                        </div>
+                      </div>
 
-                        ${viewingRechnung.positionen?.length ? `
-                          <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 20px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <thead>
-                              <tr style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%);">
-                                <th style="padding: 12px; text-align: left; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Beschreibung</th>
-                                <th style="padding: 12px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Menge</th>
-                                <th style="padding: 12px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Einzelpreis</th>
-                                <th style="padding: 12px; text-align: right; color: white; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">Gesamt</th>
+                      ${viewingRechnung.beschreibung ? `<p>${viewingRechnung.beschreibung}</p>` : ''}
+
+                      ${viewingRechnung.positionen?.length ? `
+                        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                          <thead>
+                            <tr style="background: #e5e5e5;">
+                              <th style="padding: 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #000;">Pos.</th>
+                              <th style="padding: 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #000;">Beschreibung</th>
+                              <th style="padding: 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #000;">Menge</th>
+                              <th style="padding: 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #000;">Einzelpreis</th>
+                              <th style="padding: 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #000;">Gesamt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${viewingRechnung.positionen.map((pos: { beschreibung: string; menge: number; einzelpreis: number }, index: number) => `
+                              <tr style="background: ${index % 2 === 0 ? '#fff' : '#f9f9f9'};">
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd;">${index + 1}</td>
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd;">${pos.beschreibung}</td>
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">${pos.menge}</td>
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">${pos.einzelpreis.toFixed(2)} €</td>
+                                <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right; font-weight: 600;">${(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
                               </tr>
-                            </thead>
-                            <tbody>
-                              ${viewingRechnung.positionen.map((pos: { beschreibung: string; menge: number; einzelpreis: number }, index: number) => `
-                                <tr style="background: ${index % 2 === 0 ? '#f0fdf4' : 'white'};">
-                                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${pos.beschreibung}</td>
-                                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${pos.menge}</td>
-                                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${pos.einzelpreis.toFixed(2)} €</td>
-                                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: #1f2937;">${(pos.menge * pos.einzelpreis).toFixed(2)} €</td>
-                                </tr>
-                              `).join('')}
-                            </tbody>
-                          </table>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      ` : ''}
+
+                      <!-- Summen -->
+                      <div style="margin-left: auto; width: 250px; margin-top: 24px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                          <span>Nettobetrag:</span>
+                          <span style="font-weight: 500;">${viewingRechnung.netto_gesamt.toFixed(2)} €</span>
+                        </div>
+                        ${viewingRechnung.ust_satz > 0 ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                          <span>USt (${viewingRechnung.ust_satz}%):</span>
+                          <span style="font-weight: 500;">${viewingRechnung.ust_betrag.toFixed(2)} €</span>
+                        </div>
                         ` : ''}
-
-                        <!-- Summen Box -->
-                        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%); border-radius: 12px; padding: 20px; margin-top: 24px; border-left: 4px solid #10b981;">
-                          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151;">
-                            <span>Nettobetrag:</span>
-                            <span style="font-weight: 500;">${viewingRechnung.netto_gesamt.toFixed(2)} €</span>
-                          </div>
-                          ${viewingRechnung.ust_satz > 0 ? `
-                          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #374151;">
-                            <span>USt (${viewingRechnung.ust_satz}%):</span>
-                            <span style="font-weight: 500;">${viewingRechnung.ust_betrag.toFixed(2)} €</span>
-                          </div>
-                          ` : ''}
-                          <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #10b981; margin-top: 8px;">
-                            <span style="font-size: 16px; font-weight: 700; color: #1f2937;">Gesamtbetrag:</span>
-                            <span style="font-size: 18px; font-weight: 700; color: #1f2937;">${viewingRechnung.brutto_gesamt.toFixed(2)} €</span>
-                          </div>
+                        <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 2px solid #000; margin-top: 8px;">
+                          <span style="font-weight: 700;">Gesamtbetrag:</span>
+                          <span style="font-weight: 700;">${viewingRechnung.brutto_gesamt.toFixed(2)} €</span>
                         </div>
-
-                        ${viewingRechnung.ust_satz === 0 ? '<p style="font-style: italic; margin-top: 16px; color: #6b7280;"><em>Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</em></p>' : ''}
-
-                        <!-- Zahlungsinfo Box -->
-                        <div style="background: #f9fafb; padding: 20px; margin-top: 24px; border: 1px solid #e5e7eb; border-left: 3px solid #374151;">
-                          <div style="font-size: 11px; text-transform: uppercase; color: #1f2937; font-weight: 600; margin-bottom: 12px;">Zahlungsinformationen</div>
-                          <p style="margin: 0 0 8px 0; color: #4b5563;">Bitte überweisen Sie den Betrag innerhalb von ${viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
-                          <div style="margin-top: 8px;">
-                            <strong style="color: #111827;">IBAN:</strong> <span style="font-family: monospace; color: #1f2937;">${profile?.iban || '-'}</span><br>
-                            <strong style="color: #111827;">Kontoinhaber:</strong> <span style="color: #374151;">${profile?.name || ''} ${profile?.nachname || ''}</span>
-                          </div>
-                        </div>
-
-                        <p style="margin-top: 24px; color: #374151;">Mit freundlichen Grüßen<br><strong style="color: #1f2937;">${profile?.name || ''} ${profile?.nachname || ''}</strong></p>
                       </div>
+
+                      ${viewingRechnung.ust_satz === 0 ? '<p style="font-style: italic; margin-top: 16px; color: #666;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
+
+                      <!-- Zahlungsinfo -->
+                      <div style="background: #f5f5f5; padding: 16px; margin-top: 24px; border: 1px solid #ddd;">
+                        <div style="font-size: 11px; text-transform: uppercase; font-weight: 600; margin-bottom: 8px;">Zahlungsinformationen</div>
+                        <p style="margin: 0 0 8px 0;">Bitte überweisen Sie den Betrag innerhalb von ${viewingRechnung.zahlungsziel || 14} Tagen auf folgendes Konto:</p>
+                        <div>
+                          <strong>IBAN:</strong> <span style="font-family: monospace;">${profile?.iban || '-'}</span><br>
+                          <strong>Kontoinhaber:</strong> ${profile?.name || ''} ${profile?.nachname || ''}
+                        </div>
+                      </div>
+
+                      <p style="margin-top: 24px;">Mit freundlichen Grüßen<br><strong>${profile?.name || ''} ${profile?.nachname || ''}</strong></p>
                     </body>
                     </html>
                   `

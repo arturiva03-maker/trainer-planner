@@ -190,7 +190,7 @@ export interface Ausgabe {
   user_id: string
   datum: string
   betrag: number
-  kategorie: 'platzmiete' | 'fahrtkosten' | 'fortbildung' | 'buero' | 'werbung' | 'anschaffungen' | 'sonstiges' | 'material' | 'tennistraining'
+  kategorie: 'platzmiete' | 'fahrtkosten' | 'fortbildung' | 'buero' | 'werbung' | 'anschaffungen' | 'sonstiges' | 'material' | 'tennistraining' | 'kfz' | 'reisekosten' | 'telefon' | 'versicherung' | 'beitraege' | 'beratung' | 'reparatur' | 'porto' | 'bank' | 'abschreibung'
   beschreibung?: string
   hat_vorsteuer: boolean
   vorsteuer_satz: number
@@ -203,13 +203,39 @@ export interface Ausgabe {
   created_at: string
 }
 
-export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string }[] = [
-  { value: 'platzmiete', label: 'Platzmiete/Raumkosten' },
-  { value: 'fortbildung', label: 'Fortbildung' },
-  { value: 'buero', label: 'Bürobedarf' },
-  { value: 'werbung', label: 'Werbekosten' },
-  { value: 'anschaffungen', label: 'Fremdleistungen' },
-  { value: 'sonstiges', label: 'GWG/Sonstiges' }
+// SKR03-konforme Ausgabe-Kategorien
+export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string; skr03: string }[] = [
+  // Raumkosten
+  { value: 'platzmiete', label: '4210 Miete/Raumkosten', skr03: '4210' },
+  // Kfz
+  { value: 'kfz', label: '4500 Kfz-Kosten', skr03: '4500' },
+  { value: 'fahrtkosten', label: '4673 Fahrtkosten/Km-Geld', skr03: '4673' },
+  // Reise
+  { value: 'reisekosten', label: '4653 Reisekosten', skr03: '4653' },
+  // Werbung
+  { value: 'werbung', label: '4600 Werbekosten', skr03: '4600' },
+  // Fremdleistungen
+  { value: 'anschaffungen', label: '4780 Fremdleistungen', skr03: '4780' },
+  // Kommunikation
+  { value: 'telefon', label: '4920 Telefon/Internet', skr03: '4920' },
+  { value: 'porto', label: '4830 Porto/Versand', skr03: '4830' },
+  // Büro
+  { value: 'buero', label: '4930 Bürobedarf', skr03: '4930' },
+  { value: 'fortbildung', label: '4946 Fortbildung', skr03: '4946' },
+  { value: 'beratung', label: '4950 Beratung/Steuerberater', skr03: '4950' },
+  // Versicherung/Beiträge
+  { value: 'versicherung', label: '4360 Versicherungen', skr03: '4360' },
+  { value: 'beitraege', label: '4380 Beiträge/Gebühren', skr03: '4380' },
+  // Wartung
+  { value: 'reparatur', label: '4805 Reparatur/Instandhaltung', skr03: '4805' },
+  // Bank
+  { value: 'bank', label: '4855 Bankgebühren', skr03: '4855' },
+  // Abschreibung
+  { value: 'abschreibung', label: '4822 Abschreibungen', skr03: '4822' },
+  // Material
+  { value: 'material', label: '4560 Betriebsbedarf/Material', skr03: '4560' },
+  // Sonstiges
+  { value: 'sonstiges', label: '4900 Sonstige Aufwendungen', skr03: '4900' },
 ]
 
 export interface ManuelleRechnung {
@@ -419,20 +445,69 @@ export interface Buchungskonto {
   created_at: string
 }
 
-// Standard-Konten die beim ersten Start angelegt werden (SKR 03)
+// Standard-Konten nach SKR03 (Standardkontenrahmen für Selbständige/Freiberufler)
 export const STANDARD_KONTEN: Omit<Buchungskonto, 'id' | 'user_id' | 'created_at'>[] = [
-  // Einnahmen
-  { kontonummer: '8400', name: 'Erlöse 19% USt', typ: 'einnahme', beschreibung: 'Einnahmen aus Trainertätigkeit', ist_standard: true, sortierung: 1 },
-  { kontonummer: '8300', name: 'Erlöse 7% USt', typ: 'einnahme', beschreibung: 'Einnahmen mit ermäßigtem Steuersatz', ist_standard: true, sortierung: 2 },
-  { kontonummer: '8195', name: 'Erlöse Kleinunternehmer', typ: 'einnahme', beschreibung: 'Einnahmen ohne USt (§19 UStG)', ist_standard: true, sortierung: 3 },
-  // Ausgaben
-  { kontonummer: '4210', name: 'Platzmiete/Raumkosten', typ: 'ausgabe', beschreibung: 'Miete für Tennisplätze, Hallen', ist_standard: true, sortierung: 10 },
-  { kontonummer: '4600', name: 'Werbekosten', typ: 'ausgabe', beschreibung: 'Werbung, Marketing, Flyer', ist_standard: true, sortierung: 11 },
-  { kontonummer: '4930', name: 'Bürobedarf', typ: 'ausgabe', beschreibung: 'Büromaterial, Druckerkosten', ist_standard: true, sortierung: 12 },
-  { kontonummer: '4946', name: 'Fortbildungskosten', typ: 'ausgabe', beschreibung: 'Trainerlehrgänge, Lizenzen', ist_standard: true, sortierung: 13 },
-  { kontonummer: '4780', name: 'Fremdleistungen', typ: 'ausgabe', beschreibung: 'Externe Dienstleistungen, Honorare', ist_standard: true, sortierung: 14 },
-  { kontonummer: '4980', name: 'GWG/Sonstige Ausgaben', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter, sonstige Aufwendungen', ist_standard: true, sortierung: 15 },
-  // Neutral
-  { kontonummer: '1800', name: 'Privatentnahmen', typ: 'neutral', beschreibung: 'Private Entnahmen aus dem Betriebsvermögen', ist_standard: true, sortierung: 20 },
-  { kontonummer: '1890', name: 'Privateinlagen', typ: 'neutral', beschreibung: 'Private Einlagen ins Betriebsvermögen', ist_standard: true, sortierung: 21 },
+  // ============ ERLÖSKONTEN (Klasse 8) ============
+  { kontonummer: '8400', name: 'Erlöse 19% USt', typ: 'einnahme', beschreibung: 'Umsatzerlöse zum allgemeinen Steuersatz', ist_standard: true, sortierung: 1 },
+  { kontonummer: '8300', name: 'Erlöse 7% USt', typ: 'einnahme', beschreibung: 'Umsatzerlöse zum ermäßigten Steuersatz', ist_standard: true, sortierung: 2 },
+  { kontonummer: '8195', name: 'Erlöse Kleinunternehmer §19', typ: 'einnahme', beschreibung: 'Steuerfreie Umsätze nach §19 UStG', ist_standard: true, sortierung: 3 },
+  { kontonummer: '8120', name: 'Steuerfreie Umsätze', typ: 'einnahme', beschreibung: 'Sonstige steuerfreie Umsätze', ist_standard: true, sortierung: 4 },
+  { kontonummer: '8900', name: 'Sonstige Erträge', typ: 'einnahme', beschreibung: 'Sonstige betriebliche Erträge', ist_standard: true, sortierung: 5 },
+
+  // ============ AUFWANDSKONTEN (Klasse 4) ============
+  // Raumkosten
+  { kontonummer: '4210', name: 'Miete/Raumkosten', typ: 'ausgabe', beschreibung: 'Miete für Geschäftsräume, Tennisplätze, Hallen', ist_standard: true, sortierung: 10 },
+  { kontonummer: '4220', name: 'Nebenkosten', typ: 'ausgabe', beschreibung: 'Nebenkosten des Geldverkehrs, Abgaben', ist_standard: true, sortierung: 11 },
+
+  // Kfz-Kosten
+  { kontonummer: '4500', name: 'Kfz-Kosten', typ: 'ausgabe', beschreibung: 'Pauschale Kfz-Kosten (Sammelkonto)', ist_standard: true, sortierung: 20 },
+  { kontonummer: '4510', name: 'Kfz-Steuer', typ: 'ausgabe', beschreibung: 'Kraftfahrzeugsteuer', ist_standard: true, sortierung: 21 },
+  { kontonummer: '4520', name: 'Kfz laufende Kosten', typ: 'ausgabe', beschreibung: 'Benzin, Reparaturen, Wartung, TÜV', ist_standard: true, sortierung: 22 },
+  { kontonummer: '4530', name: 'Kfz-Leasing', typ: 'ausgabe', beschreibung: 'Leasingraten für betriebliche Fahrzeuge', ist_standard: true, sortierung: 23 },
+  { kontonummer: '4540', name: 'Kfz-Versicherung', typ: 'ausgabe', beschreibung: 'Haftpflicht, Kasko für Kfz', ist_standard: true, sortierung: 24 },
+
+  // Werbung und Repräsentation
+  { kontonummer: '4600', name: 'Werbekosten', typ: 'ausgabe', beschreibung: 'Werbung, Marketing, Flyer, Website', ist_standard: true, sortierung: 30 },
+  { kontonummer: '4610', name: 'Geschenke abzugsfähig', typ: 'ausgabe', beschreibung: 'Geschenke an Kunden (bis 35€)', ist_standard: true, sortierung: 31 },
+  { kontonummer: '4630', name: 'Repräsentationskosten', typ: 'ausgabe', beschreibung: 'Bewirtung, Kundenpflege (70% abzugsfähig)', ist_standard: true, sortierung: 32 },
+
+  // Reisekosten
+  { kontonummer: '4653', name: 'Reisekosten Übernachtung', typ: 'ausgabe', beschreibung: 'Hotelkosten bei Dienstreisen', ist_standard: true, sortierung: 40 },
+  { kontonummer: '4654', name: 'Reisekosten Verpflegung', typ: 'ausgabe', beschreibung: 'Verpflegungsmehraufwand', ist_standard: true, sortierung: 41 },
+  { kontonummer: '4673', name: 'Fahrtkosten', typ: 'ausgabe', beschreibung: 'Fahrtkosten (nicht Kfz), Kilometergeld', ist_standard: true, sortierung: 42 },
+
+  // Fremdleistungen
+  { kontonummer: '4780', name: 'Fremdleistungen', typ: 'ausgabe', beschreibung: 'Externe Dienstleistungen, Subunternehmer', ist_standard: true, sortierung: 50 },
+  { kontonummer: '4790', name: 'Auftragskosten', typ: 'ausgabe', beschreibung: 'Sonstige Auftragskosten', ist_standard: true, sortierung: 51 },
+
+  // Wartung und Reparatur
+  { kontonummer: '4805', name: 'Reparatur/Instandhaltung', typ: 'ausgabe', beschreibung: 'Reparaturen, Wartung von Anlagen/Geräten', ist_standard: true, sortierung: 55 },
+
+  // Porto und Telefon
+  { kontonummer: '4830', name: 'Porto/Versand', typ: 'ausgabe', beschreibung: 'Portokosten, Paketversand', ist_standard: true, sortierung: 60 },
+  { kontonummer: '4855', name: 'Bankgebühren', typ: 'ausgabe', beschreibung: 'Kontoführung, Überweisungsgebühren', ist_standard: true, sortierung: 61 },
+  { kontonummer: '4920', name: 'Telefon/Internet', typ: 'ausgabe', beschreibung: 'Telefon, Mobilfunk, Internet', ist_standard: true, sortierung: 62 },
+
+  // Büro und Material
+  { kontonummer: '4930', name: 'Bürobedarf', typ: 'ausgabe', beschreibung: 'Büromaterial, Druckerkosten, Papier', ist_standard: true, sortierung: 70 },
+  { kontonummer: '4940', name: 'Zeitschriften/Bücher', typ: 'ausgabe', beschreibung: 'Fachliteratur, Fachzeitschriften', ist_standard: true, sortierung: 71 },
+  { kontonummer: '4946', name: 'Fortbildungskosten', typ: 'ausgabe', beschreibung: 'Seminare, Lehrgänge, Lizenzen, Zertifikate', ist_standard: true, sortierung: 72 },
+  { kontonummer: '4950', name: 'Rechts-/Beratungskosten', typ: 'ausgabe', beschreibung: 'Steuerberater, Rechtsanwalt, Beratung', ist_standard: true, sortierung: 73 },
+
+  // Versicherungen und Beiträge
+  { kontonummer: '4360', name: 'Versicherungen', typ: 'ausgabe', beschreibung: 'Betriebliche Versicherungen, Haftpflicht', ist_standard: true, sortierung: 80 },
+  { kontonummer: '4380', name: 'Beiträge/Gebühren', typ: 'ausgabe', beschreibung: 'Verbandsbeiträge, Mitgliedschaften, Gebühren', ist_standard: true, sortierung: 81 },
+
+  // Abschreibungen
+  { kontonummer: '4822', name: 'Abschreibungen Sachanlagen', typ: 'ausgabe', beschreibung: 'AfA auf Sachanlagen', ist_standard: true, sortierung: 85 },
+  { kontonummer: '4824', name: 'Sofortabschreibung GWG', typ: 'ausgabe', beschreibung: 'Geringwertige Wirtschaftsgüter (bis 800€ netto)', ist_standard: true, sortierung: 86 },
+
+  // Sonstige Aufwendungen
+  { kontonummer: '4900', name: 'Sonstige Aufwendungen', typ: 'ausgabe', beschreibung: 'Sonstige betriebliche Aufwendungen', ist_standard: true, sortierung: 90 },
+  { kontonummer: '4560', name: 'Betriebsbedarf/Material', typ: 'ausgabe', beschreibung: 'Verbrauchsmaterial, Tennisbälle, Trainingsgeräte', ist_standard: true, sortierung: 91 },
+
+  // ============ PRIVATKONTEN (Klasse 1) ============
+  { kontonummer: '1800', name: 'Privatentnahmen', typ: 'neutral', beschreibung: 'Private Entnahmen aus dem Betriebsvermögen', ist_standard: true, sortierung: 100 },
+  { kontonummer: '1890', name: 'Privateinlagen', typ: 'neutral', beschreibung: 'Private Einlagen ins Betriebsvermögen', ist_standard: true, sortierung: 101 },
+  { kontonummer: '1370', name: 'Durchlaufende Posten', typ: 'neutral', beschreibung: 'Durchlaufende Posten (keine Auswirkung auf Gewinn)', ist_standard: true, sortierung: 102 },
 ]
