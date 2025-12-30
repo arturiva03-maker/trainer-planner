@@ -2,12 +2,21 @@
   --primary: #C75B38;
   --primary-hover: #A84C2E;
   --primary-light: #F5E6E0;
-  --success: #C75B38;
-  --success-light: #F5E6E0;
-  --danger: #B54332;
-  --danger-light: #F5E6E0;
-  --warning: #C75B38;
-  --warning-light: #F5E6E0;
+  --success: #155724;
+  --success-light: #D4EDDA;
+  --danger: #721C24;
+  --danger-light: #F8D7DA;
+  --warning: #856404;
+  --warning-light: #FFF3CD;
+  /* Status-spezifische Farben */
+  --status-geplant-bg: #E8E4DF;
+  --status-geplant-text: #4A4543;
+  --status-durchgefuehrt-bg: #D4EDDA;
+  --status-durchgefuehrt-text: #155724;
+  --status-abgesagt-bg: #F8D7DA;
+  --status-abgesagt-text: #721C24;
+  --status-bezahlt-bg: #F5E6E0;
+  --status-bezahlt-text: #C75B38;
   --gray-50: #FAF8F5;
   --gray-100: #F5F3F0;
   --gray-200: #E8E4DF;
@@ -1406,9 +1415,9 @@ tbody tr:last-child td {
 }
 
 .training-block.selected {
-  outline: 3px solid #C75B38;
+  outline: 3px solid #2D2926;
   outline-offset: 2px;
-  box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 0 6px rgba(45, 41, 38, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
   z-index: 25;
 }
 
@@ -1417,28 +1426,32 @@ tbody tr:last-child td {
 }
 
 .training-block.status-geplant {
-  background: linear-gradient(135deg, #C75B38 0%, #A84C2E 100%);
-  box-shadow: 0 2px 8px rgba(199, 91, 56, 0.3);
+  background: linear-gradient(135deg, #6B635E 0%, #4A4543 100%);
+  box-shadow: 0 2px 8px rgba(74, 69, 67, 0.3);
+}
+
+.training-block.status-geplant:hover {
+  box-shadow: 0 4px 16px rgba(74, 69, 67, 0.4);
 }
 
 .training-block.status-durchgefuehrt {
-  background: linear-gradient(135deg, #C75B38 0%, #A84C2E 100%);
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
 }
 
 .training-block.status-durchgefuehrt:hover {
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 16px rgba(40, 167, 69, 0.4);
 }
 
 .training-block.status-abgesagt {
-  background: linear-gradient(135deg, #B54332 0%, #9A3828 100%);
-  opacity: 0.75;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, #dc3545 0%, #a71d2a 100%);
+  opacity: 0.85;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
 }
 
 .training-block.status-abgesagt:hover {
-  opacity: 0.9;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  opacity: 1;
+  box-shadow: 0 4px 16px rgba(220, 53, 69, 0.4);
 }
 
 .training-block .training-title {
@@ -1570,18 +1583,28 @@ tbody tr:last-child td {
 }
 
 .status-badge.geplant {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--status-geplant-bg);
+  color: var(--status-geplant-text);
 }
 
 .status-badge.durchgefuehrt {
-  background: var(--success-light);
-  color: var(--success);
+  background: var(--status-durchgefuehrt-bg);
+  color: var(--status-durchgefuehrt-text);
 }
 
 .status-badge.abgesagt {
-  background: var(--danger-light);
-  color: var(--danger);
+  background: var(--status-abgesagt-bg);
+  color: var(--status-abgesagt-text);
+}
+
+.status-badge.bezahlt {
+  background: var(--status-bezahlt-bg);
+  color: var(--status-bezahlt-text);
+}
+
+.status-badge.offen {
+  background: var(--status-geplant-bg);
+  color: var(--status-geplant-text);
 }
 
 /* Tabs */
@@ -3233,8 +3256,8 @@ tbody tr:last-child td {
 }
 
 .status-badge.active {
-  background: var(--success-light);
-  color: var(--success);
+  background: var(--status-durchgefuehrt-bg);
+  color: var(--status-durchgefuehrt-text);
 }
 
 .status-badge.inactive {

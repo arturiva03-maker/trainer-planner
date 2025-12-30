@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react'
 import { supabase } from './supabaseClient'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -38,6 +38,52 @@ import {
   formatMonthGerman,
   formatQuartal
 } from './utils'
+
+// ============ SCROLL PRESERVATION HOOK ============
+// Globaler Hook um Scroll-Position bei State-Updates zu erhalten
+const useScrollPreservation = () => {
+  const scrollPositionRef = useRef<number>(0)
+  const shouldRestoreRef = useRef<boolean>(false)
+
+  // Speichere aktuelle Scroll-Position
+  const saveScrollPosition = useCallback(() => {
+    scrollPositionRef.current = window.scrollY
+    shouldRestoreRef.current = true
+  }, [])
+
+  // Stelle Scroll-Position nach dem Render wieder her
+  useLayoutEffect(() => {
+    if (shouldRestoreRef.current) {
+      window.scrollTo(0, scrollPositionRef.current)
+      shouldRestoreRef.current = false
+    }
+  })
+
+  // Wrapper für Funktionen, die die Scroll-Position erhalten sollen
+  const withScrollPreservation = useCallback(<T extends (...args: unknown[]) => unknown>(fn: T): T => {
+    return ((...args: Parameters<T>) => {
+      saveScrollPosition()
+      return fn(...args)
+    }) as T
+  }, [saveScrollPosition])
+
+  return { saveScrollPosition, withScrollPreservation }
+}
+
+// ============ SCROLL CONTEXT ============
+// Für globale Nutzung in der gesamten App
+let globalSaveScrollPosition: (() => void) | null = null
+
+const setGlobalScrollSaver = (saver: () => void) => {
+  globalSaveScrollPosition = saver
+}
+
+// Aufrufbar von überall, um Scroll-Position vor State-Updates zu speichern
+const preserveScroll = () => {
+  if (globalSaveScrollPosition) {
+    globalSaveScrollPosition()
+  }
+}
 
 // Tennis Logo Icon Component - Terrakotta racket with ball
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
@@ -387,6 +433,15 @@ function App() {
     confirmText: string
     variant: 'danger' | 'warning' | 'primary'
   }>({ isOpen: false, title: '', message: '', confirmText: 'Löschen', variant: 'danger' })
+
+  // Scroll Preservation Hook initialisieren
+  const { saveScrollPosition } = useScrollPreservation()
+
+  // Globale Scroll-Funktion registrieren
+  useEffect(() => {
+    setGlobalScrollSaver(saveScrollPosition)
+    return () => { globalSaveScrollPosition = null }
+  }, [saveScrollPosition])
 
   // URL-Detection für öffentliche Formulare
   useEffect(() => {
@@ -988,6 +1043,7 @@ function KalenderView({
   }
 
   const handleDoubleClick = async (training: Training) => {
+    preserveScroll()
     const newStatus = training.status === 'geplant' ? 'durchgefuehrt' : 'geplant'
     await supabase.from('trainings').update({ status: newStatus }).eq('id', training.id)
     onUpdate()
@@ -1016,6 +1072,7 @@ function KalenderView({
 
   // Alle ausgewählten Trainings als durchgeführt markieren
   const handleMarkSelectedAsDurchgefuehrt = async () => {
+    preserveScroll()
     const selectedTrainings = trainings.filter(t => selectedTrainingIds.has(t.id))
 
     for (const training of selectedTrainings) {
@@ -2875,6 +2932,8 @@ function AbrechnungView({
   const [showTrainingKorrekturModal, setShowTrainingKorrekturModal] = useState<Training | null>(null)
   const [trainingKorrekturBetrag, setTrainingKorrekturBetrag] = useState('')
   const [trainingKorrekturGrund, setTrainingKorrekturGrund] = useState('')
+  // Bulk-Auswahl für "Als bezahlt markieren"
+  const [selectedForBulkPayment, setSelectedForBulkPayment] = useState<Set<string>>(new Set())
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -3197,6 +3256,7 @@ function AbrechnungView({
 
   // Alle Trainings eines Spielers im Monat als bezahlt/offen markieren
   const toggleAlleBezahlt = async (spielerId: string, currentStatus: boolean) => {
+    preserveScroll()
     const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
     if (!spielerData) return
 
@@ -3263,6 +3323,7 @@ function AbrechnungView({
 
   // Einzelnes Training für einen Spieler als bezahlt markieren
   const toggleTrainingBezahlt = async (trainingId: string, spielerId: string, currentStatus: boolean) => {
+    preserveScroll()
     const existingPayment = spielerPayments.find(
       p => p.training_id === trainingId && p.spieler_id === spielerId
     )
@@ -3315,6 +3376,7 @@ function AbrechnungView({
 
   // Korrektur speichern oder aktualisieren
   const saveKorrektur = async (spielerId: string) => {
+    preserveScroll()
     setKorrekturSaving(true)
     try {
       const betrag = parseFloat(korrekturBetrag.replace(',', '.'))
@@ -3364,6 +3426,7 @@ function AbrechnungView({
 
   // Korrektur löschen
   const deleteKorrektur = async (spielerId: string) => {
+    preserveScroll()
     const existingAdjustment = adjustments.find(
       a => a.spieler_id === spielerId && a.monat === selectedMonth
     )
@@ -3407,6 +3470,7 @@ function AbrechnungView({
 
   // Training-Korrektur speichern
   const saveTrainingKorrektur = async () => {
+    preserveScroll()
     if (!showTrainingKorrekturModal) return
 
     const betrag = trainingKorrekturBetrag ? parseFloat(trainingKorrekturBetrag.replace(',', '.')) : null
@@ -3427,6 +3491,7 @@ function AbrechnungView({
 
   // Training-Korrektur löschen
   const deleteTrainingKorrektur = async () => {
+    preserveScroll()
     if (!showTrainingKorrekturModal) return
     const confirmed = await showConfirm('Korrektur entfernen', 'Korrektur wirklich entfernen?')
     if (!confirmed) return
@@ -3442,6 +3507,73 @@ function AbrechnungView({
     setShowTrainingKorrekturModal(null)
     setTrainingKorrekturBetrag('')
     setTrainingKorrekturGrund('')
+    onUpdate()
+  }
+
+  // Offene Spieler für Bulk-Auswahl (nur Spieler mit offenen Beträgen)
+  const offeneSpieler = useMemo(() => {
+    return filteredSummary.filter(s => !s.bezahlt)
+  }, [filteredSummary])
+
+  // Toggle einzelnen Spieler für Bulk-Auswahl
+  const toggleBulkSelection = (spielerId: string) => {
+    setSelectedForBulkPayment(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(spielerId)) {
+        newSet.delete(spielerId)
+      } else {
+        newSet.add(spielerId)
+      }
+      return newSet
+    })
+  }
+
+  // Alle offenen Spieler auswählen/abwählen
+  const toggleAllBulkSelection = () => {
+    if (selectedForBulkPayment.size === offeneSpieler.length) {
+      setSelectedForBulkPayment(new Set())
+    } else {
+      setSelectedForBulkPayment(new Set(offeneSpieler.map(s => s.spieler.id)))
+    }
+  }
+
+  // Ausgewählte Spieler als bezahlt markieren
+  const markSelectedAsBezahlt = async () => {
+    preserveScroll()
+    if (selectedForBulkPayment.size === 0) return
+
+    for (const spielerId of selectedForBulkPayment) {
+      const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
+      if (!spielerData) continue
+
+      // Alle Trainings dieses Spielers als bezahlt markieren
+      for (const training of spielerData.trainings) {
+        const existingPayment = spielerPayments.find(
+          p => p.training_id === training.id && p.spieler_id === spielerId
+        )
+
+        if (existingPayment) {
+          if (!existingPayment.bezahlt) {
+            await supabase
+              .from('spieler_training_payments')
+              .update({ bezahlt: true })
+              .eq('id', existingPayment.id)
+          }
+        } else {
+          await supabase
+            .from('spieler_training_payments')
+            .insert({
+              user_id: userId,
+              training_id: training.id,
+              spieler_id: spielerId,
+              bezahlt: true,
+              bar_bezahlt: training.bar_bezahlt || false
+            })
+        }
+      }
+    }
+
+    setSelectedForBulkPayment(new Set())
     onUpdate()
   }
 
@@ -3609,6 +3741,34 @@ function AbrechnungView({
               </button>
             </div>
           </div>
+          {/* Bulk-Bezahlt Button */}
+          {selectedForBulkPayment.size > 0 && (
+            <div style={{
+              padding: '12px 16px',
+              background: 'var(--status-durchgefuehrt-bg)',
+              borderTop: '1px solid var(--gray-200)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16
+            }}>
+              <span style={{ color: 'var(--status-durchgefuehrt-text)', fontWeight: 500 }}>
+                {selectedForBulkPayment.size} {selectedForBulkPayment.size === 1 ? 'Spieler' : 'Spieler'} ausgewählt
+              </span>
+              <button
+                className="btn btn-primary"
+                onClick={markSelectedAsBezahlt}
+                style={{ background: 'var(--success)', borderColor: 'var(--success)' }}
+              >
+                ✓ Ausgewählte als bezahlt markieren
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setSelectedForBulkPayment(new Set())}
+              >
+                Auswahl aufheben
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Desktop Table */}
@@ -3616,6 +3776,17 @@ function AbrechnungView({
           <table>
             <thead>
               <tr>
+                <th style={{ width: 40, textAlign: 'center' }}>
+                  {offeneSpieler.length > 0 && (
+                    <input
+                      type="checkbox"
+                      checked={selectedForBulkPayment.size === offeneSpieler.length && offeneSpieler.length > 0}
+                      onChange={toggleAllBulkSelection}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Alle offenen auswählen"
+                    />
+                  )}
+                </th>
                 <th>Spieler</th>
                 <th>Trainings</th>
                 <th>Summe</th>
@@ -3630,6 +3801,15 @@ function AbrechnungView({
                   onClick={() => setSelectedSpielerDetail(item.spieler.id)}
                   style={{ cursor: 'pointer' }}
                 >
+                  <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    {!item.bezahlt && (
+                      <input
+                        type="checkbox"
+                        checked={selectedForBulkPayment.has(item.spieler.id)}
+                        onChange={() => toggleBulkSelection(item.spieler.id)}
+                      />
+                    )}
+                  </td>
                   <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{item.spieler.name}</td>
                   <td>{item.trainings.length} Trainings</td>
                   <td>
@@ -3641,7 +3821,7 @@ function AbrechnungView({
                     )}
                   </td>
                   <td>
-                    <span className={`status-badge ${item.bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
+                    <span className={`status-badge ${item.bezahlt ? 'bezahlt' : 'offen'}`}>
                       {item.bezahlt ? 'Bezahlt' : 'Offen'}
                     </span>
                   </td>
@@ -3660,7 +3840,7 @@ function AbrechnungView({
               ))}
               {filteredSummary.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="empty-state">
+                  <td colSpan={6} className="empty-state">
                     Keine Abrechnungen für diesen Monat
                   </td>
                 </tr>
@@ -3671,6 +3851,26 @@ function AbrechnungView({
 
         {/* Mobile Card List */}
         <div className="mobile-card-list">
+          {/* Mobile Bulk-Auswahl Buttons */}
+          {offeneSpieler.length > 0 && (
+            <div style={{ padding: '8px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={toggleAllBulkSelection}
+              >
+                {selectedForBulkPayment.size === offeneSpieler.length ? 'Alle abwählen' : 'Alle offenen auswählen'}
+              </button>
+              {selectedForBulkPayment.size > 0 && (
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={markSelectedAsBezahlt}
+                  style={{ background: 'var(--success)', borderColor: 'var(--success)' }}
+                >
+                  {selectedForBulkPayment.size} als bezahlt markieren
+                </button>
+              )}
+            </div>
+          )}
           {filteredSummary.map((item) => (
             <div
               key={item.spieler.id}
@@ -3679,11 +3879,22 @@ function AbrechnungView({
               style={{ cursor: 'pointer' }}
             >
               <div className="mobile-card-header">
-                <div>
-                  <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{item.spieler.name}</div>
-                  <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {!item.bezahlt && (
+                    <input
+                      type="checkbox"
+                      checked={selectedForBulkPayment.has(item.spieler.id)}
+                      onChange={() => toggleBulkSelection(item.spieler.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ width: 20, height: 20 }}
+                    />
+                  )}
+                  <div>
+                    <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{item.spieler.name}</div>
+                    <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
+                  </div>
                 </div>
-                <span className={`status-badge ${item.bezahlt ? 'durchgefuehrt' : 'geplant'}`}>
+                <span className={`status-badge ${item.bezahlt ? 'bezahlt' : 'offen'}`}>
                   {item.bezahlt ? 'Bezahlt' : 'Offen'}
                 </span>
               </div>
@@ -4623,7 +4834,7 @@ function InvoiceModal({
       '{{iban}}': iban,
       '{{trainer_name}}': rechnungsstellerName,
       '{{trainer_adresse}}': rechnungsstellerAdresse,
-      '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+      '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (profile?.steuernummer ? `<br><span style="color: #6B635E; font-size: 10px;">Steuernummer: ${profile.steuernummer}</span>` : '') + (ustIdNr ? `<br><span style="color: #6B635E; font-size: 10px;">USt-IdNr: ${ustIdNr}</span>` : ''),
       '{{steuernummer}}': profile?.steuernummer || '',
       '{{empfaenger_name}}': rechnungsempfaengerName,
       '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
@@ -4982,7 +5193,7 @@ ${rechnungsstellerName}`
       '{{iban}}': iban,
       '{{trainer_name}}': rechnungsstellerName,
       '{{trainer_adresse}}': rechnungsstellerAdresse,
-      '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+      '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (profile?.steuernummer ? `<br><span style="color: #6B635E; font-size: 10px;">Steuernummer: ${profile.steuernummer}</span>` : '') + (ustIdNr ? `<br><span style="color: #6B635E; font-size: 10px;">USt-IdNr: ${ustIdNr}</span>` : ''),
       '{{steuernummer}}': profile?.steuernummer || '',
       '{{empfaenger_name}}': rechnungsempfaengerName,
       '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
@@ -5337,7 +5548,7 @@ ${rechnungsstellerName}`
           '{{iban}}': iban,
           '{{trainer_name}}': rechnungsstellerName,
           '{{trainer_adresse}}': rechnungsstellerAdresse,
-          '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (ustIdNr ? `<br>USt-IdNr: ${ustIdNr}` : ''),
+          '{{trainer_adresse_html}}': rechnungsstellerAdresse.replace(/\n/g, '<br>') + (profile?.steuernummer ? `<br><span style="color: #6B635E; font-size: 10px;">Steuernummer: ${profile.steuernummer}</span>` : '') + (ustIdNr ? `<br><span style="color: #6B635E; font-size: 10px;">USt-IdNr: ${ustIdNr}</span>` : ''),
           '{{steuernummer}}': profile?.steuernummer || '',
           '{{empfaenger_name}}': rechnungsempfaengerName,
           '{{empfaenger_adresse}}': rechnungsempfaengerAdresse,
