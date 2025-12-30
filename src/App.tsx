@@ -6551,42 +6551,41 @@ ${profile?.name || ''}`
         </style>
       </head>
       <body>
-        <!-- Header - Klassisch wie Mini-Tennis -->
-        <div style="margin-bottom: 24px;">
-          <h1 style="margin: 0 0 8px 0; font-size: 32px; font-weight: 400; color: #2D2926; letter-spacing: 4px;">RECHNUNG</h1>
-          <div style="height: 3px; background: #2D2926; width: 100%;"></div>
+        <!-- Header mit farbigem Balken -->
+        <div style="background: #8B7D76; margin: -40px -40px 24px -40px; padding: 24px 40px;">
+          <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px;">RECHNUNG</h1>
         </div>
 
         <!-- Adressbereich -->
-        <div style="display: flex; justify-content: space-between; margin-bottom: 32px; gap: 40px;">
-          <div style="flex: 1;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungssteller</div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 24px; gap: 20px;">
+          <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #4A4543;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
             <div style="font-weight: 600; color: #2D2926;">${rechnungsstellerName}</div>
             <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">${rechnungsstellerAdresse.replace(/\n/g, '<br>')}</div>
             ${profile?.steuernummer ? `<div style="color: #6B635E; font-size: 10px; margin-top: 8px;">Steuernummer: ${profile?.steuernummer}</div>` : ''}
             ${ustIdNr ? `<div style="color: #6B635E; font-size: 10px;">USt-IdNr: ${ustIdNr}</div>` : ''}
           </div>
-          <div style="flex: 1; text-align: right;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px; letter-spacing: 1px;">Rechnungsempfänger</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #6B635E;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
             <div style="font-weight: 600; color: #2D2926;">${rechnungData.empfaengerName}</div>
             <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">${(rechnungData.empfaengerAdresse || '').replace(/\n/g, '<br>')}</div>
           </div>
         </div>
 
-        <!-- Rechnungsdetails - graue Boxen -->
-        <div style="display: flex; gap: 12px; margin-bottom: 32px;">
-          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #E8E4DF;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; letter-spacing: 0.5px;">Rechnungsnummer</div>
-            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 6px;">${rechnungData.rechnungsnummer}</div>
+        <!-- Rechnungsdetails - 3 separate Boxen -->
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+          <div style="flex: 1; background: #FAF8F5; padding: 12px 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Rechnungsnummer</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 4px;">${rechnungData.rechnungsnummer}</div>
           </div>
-          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #E8E4DF;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; letter-spacing: 0.5px;">Rechnungsdatum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 6px;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 12px 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Rechnungsdatum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 4px;">${formatDateGerman(rechnungData.rechnungsdatum)}</div>
           </div>
           ${rechnungData.leistungszeitraum ? `
-          <div style="flex: 1; background: #f3f4f6; padding: 16px; text-align: center; border: 1px solid #E8E4DF;">
-            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; letter-spacing: 0.5px;">Leistungszeitraum</div>
-            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 6px;">${rechnungData.leistungszeitraum}</div>
+          <div style="flex: 1; background: #FAF8F5; padding: 12px 16px; text-align: center; border: 1px solid #E8E4DF;">
+            <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600;">Leistungszeitraum</div>
+            <div style="font-size: 14px; font-weight: 700; color: #2D2926; margin-top: 4px;">${rechnungData.leistungszeitraum}</div>
           </div>
           ` : ''}
         </div>
