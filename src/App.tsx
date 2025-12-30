@@ -4654,7 +4654,7 @@ function InvoiceModal({
       // Standard PDF-Layout - Professionelles Design
       pdfHtml = `
         <!-- Header -->
-        <div style="background: #2D2926; margin: -24px -24px 24px -24px; padding: 24px;">
+        <div style="background: #8B7D76; margin: -24px -24px 24px -24px; padding: 24px;">
           <h1 style="text-align: center; margin: 0; font-size: 28px; color: white; font-weight: 700; letter-spacing: 2px; ">RECHNUNG</h1>
         </div>
 
