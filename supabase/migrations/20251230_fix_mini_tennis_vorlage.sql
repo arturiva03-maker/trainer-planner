@@ -11,7 +11,6 @@ SET inhalt = $HTML$<!-- Header mit farbigem Balken -->
     <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungssteller</div>
     <div style="font-weight: 600; color: #2D2926;">{{trainer_name}}</div>
     <div style="color: #4A4543; font-size: 11px; margin-top: 4px;">{{trainer_adresse_html}}</div>
-    {{trainer_steuernummer_block}}
   </div>
   <div style="flex: 1; background: #FAF8F5; padding: 16px; border-left: 3px solid #6B635E;">
     <div style="font-size: 10px; text-transform: uppercase; color: #6B635E; font-weight: 600; margin-bottom: 8px;">Rechnungsempfänger</div>
