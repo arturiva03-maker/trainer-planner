@@ -3306,11 +3306,13 @@ function AbrechnungView({
     }
   }
 
-  // Alle Trainings eines Spielers im Monat als ausstehend markieren
-  const toggleAlleAusstehend = async (spielerId: string) => {
+  // Alle Trainings eines Spielers im Monat als ausstehend/offen markieren (Toggle)
+  const toggleAlleAusstehend = async (spielerId: string, currentAusstehend: boolean) => {
     preserveScroll()
     const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
     if (!spielerData) return
+
+    const newAusstehend = !currentAusstehend
 
     // Optimistisches Update - sofort alle UI aktualisieren
     const updatedPayments: SpielerTrainingPayment[] = []
@@ -3322,7 +3324,7 @@ function AbrechnungView({
       )
 
       if (existingPayment) {
-        updatedPayments.push({ ...existingPayment, bezahlt: false, bar_bezahlt: false, ausstehend: true })
+        updatedPayments.push({ ...existingPayment, bezahlt: false, bar_bezahlt: false, ausstehend: newAusstehend })
       } else {
         newPayments.push({
           id: `temp-${training.id}-${spielerId}`,
@@ -3331,7 +3333,7 @@ function AbrechnungView({
           spieler_id: spielerId,
           bezahlt: false,
           bar_bezahlt: false,
-          ausstehend: true,
+          ausstehend: newAusstehend,
           created_at: new Date().toISOString()
         })
       }
@@ -3354,7 +3356,7 @@ function AbrechnungView({
       if (existingPayment) {
         await supabase
           .from('spieler_training_payments')
-          .update({ bezahlt: false, bar_bezahlt: false, ausstehend: true })
+          .update({ bezahlt: false, bar_bezahlt: false, ausstehend: newAusstehend })
           .eq('id', existingPayment.id)
       } else {
         await supabase
@@ -3365,7 +3367,7 @@ function AbrechnungView({
             spieler_id: spielerId,
             bezahlt: false,
             bar_bezahlt: false,
-            ausstehend: true
+            ausstehend: newAusstehend
           })
       }
     }
@@ -3826,12 +3828,16 @@ function AbrechnungView({
                             className="btn btn-sm"
                             onClick={(e) => {
                               e.stopPropagation()
-                              toggleAlleAusstehend(item.spieler.id)
+                              toggleAlleAusstehend(item.spieler.id, item.ausstehend)
                             }}
-                            style={{ background: '#F59E0B', color: 'white', borderColor: '#F59E0B' }}
-                            title="Alle Trainings als ausstehend markieren"
+                            style={{
+                              background: item.ausstehend ? '#6B7280' : '#F59E0B',
+                              color: 'white',
+                              borderColor: item.ausstehend ? '#6B7280' : '#F59E0B'
+                            }}
+                            title={item.ausstehend ? "Zurück auf offen setzen" : "Als ausstehend markieren"}
                           >
-                            Ausstehend
+                            {item.ausstehend ? 'Offen' : 'Ausstehend'}
                           </button>
                           <button
                             className="btn btn-sm"
@@ -3911,11 +3917,15 @@ function AbrechnungView({
                       className="btn btn-sm"
                       onClick={(e) => {
                         e.stopPropagation()
-                        toggleAlleAusstehend(item.spieler.id)
+                        toggleAlleAusstehend(item.spieler.id, item.ausstehend)
                       }}
-                      style={{ background: '#F59E0B', color: 'white', borderColor: '#F59E0B' }}
+                      style={{
+                        background: item.ausstehend ? '#6B7280' : '#F59E0B',
+                        color: 'white',
+                        borderColor: item.ausstehend ? '#6B7280' : '#F59E0B'
+                      }}
                     >
-                      Ausstehend
+                      {item.ausstehend ? 'Offen' : 'Ausstehend'}
                     </button>
                     <button
                       className="btn btn-sm"
