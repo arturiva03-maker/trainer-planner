@@ -2822,7 +2822,7 @@ function AbrechnungView({
   userId: string
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
-  const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'bar'>('alle')
+  const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar'>('alle')
   const [filterType, setFilterType] = useState<'keine' | 'spieler' | 'tag'>('keine')
   const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
   const [spielerSuche, setSpielerSuche] = useState('')
@@ -2861,17 +2861,17 @@ function AbrechnungView({
 
   // Prüft den Bezahlstatus eines Spielers für ein Training
   // Nutzt spielerPayments wenn vorhanden, sonst Fallback auf training.bezahlt/bar_bezahlt
-  const getSpielerPaymentStatus = (spielerId: string, training: Training): { bezahlt: boolean, barBezahlt: boolean } => {
+  const getSpielerPaymentStatus = (spielerId: string, training: Training): { bezahlt: boolean, barBezahlt: boolean, ausstehend: boolean } => {
     const payment = spielerPayments.find(p => p.training_id === training.id && p.spieler_id === spielerId)
     if (payment) {
-      return { bezahlt: payment.bezahlt, barBezahlt: payment.bar_bezahlt }
+      return { bezahlt: payment.bezahlt, barBezahlt: payment.bar_bezahlt, ausstehend: payment.ausstehend || false }
     }
     // Fallback: Für Einzeltrainings (nur 1 Spieler) das alte Feld nutzen
     if (training.spieler_ids.length === 1) {
-      return { bezahlt: training.bezahlt, barBezahlt: training.bar_bezahlt }
+      return { bezahlt: training.bezahlt, barBezahlt: training.bar_bezahlt, ausstehend: false }
     }
     // Für Gruppentrainings ohne expliziten Eintrag: als offen betrachten
-    return { bezahlt: false, barBezahlt: false }
+    return { bezahlt: false, barBezahlt: false, ausstehend: false }
   }
 
   const spielerSummary = useMemo(() => {
@@ -2882,8 +2882,10 @@ function AbrechnungView({
         summe: number
         barSumme: number
         bezahltSumme: number
+        ausstehendSumme: number
         offeneSumme: number
         bezahlt: boolean
+        ausstehend: boolean
         adjustment: number
         monatlicheSerien: Set<string> // Track welche Serien bereits berechnet wurden
       }
@@ -2909,8 +2911,10 @@ function AbrechnungView({
             summe: 0,
             barSumme: 0,
             bezahltSumme: 0,
+            ausstehendSumme: 0,
             offeneSumme: 0,
             bezahlt: false,
+            ausstehend: false,
             adjustment: 0,
             monatlicheSerien: new Set()
           }
@@ -2955,6 +2959,8 @@ function AbrechnungView({
             summary[spielerId].barSumme += spielerPreis
           } else if (paymentStatus.bezahlt) {
             summary[spielerId].bezahltSumme += spielerPreis
+          } else if (paymentStatus.ausstehend) {
+            summary[spielerId].ausstehendSumme += spielerPreis
           } else {
             summary[spielerId].offeneSumme += spielerPreis
           }
@@ -2974,8 +2980,10 @@ function AbrechnungView({
               summe: 0,
               barSumme: 0,
               bezahltSumme: 0,
+              ausstehendSumme: 0,
               offeneSumme: 0,
               bezahlt: false,
+              ausstehend: false,
               adjustment: 0,
               monatlicheSerien: new Set()
             }
@@ -2995,12 +3003,14 @@ function AbrechnungView({
 
           summary[spielerId].summe += spielerPreis
 
-          // Entfernte Spieler: immer als offene Summe behandeln (noch nicht bezahlt)
+          // Entfernte Spieler: Bezahlstatus prüfen
           const paymentStatus = getSpielerPaymentStatus(spielerId, t)
           if (paymentStatus.barBezahlt) {
             summary[spielerId].barSumme += spielerPreis
           } else if (paymentStatus.bezahlt) {
             summary[spielerId].bezahltSumme += spielerPreis
+          } else if (paymentStatus.ausstehend) {
+            summary[spielerId].ausstehendSumme += spielerPreis
           } else {
             summary[spielerId].offeneSumme += spielerPreis
           }
@@ -3021,8 +3031,10 @@ function AbrechnungView({
         summary[spielerId].offeneSumme += summary[spielerId].adjustment
       }
 
-      // Bezahlt nur wenn ALLE Trainings bezahlt sind (bar oder normal) UND keine offenen Beträge
-      summary[spielerId].bezahlt = summary[spielerId].offeneSumme <= 0
+      // Bezahlt nur wenn ALLE Trainings bezahlt sind (bar oder normal) UND keine offenen/ausstehenden Beträge
+      summary[spielerId].bezahlt = summary[spielerId].offeneSumme <= 0 && summary[spielerId].ausstehendSumme <= 0
+      // Ausstehend wenn mindestens ein Training ausstehend ist (aber nicht alles bezahlt)
+      summary[spielerId].ausstehend = summary[spielerId].ausstehendSumme > 0 && !summary[spielerId].bezahlt
     })
 
     return Object.values(summary)
@@ -3121,13 +3133,16 @@ function AbrechnungView({
         .filter(s => s.trainings.length > 0)
     }
 
-    // Status-Filter (bezahlt/offen/bar)
+    // Status-Filter (bezahlt/offen/ausstehend/bar)
     switch (filter) {
       case 'bezahlt':
         result = result.filter((s) => s.bezahlt)
         break
       case 'offen':
-        result = result.filter((s) => !s.bezahlt)
+        result = result.filter((s) => !s.bezahlt && !s.ausstehend)
+        break
+      case 'ausstehend':
+        result = result.filter((s) => s.ausstehend)
         break
       case 'bar':
         result = result.filter((s) => s.barSumme > 0)
@@ -3177,7 +3192,7 @@ function AbrechnungView({
       )
 
       if (existingPayment) {
-        updatedPayments.push({ ...existingPayment, bezahlt: newStatus })
+        updatedPayments.push({ ...existingPayment, bezahlt: newStatus, ausstehend: false })
       } else {
         newPayments.push({
           id: `temp-${training.id}-${spielerId}`,
@@ -3186,6 +3201,7 @@ function AbrechnungView({
           spieler_id: spielerId,
           bezahlt: newStatus,
           bar_bezahlt: training.bar_bezahlt || false,
+          ausstehend: false,
           created_at: new Date().toISOString()
         })
       }
@@ -3208,7 +3224,7 @@ function AbrechnungView({
       if (existingPayment) {
         await supabase
           .from('spieler_training_payments')
-          .update({ bezahlt: newStatus })
+          .update({ bezahlt: newStatus, ausstehend: false })
           .eq('id', existingPayment.id)
       } else {
         await supabase
@@ -3218,12 +3234,11 @@ function AbrechnungView({
             training_id: training.id,
             spieler_id: spielerId,
             bezahlt: newStatus,
-            bar_bezahlt: training.bar_bezahlt || false
+            bar_bezahlt: training.bar_bezahlt || false,
+            ausstehend: false
           })
       }
     }
-
-    onUpdate()
   }
 
   // Alle Trainings eines Spielers im Monat als bar bezahlt markieren
@@ -3242,7 +3257,7 @@ function AbrechnungView({
       )
 
       if (existingPayment) {
-        updatedPayments.push({ ...existingPayment, bezahlt: true, bar_bezahlt: true })
+        updatedPayments.push({ ...existingPayment, bezahlt: true, bar_bezahlt: true, ausstehend: false })
       } else {
         newPayments.push({
           id: `temp-${training.id}-${spielerId}`,
@@ -3251,6 +3266,7 @@ function AbrechnungView({
           spieler_id: spielerId,
           bezahlt: true,
           bar_bezahlt: true,
+          ausstehend: false,
           created_at: new Date().toISOString()
         })
       }
@@ -3273,7 +3289,7 @@ function AbrechnungView({
       if (existingPayment) {
         await supabase
           .from('spieler_training_payments')
-          .update({ bezahlt: true, bar_bezahlt: true })
+          .update({ bezahlt: true, bar_bezahlt: true, ausstehend: false })
           .eq('id', existingPayment.id)
       } else {
         await supabase
@@ -3283,12 +3299,76 @@ function AbrechnungView({
             training_id: training.id,
             spieler_id: spielerId,
             bezahlt: true,
-            bar_bezahlt: true
+            bar_bezahlt: true,
+            ausstehend: false
           })
       }
     }
+  }
 
-    onUpdate()
+  // Alle Trainings eines Spielers im Monat als ausstehend markieren
+  const toggleAlleAusstehend = async (spielerId: string) => {
+    preserveScroll()
+    const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
+    if (!spielerData) return
+
+    // Optimistisches Update - sofort alle UI aktualisieren
+    const updatedPayments: SpielerTrainingPayment[] = []
+    const newPayments: SpielerTrainingPayment[] = []
+
+    for (const training of spielerData.trainings) {
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === training.id && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
+        updatedPayments.push({ ...existingPayment, bezahlt: false, bar_bezahlt: false, ausstehend: true })
+      } else {
+        newPayments.push({
+          id: `temp-${training.id}-${spielerId}`,
+          user_id: userId,
+          training_id: training.id,
+          spieler_id: spielerId,
+          bezahlt: false,
+          bar_bezahlt: false,
+          ausstehend: true,
+          created_at: new Date().toISOString()
+        })
+      }
+    }
+
+    setSpielerPayments(prev => {
+      const updated = prev.map(p => {
+        const match = updatedPayments.find(up => up.id === p.id)
+        return match || p
+      })
+      return [...updated, ...newPayments]
+    })
+
+    // Datenbank-Operationen
+    for (const training of spielerData.trainings) {
+      const existingPayment = spielerPayments.find(
+        p => p.training_id === training.id && p.spieler_id === spielerId
+      )
+
+      if (existingPayment) {
+        await supabase
+          .from('spieler_training_payments')
+          .update({ bezahlt: false, bar_bezahlt: false, ausstehend: true })
+          .eq('id', existingPayment.id)
+      } else {
+        await supabase
+          .from('spieler_training_payments')
+          .insert({
+            user_id: userId,
+            training_id: training.id,
+            spieler_id: spielerId,
+            bezahlt: false,
+            bar_bezahlt: false,
+            ausstehend: true
+          })
+      }
+    }
   }
 
   // Einzelnes Training für einen Spieler als bezahlt markieren
@@ -3306,7 +3386,7 @@ function AbrechnungView({
     // Optimistisches Update - sofort UI aktualisieren
     if (existingPayment) {
       setSpielerPayments(prev => prev.map(p =>
-        p.id === existingPayment.id ? { ...p, bezahlt: newStatus } : p
+        p.id === existingPayment.id ? { ...p, bezahlt: newStatus, ausstehend: false } : p
       ))
     } else {
       // Temporärer Eintrag für optimistisches Update
@@ -3317,6 +3397,7 @@ function AbrechnungView({
         spieler_id: spielerId,
         bezahlt: newStatus,
         bar_bezahlt: trainingBarBezahlt,
+        ausstehend: false,
         created_at: new Date().toISOString()
       }
       setSpielerPayments(prev => [...prev, tempPayment])
@@ -3326,7 +3407,7 @@ function AbrechnungView({
     if (existingPayment) {
       await supabase
         .from('spieler_training_payments')
-        .update({ bezahlt: newStatus })
+        .update({ bezahlt: newStatus, ausstehend: false })
         .eq('id', existingPayment.id)
     } else {
       await supabase
@@ -3336,11 +3417,10 @@ function AbrechnungView({
           training_id: trainingId,
           spieler_id: spielerId,
           bezahlt: newStatus,
-          bar_bezahlt: trainingBarBezahlt
+          bar_bezahlt: trainingBarBezahlt,
+          ausstehend: false
         })
     }
-
-    onUpdate()
   }
 
 
@@ -3575,6 +3655,7 @@ function AbrechnungView({
               >
                 <option value="alle">Alle</option>
                 <option value="bezahlt">Nur bezahlt</option>
+                <option value="ausstehend">Nur ausstehend</option>
                 <option value="offen">Nur offen</option>
                 <option value="bar">Nur bar</option>
               </select>
@@ -3724,12 +3805,12 @@ function AbrechnungView({
                     )}
                   </td>
                   <td>
-                    <span className={`status-badge ${item.bezahlt ? 'bezahlt' : 'offen'}`}>
-                      {item.bezahlt ? 'Bezahlt' : 'Offen'}
+                    <span className={`status-badge ${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}>
+                      {item.bezahlt ? 'Bezahlt' : item.ausstehend ? 'Ausstehend' : 'Offen'}
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       <button
                         className="btn btn-sm btn-secondary"
                         onClick={(e) => {
@@ -3737,20 +3818,33 @@ function AbrechnungView({
                           toggleAlleBezahlt(item.spieler.id, item.bezahlt)
                         }}
                       >
-                        {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
+                        {item.bezahlt ? 'Offen' : 'Bezahlt'}
                       </button>
                       {!item.bezahlt && (
-                        <button
-                          className="btn btn-sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleAlleBarBezahlt(item.spieler.id)
-                          }}
-                          style={{ background: 'var(--warning)', color: '#1E40AF', borderColor: 'var(--warning)' }}
-                          title="Alle Trainings als bar bezahlt markieren"
-                        >
-                          Bar
-                        </button>
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleAlleAusstehend(item.spieler.id)
+                            }}
+                            style={{ background: '#F59E0B', color: 'white', borderColor: '#F59E0B' }}
+                            title="Alle Trainings als ausstehend markieren"
+                          >
+                            Ausstehend
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleAlleBarBezahlt(item.spieler.id)
+                            }}
+                            style={{ background: 'var(--warning)', color: '#1E40AF', borderColor: 'var(--warning)' }}
+                            title="Alle Trainings als bar bezahlt markieren"
+                          >
+                            Bar
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -3781,8 +3875,8 @@ function AbrechnungView({
                   <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{item.spieler.name}</div>
                   <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
                 </div>
-                <span className={`status-badge ${item.bezahlt ? 'bezahlt' : 'offen'}`}>
-                  {item.bezahlt ? 'Bezahlt' : 'Offen'}
+                <span className={`status-badge ${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}>
+                  {item.bezahlt ? 'Bezahlt' : item.ausstehend ? 'Ausstehend' : 'Offen'}
                 </span>
               </div>
               <div className="mobile-card-body">
@@ -3809,19 +3903,31 @@ function AbrechnungView({
                     toggleAlleBezahlt(item.spieler.id, item.bezahlt)
                   }}
                 >
-                  {item.bezahlt ? 'Alle offen' : 'Alle bezahlt'}
+                  {item.bezahlt ? 'Offen' : 'Bezahlt'}
                 </button>
                 {!item.bezahlt && (
-                  <button
-                    className="btn btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleAlleBarBezahlt(item.spieler.id)
-                    }}
-                    style={{ background: 'var(--warning)', color: '#1E40AF', borderColor: 'var(--warning)' }}
-                  >
-                    Alle bar
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleAlleAusstehend(item.spieler.id)
+                      }}
+                      style={{ background: '#F59E0B', color: 'white', borderColor: '#F59E0B' }}
+                    >
+                      Ausstehend
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleAlleBarBezahlt(item.spieler.id)
+                      }}
+                      style={{ background: 'var(--warning)', color: '#1E40AF', borderColor: 'var(--warning)' }}
+                    >
+                      Bar
+                    </button>
+                  </>
                 )}
               </div>
             </div>

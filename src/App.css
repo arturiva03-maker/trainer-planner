@@ -1614,6 +1614,11 @@ tbody tr:last-child td {
   color: var(--status-bezahlt-text);
 }
 
+.status-badge.ausstehend {
+  background: #F59E0B;
+  color: white;
+}
+
 .status-badge.offen {
   background: var(--status-geplant-bg);
   color: var(--status-geplant-text);

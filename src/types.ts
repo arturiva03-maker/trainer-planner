@@ -109,6 +109,7 @@ export interface SpielerTrainingPayment {
   spieler_id: string
   bezahlt: boolean
   bar_bezahlt: boolean
+  ausstehend: boolean // Rechnung/Erinnerung gesendet, Zahlung erwartet
   created_at: string
 }
 

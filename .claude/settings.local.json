@@ -35,7 +35,8 @@
       "Bash(SUPABASE_ACCESS_TOKEN=sbp_6b11f1da0cc5695191516ea03a294aaca7d59c40 npx supabase:*)",
       "Bash(git checkout:*)",
       "Bash(git show:*)",
-      "Bash(SUPABASE_ACCESS_TOKEN=sbp_0de703cc667f830305950f8874ea71accf5828e1 npx supabase:*)"
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_0de703cc667f830305950f8874ea71accf5828e1 npx supabase:*)",
+      "Bash(node -e \"const fs = require\\(''fs''\\); const content = fs.readFileSync\\(''C:/Users/artur/trainer-planner/src/App.tsx'', ''utf8''\\).split\\(''\\\\n''\\); const before = content.slice\\(0, 7758\\); const after = content.slice\\(11792\\); const result = [...before, ...after].join\\(''\\\\n''\\); fs.writeFileSync\\(''C:/Users/artur/trainer-planner/src/App.tsx'', result\\);\")"
     ]
   },
   "alwaysAllowWrites": true,
