@@ -248,15 +248,6 @@ export interface EmailVorlage {
   created_at: string
 }
 
-export interface PdfVorlage {
-  id: string
-  user_id: string
-  name: string
-  inhalt: string // HTML-Vorlage
-  ist_standard: boolean
-  created_at: string
-}
-
 // Verfügbare Platzhalter für E-Mail-Vorlagen (nur Text)
 export const EMAIL_PLATZHALTER = [
   { key: '{{spieler_name}}', beschreibung: 'Name des Spielers' },
@@ -275,30 +266,6 @@ export const EMAIL_PLATZHALTER = [
   { key: '{{empfaenger_adresse}}', beschreibung: 'Adresse des Rechnungsempfängers' },
   { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis (falls zutreffend)' },
   { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
-  { key: '{{spieler_iban}}', beschreibung: 'IBAN des Spielers (maskiert: DE12****5678)' },
-  { key: '{{spieler_mandatsreferenz}}', beschreibung: 'Mandatsreferenz des Spielers' },
-  { key: '{{spieler_unterschriftsdatum}}', beschreibung: 'Unterschriftsdatum SEPA-Mandat' },
-]
-
-// Verfügbare Platzhalter für PDF-Vorlagen (mit HTML)
-export const PDF_PLATZHALTER = [
-  { key: '{{spieler_name}}', beschreibung: 'Name des Spielers' },
-  { key: '{{rechnungsnummer}}', beschreibung: 'Rechnungsnummer' },
-  { key: '{{rechnungsdatum}}', beschreibung: 'Rechnungsdatum' },
-  { key: '{{monat}}', beschreibung: 'Abrechnungsmonat (z.B. Dezember 2024)' },
-  { key: '{{positionen_tabelle}}', beschreibung: 'Trainings als HTML-Tabelle' },
-  { key: '{{netto}}', beschreibung: 'Nettobetrag' },
-  { key: '{{ust}}', beschreibung: 'Umsatzsteuer-Betrag' },
-  { key: '{{brutto}}', beschreibung: 'Gesamtbetrag (Brutto)' },
-  { key: '{{iban}}', beschreibung: 'IBAN des Trainers' },
-  { key: '{{trainer_name}}', beschreibung: 'Name des Trainers' },
-  { key: '{{trainer_adresse_html}}', beschreibung: 'Adresse des Trainers (HTML)' },
-  { key: '{{steuernummer}}', beschreibung: 'Steuernummer des Trainers' },
-  { key: '{{empfaenger_name}}', beschreibung: 'Name des Rechnungsempfängers' },
-  { key: '{{empfaenger_adresse_html}}', beschreibung: 'Adresse des Empfängers (HTML)' },
-  { key: '{{kleinunternehmer_hinweis}}', beschreibung: 'Kleinunternehmer-Hinweis' },
-  { key: '{{ust_zeile}}', beschreibung: 'USt-Zeile (leer bei Kleinunternehmer)' },
-  { key: '{{summen_block}}', beschreibung: 'Summen-Block als HTML' },
   { key: '{{spieler_iban}}', beschreibung: 'IBAN des Spielers (maskiert: DE12****5678)' },
   { key: '{{spieler_mandatsreferenz}}', beschreibung: 'Mandatsreferenz des Spielers' },
   { key: '{{spieler_unterschriftsdatum}}', beschreibung: 'Unterschriftsdatum SEPA-Mandat' },
