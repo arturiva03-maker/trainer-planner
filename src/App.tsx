@@ -7859,6 +7859,8 @@ function BuchhaltungView({
   }>({ datum: '', betrag: '', verwendungszweck: '' })
   const [isMatching, setIsMatching] = useState(false)
   const [matchingError, setMatchingError] = useState<string | null>(null)
+  const [zuordnungModal, setZuordnungModal] = useState<BankTransaction | null>(null)
+  const [selectedRechnungIds, setSelectedRechnungIds] = useState<Set<string>>(new Set())
 
   // Einnahmen-Bearbeitung States
   const [editingManuelleRechnung, setEditingManuelleRechnung] = useState<ManuelleRechnung | null>(null)
@@ -8544,19 +8546,13 @@ function BuchhaltungView({
         .eq('id', tx.id)
 
     } else if (suggestion.type === 'rechnung') {
-      // Rechnung als bezahlt markieren
-      await supabase
-        .from('manuelle_rechnungen')
-        .update({ bezahlt: true })
-        .eq('id', suggestion.id)
+      // Rechnung zuordnen (verwendet handleSetRechnung für Konsistenz)
+      await handleSetRechnung(tx, suggestion.id)
 
+      // AI-Suggestion-Status aktualisieren
       await supabase
         .from('bank_transactions')
-        .update({
-          match_status: 'manual_matched',
-          matched_rechnung_id: suggestion.id,
-          ai_suggestion_status: 'accepted'
-        })
+        .update({ ai_suggestion_status: 'accepted' })
         .eq('id', tx.id)
 
     } else if (suggestion.type === 'ausgabe') {
@@ -8626,13 +8622,21 @@ function BuchhaltungView({
     }
   }
 
-  // Rechnung einer Transaktion zuordnen (für Einnahmen)
+  // Einzelne Rechnung einer Transaktion zuordnen (für AI-Matching und Abwärtskompatibilität)
   const handleSetRechnung = async (tx: BankTransaction, rechnungId: string) => {
     // Rechnung als bezahlt markieren
     await supabase
       .from('manuelle_rechnungen')
       .update({ bezahlt: true })
       .eq('id', rechnungId)
+
+    // Zuordnung in Zwischentabelle speichern
+    await supabase
+      .from('bank_transaction_rechnungen')
+      .insert({
+        bank_transaction_id: tx.id,
+        rechnung_id: rechnungId
+      })
 
     // Transaktion mit Rechnung verknüpfen
     await supabase
@@ -8654,6 +8658,52 @@ function BuchhaltungView({
       setBankTransactions(data)
     }
 
+    onUpdate() // Rechnungen neu laden
+  }
+
+  // Mehrere Rechnungen einer Transaktion zuordnen (für Sammelbuchungen)
+  const handleSetMultipleRechnungen = async (tx: BankTransaction, rechnungIds: string[]) => {
+    if (rechnungIds.length === 0) return
+
+    // 1. Alle ausgewählten Rechnungen als bezahlt markieren
+    for (const rechnungId of rechnungIds) {
+      await supabase
+        .from('manuelle_rechnungen')
+        .update({ bezahlt: true })
+        .eq('id', rechnungId)
+    }
+
+    // 2. Zuordnungen in Zwischentabelle speichern
+    const zuordnungen = rechnungIds.map(rechnungId => ({
+      bank_transaction_id: tx.id,
+      rechnung_id: rechnungId
+    }))
+
+    await supabase
+      .from('bank_transaction_rechnungen')
+      .insert(zuordnungen)
+
+    // 3. Transaktion als gematcht markieren (erste Rechnung auch in matched_rechnung_id für Abwärtskompatibilität)
+    await supabase
+      .from('bank_transactions')
+      .update({
+        matched_rechnung_id: rechnungIds[0],
+        match_status: 'manual_matched'
+      })
+      .eq('id', tx.id)
+
+    // 4. Transaktionen neu laden
+    const { data } = await supabase
+      .from('bank_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('booking_date', { ascending: false })
+
+    if (data) {
+      setBankTransactions(data)
+    }
+
+    setZuordnungModal(null)
     onUpdate() // Rechnungen neu laden
   }
 
@@ -9892,47 +9942,39 @@ function BuchhaltungView({
                         </td>
                         <td>
                           {tx.match_status === 'unmatched' ? (
-                            <select
-                              className="form-control"
-                              style={{ minWidth: 180, fontSize: 12, padding: '4px 8px' }}
-                              value=""
-                              onChange={e => {
-                                if (e.target.value) {
-                                  const [type, id] = e.target.value.split(':')
-                                  if (type === 'rechnung') {
-                                    handleSetRechnung(tx, id)
-                                  } else {
-                                    handleSetKonto(tx, id)
-                                  }
-                                }
-                              }}
-                            >
-                              <option value="">Zuordnen...</option>
-                              {/* Für Einnahmen: Offene Rechnungen anzeigen */}
-                              {tx.amount >= 0 && offenePosten.length > 0 && (
-                                <optgroup label="📄 Offene Rechnungen">
-                                  {offenePosten
-                                    .filter(p => p.typ === 'rechnung')
-                                    .map(p => (
-                                      <option key={`rechnung:${p.id}`} value={`rechnung:${p.id}`}>
-                                        {p.empfaenger_name} - {p.betrag.toFixed(2)} € ({p.rechnungsnummer || p.datum})
-                                      </option>
-                                    ))
-                                  }
-                                </optgroup>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              {/* Für Einnahmen: Button zum Rechnungen-Modal */}
+                              {tx.amount >= 0 && offenePosten.filter(p => p.typ === 'rechnung').length > 0 && (
+                                <button
+                                  className="btn btn-sm btn-secondary"
+                                  style={{ fontSize: 12, padding: '4px 8px' }}
+                                  onClick={() => setZuordnungModal(tx)}
+                                >
+                                  Rechnungen zuordnen
+                                </button>
                               )}
-                              {/* Passende Konten anzeigen */}
-                              <optgroup label="📊 Buchungskonten">
+                              {/* Buchungskonto-Dropdown */}
+                              <select
+                                className="form-control"
+                                style={{ minWidth: 140, fontSize: 12, padding: '4px 8px' }}
+                                value=""
+                                onChange={e => {
+                                  if (e.target.value) {
+                                    handleSetKonto(tx, e.target.value)
+                                  }
+                                }}
+                              >
+                                <option value="">Konto...</option>
                                 {buchungskonten
                                   .filter(k => tx.amount >= 0 ? k.typ === 'einnahme' : k.typ !== 'einnahme')
                                   .map(k => (
-                                    <option key={`konto:${k.id}`} value={`konto:${k.id}`}>
+                                    <option key={k.id} value={k.id}>
                                       {k.kontonummer} - {k.name}
                                     </option>
                                   ))
                                 }
-                              </optgroup>
-                            </select>
+                              </select>
+                            </div>
                           ) : zugeordnetesKonto ? (
                             <span style={{ fontSize: 12 }}>
                               📊 {zugeordnetesKonto.kontonummer} - {zugeordnetesKonto.name}
@@ -10001,6 +10043,227 @@ function BuchhaltungView({
           )}
         </div>
       )}
+
+      {/* Rechnungszuordnung Modal (Mehrfachauswahl für Sammelbuchungen) */}
+      {zuordnungModal && (() => {
+        const rechnungen = offenePosten.filter(p => p.typ === 'rechnung')
+
+        const summeAusgewaehlt = rechnungen
+          .filter(r => selectedRechnungIds.has(r.id))
+          .reduce((sum, r) => sum + r.betrag, 0)
+
+        const differenz = zuordnungModal.amount - summeAusgewaehlt
+
+        // "Passende auswählen" - Findet Kombination die genau passt
+        const findExactMatch = () => {
+          const rechnungenSortiert = [...rechnungen].sort((a, b) => b.betrag - a.betrag)
+          const targetAmount = zuordnungModal.amount
+
+          const findCombination = (
+            items: typeof rechnungen,
+            target: number,
+            current: string[],
+            index: number
+          ): string[] | null => {
+            if (Math.abs(target) < 0.01) return current
+            if (index >= items.length || target < 0) return null
+
+            const withItem = findCombination(
+              items,
+              target - items[index].betrag,
+              [...current, items[index].id],
+              index + 1
+            )
+            if (withItem) return withItem
+
+            return findCombination(items, target, current, index + 1)
+          }
+
+          const match = findCombination(rechnungenSortiert, targetAmount, [], 0)
+          if (match) {
+            setSelectedRechnungIds(new Set(match))
+          }
+        }
+
+        const toggleRechnung = (id: string) => {
+          setSelectedRechnungIds(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) {
+              next.delete(id)
+            } else {
+              next.add(id)
+            }
+            return next
+          })
+        }
+
+        const closeModal = () => {
+          setZuordnungModal(null)
+          setSelectedRechnungIds(new Set())
+        }
+
+        return (
+          <div className="modal-overlay" onClick={closeModal}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+              <div className="modal-header">
+                <h3>Rechnungen zuordnen</h3>
+                <button className="btn btn-ghost" onClick={closeModal}>✕</button>
+              </div>
+
+              <div className="modal-body">
+                {/* Transaktionsinfo */}
+                <div style={{
+                  background: 'var(--gray-100)',
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 16
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{zuordnungModal.booking_date}</span>
+                    <strong style={{
+                      color: zuordnungModal.amount >= 0 ? 'var(--success)' : 'var(--danger)'
+                    }}>
+                      {zuordnungModal.amount.toFixed(2)} €
+                    </strong>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--gray-500)', marginTop: 4 }}>
+                    {zuordnungModal.remittance_info || zuordnungModal.debtor_name || '-'}
+                  </div>
+                </div>
+
+                {/* Aktions-Buttons */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={findExactMatch}
+                    title="Sucht automatisch Rechnungen die genau den Betrag ergeben"
+                  >
+                    Passende auswählen
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setSelectedRechnungIds(new Set())}
+                  >
+                    Alle abwählen
+                  </button>
+                </div>
+
+                {/* Rechnungsliste */}
+                {rechnungen.length === 0 ? (
+                  <p style={{ color: 'var(--gray-500)', textAlign: 'center', padding: 20 }}>
+                    Keine offenen Rechnungen vorhanden
+                  </p>
+                ) : (
+                  <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8 }}>
+                    {rechnungen.map(rechnung => (
+                      <label
+                        key={rechnung.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '10px 12px',
+                          borderBottom: '1px solid var(--gray-200)',
+                          cursor: 'pointer',
+                          background: selectedRechnungIds.has(rechnung.id) ? 'var(--primary-light, #e3f2fd)' : 'transparent'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRechnungIds.has(rechnung.id)}
+                          onChange={() => toggleRechnung(rechnung.id)}
+                          style={{ marginRight: 12, width: 18, height: 18 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 500 }}>{rechnung.empfaenger_name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>
+                            {rechnung.rechnungsnummer || rechnung.datum}
+                          </div>
+                        </div>
+                        <div style={{
+                          fontWeight: 600,
+                          color: Math.abs(rechnung.betrag - zuordnungModal.amount) < 0.01 ? 'var(--success)' : 'inherit'
+                        }}>
+                          {rechnung.betrag.toFixed(2)} €
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {/* Summen-Vergleich */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 16,
+                  background: 'var(--gray-50)',
+                  borderRadius: 8,
+                  marginTop: 16
+                }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Bankumsatz</div>
+                    <div style={{ fontSize: 18, fontWeight: 600 }}>
+                      {zuordnungModal.amount.toFixed(2)} €
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Differenz</div>
+                    <div style={{
+                      fontSize: 18,
+                      fontWeight: 600,
+                      color: Math.abs(differenz) < 0.01 ? 'var(--success)' : 'var(--warning, #f59e0b)'
+                    }}>
+                      {differenz >= 0 ? '+' : ''}{differenz.toFixed(2)} €
+                      {Math.abs(differenz) < 0.01 && ' ✓'}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>Ausgewählt</div>
+                    <div style={{ fontSize: 18, fontWeight: 600 }}>
+                      {summeAusgewaehlt.toFixed(2)} €
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warnung bei Differenz */}
+                {Math.abs(differenz) >= 0.01 && selectedRechnungIds.size > 0 && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: '#FEF3C7',
+                    borderRadius: 8,
+                    border: '1px solid #F59E0B',
+                    fontSize: 13
+                  }}>
+                    <strong>Hinweis:</strong> Die Summe der ausgewählten Rechnungen
+                    entspricht nicht dem Bankumsatz.
+                    {differenz > 0 ? ` Überzahlung von ${differenz.toFixed(2)} €.` : ` Unterzahlung von ${Math.abs(differenz).toFixed(2)} €.`}
+                    {' '}Die Zuordnung ist dennoch möglich.
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={closeModal}>
+                  Abbrechen
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    handleSetMultipleRechnungen(zuordnungModal, Array.from(selectedRechnungIds))
+                    setSelectedRechnungIds(new Set())
+                  }}
+                  disabled={selectedRechnungIds.size === 0}
+                >
+                  {selectedRechnungIds.size} Rechnung{selectedRechnungIds.size !== 1 ? 'en' : ''} zuordnen
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* CSV Import Modal */}
       {showCsvImportModal && (

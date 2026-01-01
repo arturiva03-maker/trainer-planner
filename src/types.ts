@@ -421,6 +421,14 @@ export interface OffenerPosten {
   rechnungsnummer?: string
 }
 
+// Zwischentabelle für N:M Beziehung zwischen Bankumsätzen und Rechnungen (Sammelbuchungen)
+export interface BankTransactionRechnung {
+  id: string
+  bank_transaction_id: string
+  rechnung_id: string
+  created_at: string
+}
+
 // CSV-Import Format (häufige deutsche Banken)
 export interface CSVImportMapping {
   datum: string // Spaltenname für Datum
