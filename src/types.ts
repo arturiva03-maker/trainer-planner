@@ -185,59 +185,6 @@ export interface FormularAnmeldung {
   created_at: string
 }
 
-export interface Ausgabe {
-  id: string
-  user_id: string
-  datum: string
-  betrag: number
-  kategorie: 'platzmiete' | 'fahrtkosten' | 'fortbildung' | 'buero' | 'werbung' | 'anschaffungen' | 'sonstiges' | 'material' | 'tennistraining' | 'kfz' | 'reisekosten' | 'telefon' | 'versicherung' | 'beitraege' | 'beratung' | 'reparatur' | 'porto' | 'bank' | 'abschreibung'
-  beschreibung?: string
-  hat_vorsteuer: boolean
-  vorsteuer_satz: number
-  beleg_path?: string
-  beleg_name?: string
-  rechnungsnummer?: string
-  rechnungsdatum?: string
-  bezahlt: boolean
-  buchungskonto_id?: string // Zuordnung zu Buchungskonto
-  created_at: string
-}
-
-// SKR03-konforme Ausgabe-Kategorien
-export const AUSGABE_KATEGORIEN: { value: Ausgabe['kategorie']; label: string; skr03: string }[] = [
-  // Raumkosten
-  { value: 'platzmiete', label: '4210 Miete/Raumkosten', skr03: '4210' },
-  // Kfz
-  { value: 'kfz', label: '4500 Kfz-Kosten', skr03: '4500' },
-  { value: 'fahrtkosten', label: '4673 Fahrtkosten/Km-Geld', skr03: '4673' },
-  // Reise
-  { value: 'reisekosten', label: '4653 Reisekosten', skr03: '4653' },
-  // Werbung
-  { value: 'werbung', label: '4600 Werbekosten', skr03: '4600' },
-  // Fremdleistungen
-  { value: 'anschaffungen', label: '4780 Fremdleistungen', skr03: '4780' },
-  // Kommunikation
-  { value: 'telefon', label: '4920 Telefon/Internet', skr03: '4920' },
-  { value: 'porto', label: '4830 Porto/Versand', skr03: '4830' },
-  // Büro
-  { value: 'buero', label: '4930 Bürobedarf', skr03: '4930' },
-  { value: 'fortbildung', label: '4946 Fortbildung', skr03: '4946' },
-  { value: 'beratung', label: '4950 Beratung/Steuerberater', skr03: '4950' },
-  // Versicherung/Beiträge
-  { value: 'versicherung', label: '4360 Versicherungen', skr03: '4360' },
-  { value: 'beitraege', label: '4380 Beiträge/Gebühren', skr03: '4380' },
-  // Wartung
-  { value: 'reparatur', label: '4805 Reparatur/Instandhaltung', skr03: '4805' },
-  // Bank
-  { value: 'bank', label: '4855 Bankgebühren', skr03: '4855' },
-  // Abschreibung
-  { value: 'abschreibung', label: '4822 Abschreibungen', skr03: '4822' },
-  // Material
-  { value: 'material', label: '4560 Betriebsbedarf/Material', skr03: '4560' },
-  // Sonstiges
-  { value: 'sonstiges', label: '4900 Sonstige Aufwendungen', skr03: '4900' },
-]
-
 export interface ManuelleRechnung {
   id: string
   user_id: string
