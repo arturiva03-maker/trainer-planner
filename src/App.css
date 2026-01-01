@@ -1437,12 +1437,12 @@ tbody tr:last-child td {
 }
 
 .training-block.status-geplant {
-  background: linear-gradient(135deg, #64748B 0%, #475569 100%);
-  box-shadow: 0 2px 8px rgba(100, 116, 139, 0.3);
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
 }
 
 .training-block.status-geplant:hover {
-  box-shadow: 0 4px 16px rgba(100, 116, 139, 0.4);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
 }
 
 .training-block.status-durchgefuehrt {
