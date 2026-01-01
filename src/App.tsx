@@ -3615,21 +3615,21 @@ function AbrechnungView({
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Gesamtumsatz</div>
-          <div className="stat-value">{stats.total.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: '#3B82F6' }}>{stats.total.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Bar bezahlt</div>
-          <div className="stat-value">{stats.bar.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: '#10B981' }}>{stats.bar.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Bezahlt</div>
-          <div className="stat-value" style={{ color: 'var(--success)' }}>
+          <div className="stat-value" style={{ color: '#22C55E' }}>
             {stats.bezahlt.toFixed(2)} €
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Offen</div>
-          <div className="stat-value" style={{ color: 'var(--danger)' }}>
+          <div className="stat-value" style={{ color: '#6B7280' }}>
             {stats.offen.toFixed(2)} €
           </div>
         </div>
