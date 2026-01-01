@@ -3839,7 +3839,7 @@ function AbrechnungView({
                               e.stopPropagation()
                               toggleAlleBarBezahlt(item.spieler.id)
                             }}
-                            style={{ background: 'var(--warning)', color: '#1E40AF', borderColor: 'var(--warning)' }}
+                            style={{ background: '#10B981', color: 'white', borderColor: '#10B981' }}
                             title="Alle Trainings als bar bezahlt markieren"
                           >
                             Bar
@@ -3923,7 +3923,7 @@ function AbrechnungView({
                         e.stopPropagation()
                         toggleAlleBarBezahlt(item.spieler.id)
                       }}
-                      style={{ background: 'var(--warning)', color: '#1E40AF', borderColor: 'var(--warning)' }}
+                      style={{ background: '#10B981', color: 'white', borderColor: '#10B981' }}
                     >
                       Bar
                     </button>
