@@ -1229,9 +1229,9 @@ tbody tr:last-child td {
 }
 
 .view-toggle .btn {
-  background: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  color: #64748B;
+  background: white;
+  border: 2px solid #3B82F6;
+  color: #3B82F6;
   padding: 10px 16px;
   border-radius: 10px;
   font-weight: 500;
@@ -1239,8 +1239,8 @@ tbody tr:last-child td {
 }
 
 .view-toggle .btn:hover {
-  background: #E2E8F0;
-  color: #334155;
+  background: #EFF6FF;
+  color: #2563EB;
 }
 
 .view-toggle .btn.btn-primary {
@@ -2328,9 +2328,9 @@ tbody tr:last-child td {
     flex: 1;
     padding: 12px 12px;
     border-radius: 10px;
-    border: 1px solid #E2E8F0;
-    background: #F1F5F9;
-    color: #64748B;
+    border: 2px solid #3B82F6;
+    background: white;
+    color: #3B82F6;
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
