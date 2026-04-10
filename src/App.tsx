@@ -5842,6 +5842,38 @@ function FormulareView({
   const [editingFormular, setEditingFormular] = useState<Formular | null>(null)
   const [selectedFormular, setSelectedFormular] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [creatingKennlern, setCreatingKennlern] = useState(false)
+
+  const createKennlerntennisFormular = async () => {
+    setCreatingKennlern(true)
+    try {
+      const felder: FormularFeld[] = [
+        { id: crypto.randomUUID(), typ: 'text', label: 'Vorname', pflichtfeld: true },
+        { id: crypto.randomUUID(), typ: 'text', label: 'Nachname', pflichtfeld: true },
+        { id: crypto.randomUUID(), typ: 'email', label: 'E-Mail', pflichtfeld: true },
+        { id: crypto.randomUUID(), typ: 'telefon', label: 'Telefonnummer', pflichtfeld: true },
+        { id: crypto.randomUUID(), typ: 'dropdown', label: 'Mitglied im Verein', pflichtfeld: true, optionen: ['Ja', 'Nein'] },
+        { id: crypto.randomUUID(), typ: 'dropdown', label: 'Spielstärke', pflichtfeld: true, optionen: ['Anfänger', 'Fortgeschritten', 'Turnierspieler'] },
+        { id: crypto.randomUUID(), typ: 'textarea', label: 'Beschreibung der Spielstärke', pflichtfeld: false, placeholder: 'z.B. seit einem Jahr Tennistraining oder im Urlaub ein paar Stunden genommen' },
+        { id: crypto.randomUUID(), typ: 'textarea', label: 'Bemerkungen', pflichtfeld: false, placeholder: 'Sonstige Hinweise, Wünsche oder Fragen...' },
+      ]
+      const { error } = await supabase.from('formulare').insert({
+        user_id: userId,
+        titel: 'Kennlerntennis',
+        beschreibung: 'Melde dich für eine unverbindliche Kennlernstunde an. Wir freuen uns auf dich!',
+        felder,
+        ist_aktiv: true
+      })
+      if (error) {
+        console.error('Error creating Kennlerntennis formular:', error)
+        alert('Fehler beim Erstellen des Kennlerntennis-Formulars')
+      } else {
+        onUpdate()
+      }
+    } finally {
+      setCreatingKennlern(false)
+    }
+  }
 
   // Anmeldungen pro Formular zählen
   const getAnmeldungenCount = (formularId: string) => {
@@ -5915,15 +5947,25 @@ function FormulareView({
     <div className="formulare-view">
       <div className="view-header">
         <h2>📝 Anmeldeformulare</h2>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setEditingFormular(null)
-            setShowFormularModal(true)
-          }}
-        >
-          + Neues Formular
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={createKennlerntennisFormular}
+            disabled={creatingKennlern}
+            title="Vorlage für Kennlerntennis-Anfrage anlegen"
+          >
+            {creatingKennlern ? 'Wird erstellt...' : '🎾 Kennlerntennis-Vorlage'}
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setEditingFormular(null)
+              setShowFormularModal(true)
+            }}
+          >
+            + Neues Formular
+          </button>
+        </div>
       </div>
 
       <div className="sub-tabs">
