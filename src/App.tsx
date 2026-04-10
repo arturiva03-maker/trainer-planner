@@ -5566,7 +5566,7 @@ function PublicFormularView({ formularId }: { formularId: string }) {
 
     setSubmitting(true)
     try {
-      const { data: inserted, error } = await supabase
+      const { error } = await supabase
         .from('formular_anmeldungen')
         .insert({
           formular_id: formularId,
@@ -5574,22 +5574,8 @@ function PublicFormularView({ formularId }: { formularId: string }) {
           gelesen: false,
           email_versendet: false
         })
-        .select()
-        .single()
 
       if (error) throw error
-
-      // E-Mail-Benachrichtigung auslösen (Trainer + Bestätigung an Anmelder).
-      // Fehler hier dürfen die Anmeldung nicht abbrechen.
-      if (inserted?.id) {
-        try {
-          await supabase.functions.invoke('send-anmeldung-email', {
-            body: { anmeldungId: inserted.id }
-          })
-        } catch (mailErr) {
-          console.error('send-anmeldung-email failed:', mailErr)
-        }
-      }
 
       setSubmitted(true)
     } catch (err) {
