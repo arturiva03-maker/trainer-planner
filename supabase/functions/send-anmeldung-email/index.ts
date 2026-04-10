@@ -50,7 +50,7 @@ serve(async (req) => {
     // 3. Trainer-Profil und Email laden
     const { data: trainer } = await supabaseAdmin
       .from('trainer_profiles')
-      .select('name')
+      .select('name, nachname')
       .eq('user_id', formular.user_id)
       .single()
 
@@ -58,19 +58,58 @@ serve(async (req) => {
       .auth.admin.getUserById(formular.user_id)
 
     const trainerEmail = userData.user?.email
-    const trainerName = trainer?.name || 'Trainer'
+    const trainerName = [trainer?.name, trainer?.nachname].filter(Boolean).join(' ') || 'Trainer'
 
     if (!trainerEmail) {
       throw new Error('Trainer-Email nicht gefunden')
     }
 
-    // 4. Email-Inhalt formatieren
-    const emailBody = formatAnmeldungEmail(anmeldung, formular, trainerName)
+    // 3b. Submitter-Email und -Name aus den Anmelde-Daten extrahieren
+    const emailFeld = (formular.felder as FormularFeld[]).find((f) => f.typ === 'email')
+    const submitterEmail = emailFeld
+      ? String(anmeldung.daten[emailFeld.id] || '').trim()
+      : ''
 
-    // 5. Email via Resend senden (falls konfiguriert)
+    const vornameFeld = (formular.felder as FormularFeld[]).find(
+      (f) => f.typ === 'text' && /vorname/i.test(f.label)
+    )
+    const nachnameFeld = (formular.felder as FormularFeld[]).find(
+      (f) => f.typ === 'text' && /nachname/i.test(f.label)
+    )
+    const nameFeld = (formular.felder as FormularFeld[]).find(
+      (f) => f.typ === 'text' && /name/i.test(f.label)
+    )
+    const submitterName =
+      [
+        vornameFeld ? String(anmeldung.daten[vornameFeld.id] || '') : '',
+        nachnameFeld ? String(anmeldung.daten[nachnameFeld.id] || '') : ''
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim() ||
+      (nameFeld ? String(anmeldung.daten[nameFeld.id] || '').trim() : '') ||
+      ''
+
+    // 4. Email-Inhalte formatieren
+    const trainerEmailBody = formatAnmeldungEmail(anmeldung, formular, trainerName)
+    const submitterEmailBody = formatBestaetigungEmail(
+      anmeldung,
+      formular,
+      trainerName,
+      submitterName
+    )
+
+    // 5. Emails via Resend senden (falls konfiguriert)
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    const FROM_ADDRESS =
+      Deno.env.get('RESEND_FROM') || 'Tennis Trainer Planner <noreply@tennistrainer-app.de>'
 
-    if (RESEND_API_KEY) {
+    const sendMail = async (to: string, subject: string, html: string) => {
+      if (!RESEND_API_KEY) {
+        console.log('RESEND_API_KEY nicht konfiguriert - Email wird nicht gesendet')
+        console.log('Email wäre an:', to, 'Betreff:', subject)
+        return
+      }
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -78,22 +117,32 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'Tennis Trainer Planner <noreply@tennistrainer-app.de>',
-          to: trainerEmail,
-          subject: `Neue Anmeldung: ${formular.titel}`,
-          html: emailBody
+          from: FROM_ADDRESS,
+          to,
+          subject,
+          html
         })
       })
-
       if (!response.ok) {
         const errorText = await response.text()
         console.error('Resend API Error:', errorText)
-        // Nicht abbrechen - Anmeldung trotzdem als verarbeitet markieren
       }
-    } else {
-      console.log('RESEND_API_KEY nicht konfiguriert - Email wird nicht gesendet')
-      console.log('Email wäre an:', trainerEmail)
-      console.log('Betreff:', `Neue Anmeldung: ${formular.titel}`)
+    }
+
+    // Email an Trainer (Besitzer des Formulars)
+    await sendMail(
+      trainerEmail,
+      `Neue Anmeldung: ${formular.titel}`,
+      trainerEmailBody
+    )
+
+    // Bestätigungs-Email an Anmelder (falls Email vorhanden)
+    if (submitterEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submitterEmail)) {
+      await sendMail(
+        submitterEmail,
+        `Bestätigung deiner Anmeldung: ${formular.titel}`,
+        submitterEmailBody
+      )
     }
 
     // 6. email_versendet Flag setzen
@@ -199,6 +248,112 @@ function formatAnmeldungEmail(
         <div style="background: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">
             Tennis Trainer Planner
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+function formatBestaetigungEmail(
+  anmeldung: { daten: Record<string, any>; created_at: string },
+  formular: {
+    titel: string
+    felder: FormularFeld[]
+    beschreibung?: string
+    event_datum?: string
+    event_uhrzeit_von?: string
+    event_uhrzeit_bis?: string
+    event_ort?: string
+    preis?: string
+    absagefrist?: string
+  },
+  trainerName: string,
+  submitterName: string
+): string {
+  let fieldsHtml = ''
+
+  formular.felder.forEach((feld) => {
+    const value = anmeldung.daten[feld.id]
+    if (value !== undefined && value !== '' && value !== false) {
+      const displayValue = feld.typ === 'checkbox' ? (value ? 'Ja' : 'Nein') : String(value)
+      fieldsHtml += `
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-weight: 500;">${feld.label}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${displayValue}</td>
+        </tr>
+      `
+    }
+  })
+
+  const eventInfo: string[] = []
+  if (formular.event_datum) {
+    eventInfo.push(`📅 ${new Date(formular.event_datum).toLocaleDateString('de-DE')}${
+      formular.event_uhrzeit_von
+        ? ` ${formular.event_uhrzeit_von}${formular.event_uhrzeit_bis ? ` - ${formular.event_uhrzeit_bis}` : ''} Uhr`
+        : ''
+    }`)
+  }
+  if (formular.event_ort) eventInfo.push(`📍 ${formular.event_ort}`)
+  if (formular.preis) eventInfo.push(`💰 ${formular.preis}`)
+  if (formular.absagefrist) eventInfo.push(`⏰ Absage: ${formular.absagefrist}`)
+
+  const greeting = submitterName ? `Hallo ${submitterName},` : 'Hallo,'
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+      <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 24px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 20px;">Anmeldung bestätigt ✓</h1>
+        </div>
+
+        <div style="padding: 24px;">
+          <p style="color: #374151; margin-bottom: 16px;">${greeting}</p>
+
+          <p style="color: #374151; margin-bottom: 20px;">
+            vielen Dank für deine Anmeldung zu <strong>"${formular.titel}"</strong>.
+            Wir haben deine Daten erhalten und melden uns in Kürze bei dir.
+          </p>
+
+          ${formular.beschreibung ? `
+            <p style="color: #4b5563; margin-bottom: 20px;">${formular.beschreibung}</p>
+          ` : ''}
+
+          ${eventInfo.length > 0 ? `
+            <div style="background: #ecfdf5; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+              <p style="margin: 0; color: #065f46; font-size: 14px; line-height: 1.6;">${eventInfo.join('<br>')}</p>
+            </div>
+          ` : ''}
+
+          <h3 style="color: #1f2937; font-size: 16px; margin-bottom: 12px;">Deine Angaben:</h3>
+
+          <table style="width: 100%; border-collapse: collapse; background: #f9fafb; border-radius: 8px; overflow: hidden;">
+            ${fieldsHtml}
+          </table>
+
+          <p style="color: #6b7280; font-size: 13px; margin-top: 20px;">
+            Eingereicht am: ${new Date(anmeldung.created_at).toLocaleString('de-DE')}
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+
+          <p style="color: #374151; margin: 0;">
+            Viele Grüße<br>
+            <strong>${trainerName}</strong>
+          </p>
+        </div>
+
+        <div style="background: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            Diese Bestätigung wurde automatisch erstellt. Bei Fragen antworte einfach auf diese E-Mail.
           </p>
         </div>
       </div>
