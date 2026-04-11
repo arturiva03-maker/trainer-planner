@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_btr_rechnung ON bank_transaction_rechnungen(rechn
 -- 3. RLS Policies (basierend auf bank_transactions.user_id)
 ALTER TABLE bank_transaction_rechnungen ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own transaction_rechnungen" ON bank_transaction_rechnungen;
 CREATE POLICY "Users can view own transaction_rechnungen" ON bank_transaction_rechnungen
   FOR SELECT USING (
     EXISTS (
@@ -27,6 +28,7 @@ CREATE POLICY "Users can view own transaction_rechnungen" ON bank_transaction_re
     )
   );
 
+DROP POLICY IF EXISTS "Users can insert own transaction_rechnungen" ON bank_transaction_rechnungen;
 CREATE POLICY "Users can insert own transaction_rechnungen" ON bank_transaction_rechnungen
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -36,6 +38,7 @@ CREATE POLICY "Users can insert own transaction_rechnungen" ON bank_transaction_
     )
   );
 
+DROP POLICY IF EXISTS "Users can delete own transaction_rechnungen" ON bank_transaction_rechnungen;
 CREATE POLICY "Users can delete own transaction_rechnungen" ON bank_transaction_rechnungen
   FOR DELETE USING (
     EXISTS (

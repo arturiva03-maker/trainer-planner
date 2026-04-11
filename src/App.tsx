@@ -1392,7 +1392,7 @@ function TrainingModal({
 
     setSaving(true)
     try {
-      const trainingData = {
+      const trainingData: Record<string, unknown> = {
         user_id: userId,
         datum,
         uhrzeit_von: uhrzeitVon,
@@ -1404,8 +1404,15 @@ function TrainingModal({
         notiz: notiz || null,
         name: trainingName || null,
         bar_bezahlt: barBezahlt,
-        custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : null,
-        spieler_tarife: spielerTarifeJson
+        custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : null
+      }
+      // spieler_tarife nur senden wenn wirklich gesetzt (Spalte muss in DB existieren,
+      // sonst schlaegt das Speichern fehl. Migration 20260411_spieler_tarife.sql).
+      if (spielerTarifeJson) {
+        trainingData.spieler_tarife = spielerTarifeJson
+      } else if (training?.spieler_tarife) {
+        // Wenn Training bereits individuelle Tarife hatte und jetzt deaktiviert wird: auf null setzen
+        trainingData.spieler_tarife = null
       }
 
       if (training) {
