@@ -1001,6 +1001,17 @@ function KalenderView({
   const isDayView = viewMode === 'day'
   const cellHeight = isDayView ? 50 : 60
   const [showAddTraining, setShowAddTraining] = useState(false)
+  const [addTrainingPreset, setAddTrainingPreset] = useState<{ date: string, von: string, bis: string } | null>(null)
+
+  const handleCellClick = (e: React.MouseEvent<HTMLDivElement>, date: Date, time: string) => {
+    // Nur bei Klick auf leere Zelle (nicht auf Training-Block)
+    if (e.target !== e.currentTarget) return
+    const [h] = time.split(':').map(Number)
+    const von = `${String(h).padStart(2, '0')}:00`
+    const bis = `${String(h + 1).padStart(2, '0')}:00`
+    setAddTrainingPreset({ date: formatDate(date), von, bis })
+    setShowAddTraining(true)
+  }
 
   // Swipe-Handling für Mobile
   const [touchStart, setTouchStart] = useState<number | null>(null)
@@ -1129,7 +1140,11 @@ function KalenderView({
                   })
 
                   return (
-                    <div key={`cell-${dayIndex}-${time}`} className="calendar-day-cell">
+                    <div
+                      key={`cell-${dayIndex}-${time}`}
+                      className="calendar-day-cell"
+                      onClick={(e) => handleCellClick(e, date, time)}
+                    >
                       {slotTrainings.map((training) => {
                         const pos = getTrainingPosition(training, isDayView)
                         const tarifName = getTarifName(training.tarif_id)
@@ -1190,10 +1205,16 @@ function KalenderView({
           spieler={spieler}
           tarife={tarife}
           userId={userId}
-          initialDate={formatDate(currentDate)}
-          onClose={() => setShowAddTraining(false)}
+          initialDate={addTrainingPreset?.date || formatDate(currentDate)}
+          initialUhrzeitVon={addTrainingPreset?.von}
+          initialUhrzeitBis={addTrainingPreset?.bis}
+          onClose={() => {
+            setShowAddTraining(false)
+            setAddTrainingPreset(null)
+          }}
           onSave={() => {
             setShowAddTraining(false)
+            setAddTrainingPreset(null)
             onUpdate()
           }}
         />
@@ -1209,6 +1230,8 @@ function TrainingModal({
   tarife,
   userId,
   initialDate,
+  initialUhrzeitVon,
+  initialUhrzeitBis,
   onClose,
   onSave
 }: {
@@ -1217,12 +1240,14 @@ function TrainingModal({
   tarife: Tarif[]
   userId: string
   initialDate?: string
+  initialUhrzeitVon?: string
+  initialUhrzeitBis?: string
   onClose: () => void
   onSave: () => void
 }) {
   const [datum, setDatum] = useState(training?.datum || initialDate || formatDate(new Date()))
-  const [uhrzeitVon, setUhrzeitVon] = useState(training?.uhrzeit_von || '09:00')
-  const [uhrzeitBis, setUhrzeitBis] = useState(training?.uhrzeit_bis || '10:00')
+  const [uhrzeitVon, setUhrzeitVon] = useState(training?.uhrzeit_von || initialUhrzeitVon || '09:00')
+  const [uhrzeitBis, setUhrzeitBis] = useState(training?.uhrzeit_bis || initialUhrzeitBis || '10:00')
   const [selectedSpieler, setSelectedSpieler] = useState<string[]>(training?.spieler_ids || [])
   const [entfernteSpieler, setEntfernteSpieler] = useState<{spieler_id: string, muss_bezahlen: boolean, entfernt_am: string}[]>(training?.entfernte_spieler || [])
   const [tarifId, setTarifId] = useState(training?.tarif_id || '')
