@@ -61,6 +61,12 @@ export interface EntfernterSpieler {
   entfernt_am: string
 }
 
+// Individueller Tarif fuer einen Spieler in einem Gruppentraining
+export interface SpielerTarifOverride {
+  tarif_id?: string | null
+  custom_preis?: number | null
+}
+
 export interface Training {
   id: string
   user_id: string
@@ -77,6 +83,7 @@ export interface Training {
   serie_id?: string
   custom_preis_pro_stunde?: number
   custom_abrechnung?: 'proTraining' | 'proSpieler'
+  spieler_tarife?: Record<string, SpielerTarifOverride> | null
   bar_bezahlt: boolean
   bezahlt: boolean
   korrektur_betrag?: number

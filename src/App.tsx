@@ -24,6 +24,7 @@ import {
   getWeekDates,
   getMonthString,
   calculateDuration,
+  calculateSpielerPreisForTraining,
   WOCHENTAGE
 } from './utils'
 
@@ -1256,11 +1257,44 @@ function TrainingModal({
   const [trainingName, setTrainingName] = useState(training?.name || '')
   const [barBezahlt, setBarBezahlt] = useState(training?.bar_bezahlt || false)
   const [customPreis, setCustomPreis] = useState(training?.custom_preis_pro_stunde?.toString() || '')
+  // Individuelle Tarife pro Spieler (Gruppentraining)
+  const [individuelleTarife, setIndividuelleTarife] = useState<boolean>(
+    !!training?.spieler_tarife && Object.keys(training.spieler_tarife).length > 0
+  )
+  const [spielerTarifeMap, setSpielerTarifeMap] = useState<Record<string, { tarif_id: string, custom_preis: string }>>(() => {
+    const initial: Record<string, { tarif_id: string, custom_preis: string }> = {}
+    if (training?.spieler_tarife) {
+      Object.entries(training.spieler_tarife).forEach(([sid, ov]) => {
+        initial[sid] = {
+          tarif_id: ov.tarif_id || '',
+          custom_preis: ov.custom_preis != null ? String(ov.custom_preis) : ''
+        }
+      })
+    }
+    return initial
+  })
   const [wiederholen, setWiederholen] = useState(false)
   const [wiederholenBis, setWiederholenBis] = useState('2026-03-29')
   const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
   const [spielerSuche, setSpielerSuche] = useState('')
+
+  // Sicherstellen, dass jeder ausgewaehlte Spieler einen Eintrag in der Map hat,
+  // sobald der Modus "individuelle Tarife" aktiv ist.
+  useEffect(() => {
+    if (!individuelleTarife) return
+    setSpielerTarifeMap(prev => {
+      const next = { ...prev }
+      let changed = false
+      selectedSpieler.forEach(sid => {
+        if (!next[sid]) {
+          next[sid] = { tarif_id: tarifId || '', custom_preis: '' }
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [individuelleTarife, selectedSpieler, tarifId])
 
   // State für Bezahl-Abfrage bei Spieler-Entfernung
   const [removeDialog, setRemoveDialog] = useState<{spielerId: string, spielerName: string} | null>(null)
@@ -1325,9 +1359,35 @@ function TrainingModal({
       return
     }
 
-    if (!tarifId && !customPreis) {
+    if (!individuelleTarife && !tarifId && !customPreis) {
       alert('Bitte einen Tarif auswählen oder einen individuellen Preis eingeben')
       return
+    }
+
+    // Bei individuellen Tarifen: pro Spieler muss mind. Tarif oder Preis gesetzt sein
+    if (individuelleTarife) {
+      for (const sid of selectedSpieler) {
+        const entry = spielerTarifeMap[sid]
+        if (!entry || (!entry.tarif_id && !entry.custom_preis)) {
+          const sp = spieler.find(s => s.id === sid)
+          alert(`Bitte Tarif oder individuellen Preis fuer ${sp?.name || 'Spieler'} angeben`)
+          return
+        }
+      }
+    }
+
+    // spieler_tarife JSON fuer DB aufbauen
+    let spielerTarifeJson: Record<string, { tarif_id: string | null, custom_preis: number | null }> | null = null
+    if (individuelleTarife && selectedSpieler.length > 0) {
+      spielerTarifeJson = {}
+      selectedSpieler.forEach(sid => {
+        const entry = spielerTarifeMap[sid]
+        if (!entry) return
+        spielerTarifeJson![sid] = {
+          tarif_id: entry.tarif_id || null,
+          custom_preis: entry.custom_preis ? parseFloat(entry.custom_preis) : null
+        }
+      })
     }
 
     setSaving(true)
@@ -1344,7 +1404,8 @@ function TrainingModal({
         notiz: notiz || null,
         name: trainingName || null,
         bar_bezahlt: barBezahlt,
-        custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : null
+        custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : null,
+        spieler_tarife: spielerTarifeJson
       }
 
       if (training) {
@@ -1411,17 +1472,18 @@ function TrainingModal({
       // Automatische Guthaben-Verrechnung bei Status-Wechsel auf "durchgefuehrt"
       const statusWurdeAufDurchgefuehrtGeaendert = status === 'durchgefuehrt' && (!training || training.status !== 'durchgefuehrt')
       if (statusWurdeAufDurchgefuehrtGeaendert && selectedSpieler.length > 0) {
-        const tarif = tarife.find(ta => ta.id === tarifId)
-        const preis = customPreis ? parseFloat(customPreis) : (tarif?.preis_pro_stunde || 0)
-        const duration = calculateDuration(uhrzeitVon, uhrzeitBis)
-        const abrechnungsart = tarif?.abrechnung || 'proTraining'
-
-        // Berechne Betrag pro Spieler
-        let betragProSpieler = preis * duration
-        if (abrechnungsart === 'proSpieler') {
-          const entfernteMitBezahlung = entfernteSpieler.filter(es => es.muss_bezahlen)
-          betragProSpieler = betragProSpieler / (selectedSpieler.length + entfernteMitBezahlung.length)
-        }
+        // Pseudo-Training fuer Preisberechnung (spiegelt trainingData)
+        const pseudoTraining = {
+          ...(training || {} as Training),
+          datum,
+          uhrzeit_von: uhrzeitVon,
+          uhrzeit_bis: uhrzeitBis,
+          spieler_ids: selectedSpieler,
+          entfernte_spieler: entfernteSpieler,
+          tarif_id: tarifId || undefined,
+          custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : undefined,
+          spieler_tarife: spielerTarifeJson || undefined
+        } as Training
 
         // Training-ID ermitteln (bei neuem Training aus DB laden)
         let trainingId = training?.id
@@ -1441,6 +1503,10 @@ function TrainingModal({
 
         // Für jeden Spieler prüfen ob Guthaben vorhanden
         for (const spielerId of selectedSpieler) {
+          // Individueller Betrag pro Spieler
+          const calc = calculateSpielerPreisForTraining(pseudoTraining, spielerId, tarife)
+          const betragProSpieler = calc.spielerPreis
+
           const { data: guthaben } = await supabase
             .from('guthaben')
             .select('*')
@@ -1727,7 +1793,7 @@ function TrainingModal({
             </div>
           </div>
 
-          {!tarifId && (
+          {!tarifId && !individuelleTarife && (
             <div className="form-group">
               <label>Individueller Preis pro Stunde (€)</label>
               <input
@@ -1737,6 +1803,83 @@ function TrainingModal({
                 onChange={(e) => setCustomPreis(e.target.value)}
                 placeholder="z.B. 45"
               />
+            </div>
+          )}
+
+          {/* Option: unterschiedliche Tarife pro Spieler */}
+          {selectedSpieler.length >= 2 && (
+            <div className="form-group">
+              <label className="checkbox-group">
+                <input
+                  type="checkbox"
+                  checked={individuelleTarife}
+                  onChange={(e) => setIndividuelleTarife(e.target.checked)}
+                />
+                Unterschiedliche Tarife pro Spieler
+              </label>
+            </div>
+          )}
+
+          {individuelleTarife && selectedSpieler.length > 0 && (
+            <div className="form-group">
+              <label>Tarife pro Spieler</label>
+              <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block', marginBottom: 8 }}>
+                Jeder Spieler zahlt seinen eigenen Betrag (nicht geteilt).
+              </small>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {selectedSpieler.map(sid => {
+                  const sp = spieler.find(s => s.id === sid)
+                  const entry = spielerTarifeMap[sid] || { tarif_id: '', custom_preis: '' }
+                  return (
+                    <div
+                      key={sid}
+                      style={{
+                        padding: 10,
+                        background: 'var(--gray-50)',
+                        borderRadius: 'var(--radius)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6
+                      }}
+                    >
+                      <div style={{ fontWeight: 500 }}>{sp?.name || 'Spieler'}</div>
+                      <select
+                        className="form-control"
+                        value={entry.tarif_id}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setSpielerTarifeMap(prev => ({
+                            ...prev,
+                            [sid]: { ...entry, tarif_id: v, custom_preis: v ? '' : entry.custom_preis }
+                          }))
+                        }}
+                      >
+                        <option value="">-- Individuell --</option>
+                        {tarife.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({t.preis_pro_stunde} €/h)
+                          </option>
+                        ))}
+                      </select>
+                      {!entry.tarif_id && (
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={entry.custom_preis}
+                          placeholder="Individueller Preis pro Stunde (€)"
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setSpielerTarifeMap(prev => ({
+                              ...prev,
+                              [sid]: { ...entry, custom_preis: v }
+                            }))
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
@@ -2899,14 +3042,11 @@ function AbrechnungView({
     } = {}
 
     monthTrainings.forEach((t) => {
-      const tarif = tarife.find((ta) => ta.id === t.tarif_id)
-      const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-      const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-      const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
       // Bei proSpieler: Anzahl zahlungspflichtiger Spieler = aktive + entfernte mit muss_bezahlen
       const entfernteMitBezahlung = (t.entfernte_spieler || []).filter(es => es.muss_bezahlen)
-      const zahlendeSpielerAnzahl = t.spieler_ids.length + entfernteMitBezahlung.length
+      // Abrechnungsart des Trainings (nur fuer Fallback bei entfernten Spielern)
+      const tarif = tarife.find((ta) => ta.id === t.tarif_id)
+      const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
 
       t.spieler_ids.forEach((spielerId) => {
         if (!summary[spielerId]) {
@@ -2929,27 +3069,19 @@ function AbrechnungView({
 
         summary[spielerId].trainings.push(t)
 
-        // Berechne den Preis basierend auf Abrechnungsart
+        // Preis mit Helper berechnen (beruecksichtigt individuelle Tarife pro Spieler)
+        const calc = calculateSpielerPreisForTraining(t, spielerId, tarife)
         let spielerPreis = 0
 
-        if (abrechnungsart === 'monatlich') {
+        if (calc.abrechnungsart === 'monatlich') {
           // Monatlicher Tarif: nur einmal pro Tarif pro Spieler pro Monat berechnen
-          // Verwende Tarif-ID als Key, damit alle Trainings mit gleichem monatlichen Tarif nur einmal gezählt werden
-          const monatlichKey = t.tarif_id || t.id
+          const monatlichKey = calc.tarifId || t.id
           if (!summary[spielerId].monatlicheSerien.has(monatlichKey)) {
             summary[spielerId].monatlicheSerien.add(monatlichKey)
-            // Bei monatlich ist der Preis der Monatsbetrag (nicht pro Stunde)
-            spielerPreis = preis
+            spielerPreis = calc.spielerPreis
           }
-          // Sonst: spielerPreis bleibt 0, da Tarif bereits berechnet
         } else {
-          // Pro Training oder Pro Spieler
-          const totalPreis = preis * duration
-          spielerPreis = totalPreis
-          if (abrechnungsart === 'proSpieler') {
-            // Teile durch Gesamtzahl zahlungspflichtiger Spieler (inkl. entfernte mit Bezahlpflicht)
-            spielerPreis = spielerPreis / zahlendeSpielerAnzahl
-          }
+          spielerPreis = calc.spielerPreis
         }
 
         // Training-Korrektur anwenden (z.B. Kartenlesergebühren)
@@ -3001,12 +3133,9 @@ function AbrechnungView({
             summary[spielerId].trainings.push(t)
           }
 
-          // Berechne den Preis
-          const totalPreis = preis * duration
-          let spielerPreis = totalPreis
-          if (abrechnungsart === 'proSpieler') {
-            spielerPreis = spielerPreis / zahlendeSpielerAnzahl
-          }
+          // Preis mit Helper berechnen (beruecksichtigt individuelle Tarife)
+          const calcEntfernt = calculateSpielerPreisForTraining(t, spielerId, tarife)
+          const spielerPreis = calcEntfernt.spielerPreis
 
           summary[spielerId].summe += spielerPreis
 
@@ -3068,10 +3197,9 @@ function AbrechnungView({
           const alleTrainingsSortiert = [...s.trainings].sort((a, b) => a.datum.localeCompare(b.datum))
           const monatlicheErstesTraining = new Map<string, string>() // tarifKey -> erstes training.id
           alleTrainingsSortiert.forEach(t => {
-            const tarif = tarife.find(ta => ta.id === t.tarif_id)
-            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-            if (abrechnungsart === 'monatlich') {
-              const monatlichKey = t.tarif_id || t.id
+            const calc = calculateSpielerPreisForTraining(t, s.spieler.id, tarife)
+            if (calc.abrechnungsart === 'monatlich') {
+              const monatlichKey = calc.tarifId || t.id
               if (!monatlicheErstesTraining.has(monatlichKey)) {
                 monatlicheErstesTraining.set(monatlichKey, t.id)
               }
@@ -3085,27 +3213,19 @@ function AbrechnungView({
           let tagOffeneSumme = 0
 
           tagTrainings.forEach(t => {
-            const tarif = tarife.find(ta => ta.id === t.tarif_id)
-            const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-            const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-
+            const calc = calculateSpielerPreisForTraining(t, s.spieler.id, tarife)
             let spielerPreis = 0
 
-            if (abrechnungsart === 'monatlich') {
+            if (calc.abrechnungsart === 'monatlich') {
               // Monatlicher Tarif: nur wenn dieses Training das ERSTE des Monats ist
-              const monatlichKey = t.tarif_id || t.id
+              const monatlichKey = calc.tarifId || t.id
               const erstesTrainingId = monatlicheErstesTraining.get(monatlichKey)
               if (t.id === erstesTrainingId) {
-                spielerPreis = preis
+                spielerPreis = calc.spielerPreis
               }
               // Sonst: 0€ da inkl. im Monatstarif
             } else {
-              spielerPreis = preis * duration
-              if (abrechnungsart === 'proSpieler') {
-                const zahlendeSpielerAnzahl = t.spieler_ids.length + (t.entfernte_spieler?.filter(e => e.muss_bezahlen).length || 0)
-                spielerPreis = spielerPreis / zahlendeSpielerAnzahl
-              }
+              spielerPreis = calc.spielerPreis
             }
 
             // Korrektur anwenden
@@ -3959,10 +4079,9 @@ function AbrechnungView({
         // Tracking über ALLE Trainings des Monats, um zu wissen welches das erste ist
         const monatlicheErstesTraining = new Map<string, string>() // tarifKey -> erstes training.id
         alleTrainingsSortiert.forEach(t => {
-          const tarif = tarife.find(ta => ta.id === t.tarif_id)
-          const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-          if (abrechnungsart === 'monatlich') {
-            const monatlichKey = t.tarif_id || t.id
+          const calc = calculateSpielerPreisForTraining(t, detail.spieler.id, tarife)
+          if (calc.abrechnungsart === 'monatlich') {
+            const monatlichKey = calc.tarifId || t.id
             if (!monatlicheErstesTraining.has(monatlichKey)) {
               monatlicheErstesTraining.set(monatlichKey, t.id)
             }
@@ -3978,35 +4097,28 @@ function AbrechnungView({
         const trainingsDetail = gefilterteTrainings
           .sort((a, b) => a.datum.localeCompare(b.datum))
           .map(t => {
-            const tarif = tarife.find(ta => ta.id === t.tarif_id)
-            const preis = t.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
-            const duration = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
-            const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+            const calc = calculateSpielerPreisForTraining(t, detail.spieler.id, tarife)
+            // Effektiver Tarif fuer Anzeige: individuell oder global
+            const effektiverTarif = calc.tarifId ? tarife.find(ta => ta.id === calc.tarifId) : undefined
 
             let basisBetrag = 0
             let istMonatlicheSerieErstesTraining = false
 
-            if (abrechnungsart === 'monatlich') {
-              // Monatlicher Tarif: nur einmal pro Tarif pro Monat berechnen
-              // Prüfe ob dieses Training das ERSTE des Monats für diesen Tarif ist
-              const monatlichKey = t.tarif_id || t.id
+            if (calc.abrechnungsart === 'monatlich') {
+              const monatlichKey = calc.tarifId || t.id
               const erstesTrainingId = monatlicheErstesTraining.get(monatlichKey)
               if (t.id === erstesTrainingId) {
-                basisBetrag = preis // Monatsbetrag, nicht pro Stunde
+                basisBetrag = calc.spielerPreis // Monatsbetrag
                 istMonatlicheSerieErstesTraining = true
               }
-              // Sonst: basisBetrag bleibt 0, da Tarif bereits beim ersten Training berechnet
             } else {
-              basisBetrag = preis * duration
-              if (abrechnungsart === 'proSpieler') {
-                basisBetrag = basisBetrag / t.spieler_ids.length
-              }
+              basisBetrag = calc.spielerPreis
             }
 
             // Korrektur anwenden (z.B. Kartenlesergebühren abziehen)
             const korrektur = t.korrektur_betrag || 0
             const betrag = basisBetrag + korrektur
-            return { training: t, basisBetrag, korrektur, betrag, tarif, istMonatlicheSerieErstesTraining, abrechnungsart }
+            return { training: t, basisBetrag, korrektur, betrag, tarif: effektiverTarif, istMonatlicheSerieErstesTraining, abrechnungsart: calc.abrechnungsart }
           })
 
         // Berechne gefilterte Summen mit korrektem Bezahlstatus

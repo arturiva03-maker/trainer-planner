@@ -43,6 +43,80 @@ export function calculateDuration(von: string, bis: string): number {
   return (bisH * 60 + bisM - vonH * 60 - vonM) / 60
 }
 
+// Berechnet den Preis eines einzelnen Spielers fuer ein Training.
+// Beruecksichtigt individuelle Tarife pro Spieler (spieler_tarife) falls vorhanden.
+// Rueckgabewerte:
+//   spielerPreis: zu zahlender Betrag des Spielers (bei "monatlich" Monatsbetrag, sonst bereits geteilter Betrag)
+//   abrechnungsart: effektive Abrechnungsart (proTraining, proSpieler, monatlich)
+//   tarifId: effektiver Tarif des Spielers (fuer "monatlich" Tracking)
+//   istIndividuell: true wenn der Spieler einen individuellen Tarif hat
+export function calculateSpielerPreisForTraining(
+  training: import('./types').Training,
+  spielerId: string,
+  tarife: import('./types').Tarif[]
+): {
+  spielerPreis: number
+  abrechnungsart: 'proTraining' | 'proSpieler' | 'monatlich'
+  tarifId: string | null
+  istIndividuell: boolean
+} {
+  const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+
+  // Individueller Tarif fuer diesen Spieler?
+  const individuell = training.spieler_tarife?.[spielerId]
+  if (individuell && (individuell.tarif_id || individuell.custom_preis != null)) {
+    const tarif = individuell.tarif_id ? tarife.find(ta => ta.id === individuell.tarif_id) : undefined
+    const preis = individuell.custom_preis != null ? individuell.custom_preis : (tarif?.preis_pro_stunde || 0)
+    const abrechnungsart = tarif?.abrechnung || 'proTraining'
+
+    if (abrechnungsart === 'monatlich') {
+      return {
+        spielerPreis: preis,
+        abrechnungsart: 'monatlich',
+        tarifId: individuell.tarif_id || null,
+        istIndividuell: true
+      }
+    }
+    // Bei individuellem Tarif zahlt jeder Spieler seinen eigenen Betrag
+    // (kein Aufteilen auf mehrere Spieler mehr, da individuell)
+    return {
+      spielerPreis: preis * duration,
+      abrechnungsart: 'proTraining',
+      tarifId: individuell.tarif_id || null,
+      istIndividuell: true
+    }
+  }
+
+  // Fallback: Training-Tarif
+  const tarif = tarife.find(ta => ta.id === training.tarif_id)
+  const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+  const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+
+  if (abrechnungsart === 'monatlich') {
+    return {
+      spielerPreis: preis,
+      abrechnungsart: 'monatlich',
+      tarifId: training.tarif_id || null,
+      istIndividuell: false
+    }
+  }
+
+  let spielerPreis = preis * duration
+  if (abrechnungsart === 'proSpieler') {
+    const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
+    const zahlendeSpielerAnzahl = training.spieler_ids.length + entfernteMitBezahlung.length
+    if (zahlendeSpielerAnzahl > 0) {
+      spielerPreis = spielerPreis / zahlendeSpielerAnzahl
+    }
+  }
+  return {
+    spielerPreis,
+    abrechnungsart,
+    tarifId: training.tarif_id || null,
+    istIndividuell: false
+  }
+}
+
 export function generateRechnungsnummer(): string {
   const now = new Date()
   const y = now.getFullYear()
