@@ -89,7 +89,9 @@ export function calculateSpielerPreisForTraining(
 
   // Fallback: Training-Tarif
   const tarif = tarife.find(ta => ta.id === training.tarif_id)
-  const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
+  const preis = training.custom_preis_pro_stunde != null
+    ? training.custom_preis_pro_stunde
+    : (tarif?.preis_pro_stunde || 0)
   const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
 
   if (abrechnungsart === 'monatlich') {
