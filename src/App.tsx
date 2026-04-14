@@ -1274,7 +1274,11 @@ function TrainingModal({
     return initial
   })
   const [wiederholen, setWiederholen] = useState(false)
-  const [wiederholenBis, setWiederholenBis] = useState('2026-03-29')
+  // Zeitraum 1: heute bis vor Sommerferien Berlin 2026 (endet 08.07.2026)
+  // Zeitraum 2: nach Sommerferien (ab 23.08.2026) bis vor Herbstferien (endet 18.10.2026)
+  const [wiederholenZeitraum1Bis, setWiederholenZeitraum1Bis] = useState('2026-07-08')
+  const [wiederholenZeitraum2Von, setWiederholenZeitraum2Von] = useState('2026-08-23')
+  const [wiederholenZeitraum2Bis, setWiederholenZeitraum2Bis] = useState('2026-10-18')
   const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
   const [spielerSuche, setSpielerSuche] = useState('')
@@ -1455,20 +1459,38 @@ function TrainingModal({
             }
           }
         }
-      } else if (wiederholen && wiederholenBis) {
-        // Create series of trainings
+      } else if (wiederholen && (wiederholenZeitraum1Bis || wiederholenZeitraum2Bis)) {
+        // Create series of trainings across two periods (before and after Sommerferien)
         const serieId = crypto.randomUUID()
-        const trainingsToCreate = []
-        let currentDate = new Date(datum)
-        const endDate = new Date(wiederholenBis)
+        const trainingsToCreate: typeof trainingData[] = []
 
-        while (currentDate <= endDate) {
-          trainingsToCreate.push({
-            ...trainingData,
-            datum: formatDate(currentDate),
-            serie_id: serieId
-          })
-          currentDate.setDate(currentDate.getDate() + 7)
+        const addWeeklyDates = (startDate: Date, endDateStr: string) => {
+          const endDate = new Date(endDateStr)
+          let current = new Date(startDate)
+          while (current <= endDate) {
+            trainingsToCreate.push({
+              ...trainingData,
+              datum: formatDate(current),
+              serie_id: serieId
+            })
+            current.setDate(current.getDate() + 7)
+          }
+        }
+
+        // Zeitraum 1: vom Training-Datum bis vor Sommerferien
+        if (wiederholenZeitraum1Bis) {
+          addWeeklyDates(new Date(datum), wiederholenZeitraum1Bis)
+        }
+
+        // Zeitraum 2: nach Sommerferien bis vor Herbstferien
+        if (wiederholenZeitraum2Von && wiederholenZeitraum2Bis) {
+          // Ersten Termin ab Zeitraum2Von finden, der auf den gleichen Wochentag fällt
+          const startDayOfWeek = new Date(datum).getDay()
+          let zeitraum2Start = new Date(wiederholenZeitraum2Von)
+          while (zeitraum2Start.getDay() !== startDayOfWeek) {
+            zeitraum2Start.setDate(zeitraum2Start.getDate() + 1)
+          }
+          addWeeklyDates(zeitraum2Start, wiederholenZeitraum2Bis)
         }
 
         await supabase.from('trainings').insert(trainingsToCreate)
@@ -1955,16 +1977,50 @@ function TrainingModal({
               </div>
 
               {wiederholen && (
-                <div className="form-group">
-                  <label>Wiederholen bis</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={wiederholenBis}
-                    onChange={(e) => setWiederholenBis(e.target.value)}
-                    min={datum}
-                  />
-                </div>
+                <>
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, marginBottom: 4 }}>
+                      Zeitraum 1 – bis vor Sommerferien
+                    </label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#666' }}>von {datum}</span>
+                      <span style={{ color: '#666' }}>bis</span>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={wiederholenZeitraum1Bis}
+                        onChange={(e) => setWiederholenZeitraum1Bis(e.target.value)}
+                        min={datum}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                    <small style={{ color: '#888' }}>Sommerferien Berlin 2026: 09.07. – 22.08.</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, marginBottom: 4 }}>
+                      Zeitraum 2 – nach Sommerferien bis vor Herbstferien
+                    </label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={wiederholenZeitraum2Von}
+                        onChange={(e) => setWiederholenZeitraum2Von(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <span style={{ color: '#666' }}>bis</span>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={wiederholenZeitraum2Bis}
+                        onChange={(e) => setWiederholenZeitraum2Bis(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                    <small style={{ color: '#888' }}>Herbstferien Berlin 2026: 19.10. – 31.10.</small>
+                  </div>
+                </>
               )}
             </>
           )}
