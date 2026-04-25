@@ -1278,7 +1278,7 @@ function TrainingModal({
   // Zeitraum 2: nach Sommerferien (ab 23.08.2026) bis vor Herbstferien (endet 18.10.2026)
   const [wiederholenZeitraum1Bis, setWiederholenZeitraum1Bis] = useState('2026-07-12')
   const [wiederholenZeitraum2Von, setWiederholenZeitraum2Von] = useState('2026-08-24')
-  const [wiederholenZeitraum2Bis, setWiederholenZeitraum2Bis] = useState('2026-10-18')
+  const [wiederholenZeitraum2Bis, setWiederholenZeitraum2Bis] = useState('2026-09-30')
   const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
   const [spielerSuche, setSpielerSuche] = useState('')
