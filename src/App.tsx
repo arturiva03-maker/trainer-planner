@@ -682,6 +682,7 @@ function KalenderView({
   const [tooltip, setTooltip] = useState<{ training: Training, x: number, y: number } | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
   const longPressFiredRef = useRef(false)
+  const longPressStartRef = useRef<{ x: number, y: number } | null>(null)
   const isTouchDeviceRef = useRef(typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches)
 
   // Navigation von Abrechnung: Zum Training-Datum springen und Bearbeitung öffnen
@@ -921,6 +922,7 @@ function KalenderView({
   const handleTrainingTouchStart = (e: React.TouchEvent, training: Training) => {
     longPressFiredRef.current = false
     const touch = e.touches[0]
+    longPressStartRef.current = { x: touch.clientX, y: touch.clientY }
     const x = Math.min(touch.clientX, window.innerWidth - 280)
     const y = Math.min(touch.clientY, window.innerHeight - 240)
     longPressTimerRef.current = window.setTimeout(() => {
@@ -931,10 +933,17 @@ function KalenderView({
 
   const handleTrainingTouchEnd = () => {
     cancelLongPress()
+    longPressStartRef.current = null
   }
 
-  const handleTrainingTouchMove = () => {
-    cancelLongPress()
+  const handleTrainingTouchMove = (e: React.TouchEvent) => {
+    if (!longPressStartRef.current || !longPressTimerRef.current) return
+    const touch = e.touches[0]
+    const dx = touch.clientX - longPressStartRef.current.x
+    const dy = touch.clientY - longPressStartRef.current.y
+    if (Math.hypot(dx, dy) > 10) {
+      cancelLongPress()
+    }
   }
 
   // Tooltip dismiss bei Tap außerhalb (mobile) oder Scroll
@@ -1204,7 +1213,7 @@ function KalenderView({
                               left: `${left}%`,
                               width: `${width}%`
                             }}
-                            draggable
+                            draggable={!isTouchDeviceRef.current}
                             onDragStart={(e) => handleTrainingDragStart(e, training)}
                             onClick={(e) => handleTrainingClick(e, training)}
                             onDoubleClick={() => handleDoubleClick(training)}
