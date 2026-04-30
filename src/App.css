@@ -1394,8 +1394,69 @@ tbody tr:last-child td {
   background: rgba(59, 130, 246, 0.04);
 }
 
+.calendar-day-cell.drag-over {
+  background: rgba(59, 130, 246, 0.18);
+  outline: 2px dashed #3B82F6;
+  outline-offset: -2px;
+}
+
 .calendar-day-cell:last-child {
   border-right: none;
+}
+
+.training-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: white;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  font-size: 13px;
+  color: #0F172A;
+  max-width: 280px;
+  min-width: 200px;
+  pointer-events: auto;
+  animation: scaleIn 0.15s ease-out;
+}
+
+.training-tooltip .tooltip-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #1E293B;
+}
+
+.training-tooltip .tooltip-row {
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.training-tooltip .tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.training-tooltip .status-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.training-tooltip .status-badge.geplant {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.training-tooltip .status-badge.durchgefuehrt {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.training-tooltip .status-badge.abgesagt {
+  background: #FEE2E2;
+  color: #991B1B;
 }
 
 .training-block {

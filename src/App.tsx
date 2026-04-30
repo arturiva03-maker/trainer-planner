@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import type { User, Session } from '@supabase/supabase-js'
 import type {
@@ -679,6 +679,10 @@ function KalenderView({
   )
   const [editingTraining, setEditingTraining] = useState<Training | null>(null)
   const [selectedTrainingIds, setSelectedTrainingIds] = useState<Set<string>>(new Set())
+  const [tooltip, setTooltip] = useState<{ training: Training, x: number, y: number } | null>(null)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressFiredRef = useRef(false)
+  const isTouchDeviceRef = useRef(typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches)
 
   // Navigation von Abrechnung: Zum Training-Datum springen und Bearbeitung öffnen
   useEffect(() => {
@@ -863,6 +867,11 @@ function KalenderView({
 
   // Klick-Handler für Trainings (Strg+Klick = Mehrfachauswahl)
   const handleTrainingClick = (e: React.MouseEvent, training: Training) => {
+    // Long-Press hat Tooltip geöffnet — Klick unterdrücken
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false
+      return
+    }
     if (e.ctrlKey || e.metaKey) {
       // Strg/Cmd gedrückt: Training zur Auswahl hinzufügen/entfernen
       e.preventDefault()
@@ -880,6 +889,112 @@ function KalenderView({
       setSelectedTrainingIds(new Set())
       setEditingTraining(training)
     }
+  }
+
+  // Hover (Desktop) — Tooltip öffnen
+  const handleTrainingMouseEnter = (e: React.MouseEvent, training: Training) => {
+    if (isTouchDeviceRef.current) return
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+    const x = Math.min(rect.right + 8, window.innerWidth - 280)
+    const y = Math.min(rect.top, window.innerHeight - 240)
+    setTooltip({ training, x, y })
+  }
+
+  const handleTrainingMouseLeave = () => {
+    if (isTouchDeviceRef.current) return
+    setTooltip(null)
+  }
+
+  // Long-Press (Mobile) — Tooltip öffnen
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  const handleTrainingTouchStart = (e: React.TouchEvent, training: Training) => {
+    longPressFiredRef.current = false
+    const touch = e.touches[0]
+    const x = Math.min(touch.clientX, window.innerWidth - 280)
+    const y = Math.min(touch.clientY, window.innerHeight - 240)
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true
+      setTooltip({ training, x, y })
+    }, 500)
+  }
+
+  const handleTrainingTouchEnd = () => {
+    cancelLongPress()
+  }
+
+  const handleTrainingTouchMove = () => {
+    cancelLongPress()
+  }
+
+  // Tooltip dismiss bei Tap außerhalb (mobile) oder Scroll
+  useEffect(() => {
+    if (!tooltip) return
+    const dismiss = () => setTooltip(null)
+    const timer = window.setTimeout(() => {
+      window.addEventListener('touchstart', dismiss)
+      window.addEventListener('scroll', dismiss, true)
+    }, 100)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('touchstart', dismiss)
+      window.removeEventListener('scroll', dismiss, true)
+    }
+  }, [tooltip])
+
+  // Drag & Drop — Training verschieben
+  const handleTrainingDragStart = (e: React.DragEvent, training: Training) => {
+    e.dataTransfer.setData('text/plain', training.id)
+    e.dataTransfer.effectAllowed = 'move'
+    setTooltip(null)
+  }
+
+  const handleCellDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes('text/plain')) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    e.currentTarget.classList.add('drag-over')
+  }
+
+  const handleCellDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove('drag-over')
+  }
+
+  const handleCellDrop = async (e: React.DragEvent<HTMLDivElement>, date: Date, time: string) => {
+    e.preventDefault()
+    e.currentTarget.classList.remove('drag-over')
+    const trainingId = e.dataTransfer.getData('text/plain')
+    if (!trainingId) return
+    const training = trainings.find(t => t.id === trainingId)
+    if (!training) return
+
+    const [newH] = time.split(':').map(Number)
+    const [oldStartH, oldStartM] = training.uhrzeit_von.split(':').map(Number)
+    const [oldEndH, oldEndM] = training.uhrzeit_bis.split(':').map(Number)
+    const durationMin = (oldEndH * 60 + oldEndM) - (oldStartH * 60 + oldStartM)
+
+    const newStart = `${String(newH).padStart(2, '0')}:${String(oldStartM).padStart(2, '0')}`
+    const newEndTotalMin = newH * 60 + oldStartM + durationMin
+    if (newEndTotalMin >= 24 * 60) return // würde über Mitternacht laufen
+    const newEndH = Math.floor(newEndTotalMin / 60)
+    const newEndM = newEndTotalMin % 60
+    const newEnd = `${String(newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`
+
+    const newDate = formatDate(date)
+    if (newDate === training.datum && newStart === training.uhrzeit_von) return
+
+    preserveScroll()
+    await supabase.from('trainings').update({
+      datum: newDate,
+      uhrzeit_von: newStart,
+      uhrzeit_bis: newEnd
+    }).eq('id', training.id)
+    onUpdate()
   }
 
   // Alle ausgewählten Trainings als durchgeführt markieren
@@ -1063,6 +1178,9 @@ function KalenderView({
                       key={`cell-${dayIndex}-${time}`}
                       className="calendar-day-cell"
                       onClick={(e) => handleCellClick(e, date, time)}
+                      onDragOver={handleCellDragOver}
+                      onDragLeave={handleCellDragLeave}
+                      onDrop={(e) => handleCellDrop(e, date, time)}
                     >
                       {slotTrainings.map((training) => {
                         const pos = getTrainingPosition(training, isDayView)
@@ -1081,8 +1199,16 @@ function KalenderView({
                               left: `${left}%`,
                               width: `${width}%`
                             }}
+                            draggable
+                            onDragStart={(e) => handleTrainingDragStart(e, training)}
                             onClick={(e) => handleTrainingClick(e, training)}
                             onDoubleClick={() => handleDoubleClick(training)}
+                            onMouseEnter={(e) => handleTrainingMouseEnter(e, training)}
+                            onMouseLeave={handleTrainingMouseLeave}
+                            onTouchStart={(e) => handleTrainingTouchStart(e, training)}
+                            onTouchEnd={handleTrainingTouchEnd}
+                            onTouchMove={handleTrainingTouchMove}
+                            onTouchCancel={handleTrainingTouchEnd}
                           >
                             <div className="training-title">{training.name || getTrainingDisplayTitle(training, true)}</div>
                             <div className="training-time">
@@ -1102,6 +1228,47 @@ function KalenderView({
           </div>
         </div>
       </div>
+
+      {/* Training Info Tooltip (Hover Desktop / Long-Press Mobile) */}
+      {tooltip && (() => {
+        const t = tooltip.training
+        const aktive = t.spieler_ids.map(id => spieler.find(s => s.id === id)?.name).filter(Boolean) as string[]
+        const entfernt = (t.entfernte_spieler || []).map(es => spieler.find(s => s.id === es.spieler_id)?.name).filter(Boolean) as string[]
+        const tarifName = getTarifName(t.tarif_id)
+        const statusLabel = t.status === 'geplant' ? 'Geplant' : t.status === 'durchgefuehrt' ? 'Durchgeführt' : 'Abgesagt'
+        return (
+          <div
+            className="training-tooltip"
+            style={{ left: tooltip.x, top: tooltip.y }}
+            onClick={() => setTooltip(null)}
+          >
+            {t.name && <div className="tooltip-title">{t.name}</div>}
+            <div className="tooltip-row">
+              <strong>{formatTime(t.uhrzeit_von)} – {formatTime(t.uhrzeit_bis)}</strong>
+            </div>
+            {tarifName && (
+              <div className="tooltip-row">Tarif: {tarifName}</div>
+            )}
+            <div className="tooltip-row">
+              Status: <span className={`status-badge ${t.status}`}>{statusLabel}</span>
+            </div>
+            {(aktive.length > 0 || entfernt.length > 0) && (
+              <div className="tooltip-row">
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>Spieler:</div>
+                {aktive.map((n, i) => <div key={`a${i}`}>• {n}</div>)}
+                {entfernt.map((n, i) => (
+                  <div key={`e${i}`} style={{ textDecoration: 'line-through', opacity: 0.6 }}>• {n}</div>
+                ))}
+              </div>
+            )}
+            {t.notiz && (
+              <div className="tooltip-row" style={{ fontStyle: 'italic', opacity: 0.85 }}>
+                {t.notiz}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Edit Training Modal */}
       {editingTraining && (
