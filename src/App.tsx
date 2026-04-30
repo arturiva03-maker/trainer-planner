@@ -3321,6 +3321,12 @@ function AbrechnungView({
         })
         // Filtere Spieler heraus die keine Trainings am Tag haben
         .filter(s => s.trainings.length > 0)
+        // Chronologisch nach frühester Uhrzeit des Tages sortieren
+        .sort((a, b) => {
+          const aZeit = a.trainings.reduce((min, t) => t.uhrzeit_von < min ? t.uhrzeit_von : min, a.trainings[0].uhrzeit_von)
+          const bZeit = b.trainings.reduce((min, t) => t.uhrzeit_von < min ? t.uhrzeit_von : min, b.trainings[0].uhrzeit_von)
+          return aZeit.localeCompare(bZeit)
+        })
     }
 
     // Status-Filter (bezahlt/offen/ausstehend/bar)
@@ -4158,7 +4164,10 @@ function AbrechnungView({
 
         // Berechne Betrag pro Training (mit korrektem monatlichen Tracking)
         const trainingsDetail = gefilterteTrainings
-          .sort((a, b) => a.datum.localeCompare(b.datum))
+          .sort((a, b) => {
+            const datumCmp = a.datum.localeCompare(b.datum)
+            return datumCmp !== 0 ? datumCmp : a.uhrzeit_von.localeCompare(b.uhrzeit_von)
+          })
           .map(t => {
             const calc = calculateSpielerPreisForTraining(t, detail.spieler.id, tarife)
             // Effektiver Tarif fuer Anzeige: individuell oder global
