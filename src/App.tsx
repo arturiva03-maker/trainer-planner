@@ -683,7 +683,27 @@ function KalenderView({
   const longPressTimerRef = useRef<number | null>(null)
   const longPressFiredRef = useRef(false)
   const longPressStartRef = useRef<{ x: number, y: number } | null>(null)
-  const isTouchDeviceRef = useRef(typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches)
+  const isTouchDeviceRef = useRef(
+    typeof window !== 'undefined' && (
+      'ontouchstart' in window ||
+      (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+      window.matchMedia('(hover: none)').matches ||
+      window.matchMedia('(pointer: coarse)').matches
+    )
+  )
+  // Drag wird erst nach einer echten Maus-Interaktion aktiviert.
+  // Damit kann auf Touch-Geraeten kein HTML5-Drag durch Long-Press ausgeloest werden.
+  const [dragEnabled, setDragEnabled] = useState(false)
+  useEffect(() => {
+    if (isTouchDeviceRef.current) return
+    const enable = () => setDragEnabled(true)
+    window.addEventListener('mousemove', enable, { once: true })
+    window.addEventListener('mousedown', enable, { once: true })
+    return () => {
+      window.removeEventListener('mousemove', enable)
+      window.removeEventListener('mousedown', enable)
+    }
+  }, [])
 
   // Navigation von Abrechnung: Zum Training-Datum springen und Bearbeitung öffnen
   useEffect(() => {
@@ -1213,7 +1233,7 @@ function KalenderView({
                               left: `${left}%`,
                               width: `${width}%`
                             }}
-                            draggable={!isTouchDeviceRef.current}
+                            draggable={dragEnabled && !isTouchDeviceRef.current}
                             onDragStart={(e) => handleTrainingDragStart(e, training)}
                             onClick={(e) => handleTrainingClick(e, training)}
                             onDoubleClick={() => handleDoubleClick(training)}
