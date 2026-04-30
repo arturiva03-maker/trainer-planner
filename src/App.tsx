@@ -763,6 +763,11 @@ function KalenderView({
     return tarife.find((t) => t.id === tarifId)?.name
   }
 
+  const hasIndividualTariffs = (training: Training): boolean => {
+    if (!training.spieler_tarife) return false
+    return Object.values(training.spieler_tarife).some(o => !!o.tarif_id || o.custom_preis != null)
+  }
+
   const getTrainingPosition = (training: Training, isDayView: boolean) => {
     const [startH, startM] = training.uhrzeit_von.split(':').map(Number)
     const [endH, endM] = training.uhrzeit_bis.split(':').map(Number)
@@ -1210,6 +1215,9 @@ function KalenderView({
                             onTouchMove={handleTrainingTouchMove}
                             onTouchCancel={handleTrainingTouchEnd}
                           >
+                            {hasIndividualTariffs(training) && (
+                              <span className="training-indiv-marker" title="Individuelle Tarife">★</span>
+                            )}
                             <div className="training-title">{training.name || getTrainingDisplayTitle(training, true)}</div>
                             <div className="training-time">
                               {formatTime(training.uhrzeit_von)} - {formatTime(training.uhrzeit_bis)}
@@ -1232,10 +1240,30 @@ function KalenderView({
       {/* Training Info Tooltip (Hover Desktop / Long-Press Mobile) */}
       {tooltip && (() => {
         const t = tooltip.training
-        const aktive = t.spieler_ids.map(id => spieler.find(s => s.id === id)?.name).filter(Boolean) as string[]
-        const entfernt = (t.entfernte_spieler || []).map(es => spieler.find(s => s.id === es.spieler_id)?.name).filter(Boolean) as string[]
         const tarifName = getTarifName(t.tarif_id)
+        const customPreis = t.custom_preis_pro_stunde
         const statusLabel = t.status === 'geplant' ? 'Geplant' : t.status === 'durchgefuehrt' ? 'Durchgeführt' : 'Abgesagt'
+        const renderSpielerRow = (spielerId: string, isEntfernt: boolean) => {
+          const sp = spieler.find(s => s.id === spielerId)
+          if (!sp) return null
+          const indiv = t.spieler_tarife?.[spielerId]
+          const indivTarif = indiv?.tarif_id ? tarife.find(ta => ta.id === indiv.tarif_id) : null
+          const indivCustom = indiv?.custom_preis
+          const hasIndiv = !!indivTarif || indivCustom != null
+          return (
+            <div
+              key={spielerId}
+              style={isEntfernt ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}
+            >
+              • {sp.name}
+              {hasIndiv && (
+                <span className="tooltip-indiv-badge">
+                  {indivTarif ? indivTarif.name : `${indivCustom} €/h`}
+                </span>
+              )}
+            </div>
+          )
+        }
         return (
           <div
             className="training-tooltip"
@@ -1247,18 +1275,22 @@ function KalenderView({
               <strong>{formatTime(t.uhrzeit_von)} – {formatTime(t.uhrzeit_bis)}</strong>
             </div>
             {tarifName && (
-              <div className="tooltip-row">Tarif: {tarifName}</div>
+              <div className="tooltip-row">
+                Tarif: {tarifName}
+                {customPreis != null && <span style={{ marginLeft: 4 }}>({customPreis} €/h custom)</span>}
+              </div>
+            )}
+            {!tarifName && customPreis != null && (
+              <div className="tooltip-row">Preis: {customPreis} €/h</div>
             )}
             <div className="tooltip-row">
               Status: <span className={`status-badge ${t.status}`}>{statusLabel}</span>
             </div>
-            {(aktive.length > 0 || entfernt.length > 0) && (
+            {(t.spieler_ids.length > 0 || (t.entfernte_spieler || []).length > 0) && (
               <div className="tooltip-row">
                 <div style={{ fontWeight: 600, marginBottom: 2 }}>Spieler:</div>
-                {aktive.map((n, i) => <div key={`a${i}`}>• {n}</div>)}
-                {entfernt.map((n, i) => (
-                  <div key={`e${i}`} style={{ textDecoration: 'line-through', opacity: 0.6 }}>• {n}</div>
-                ))}
+                {t.spieler_ids.map(id => renderSpielerRow(id, false))}
+                {(t.entfernte_spieler || []).map(es => renderSpielerRow(es.spieler_id, true))}
               </div>
             )}
             {t.notiz && (
