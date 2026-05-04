@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install --include=dev",
+  "installCommand": "rm -rf node_modules && npm ci --include=dev",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
