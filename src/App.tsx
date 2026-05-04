@@ -88,7 +88,7 @@ const featureDetails = {
       { icon: '📧', title: 'Kontaktdaten', desc: 'E-Mail und Telefonnummer für schnelle Kommunikation' },
       { icon: '🏠', title: 'Rechnungsadressen', desc: 'Individuelle Rechnungsadressen und -empfänger pro Spieler' },
       { icon: '💵', title: 'Flexible Tarife', desc: 'Erstelle verschiedene Tarife für unterschiedliche Trainingsarten' },
-      { icon: '📊', title: 'Abrechnungsmodelle', desc: 'Pro Training, pro Spieler oder monatliche Pauschalen' },
+      { icon: '📊', title: 'Abrechnungsmodelle', desc: 'Pro Training oder monatliche Pauschalen' },
       { icon: '🔗', title: 'Verknüpfungen', desc: 'Verknüpfe Spieler für gemeinsame Rechnungen (z.B. Geschwister)' }
     ]
   },
@@ -1457,16 +1457,16 @@ function TrainingModal({
   const selectedTarif = tarife.find(t => t.id === tarifId)
   const abrechnungsart = selectedTarif?.abrechnung || 'proTraining'
 
-  // Prüft ob Bezahl-Abfrage nötig ist (nur bei proTraining/proSpieler mit Spielern)
+  // Prüft ob Bezahl-Abfrage nötig ist (nur bei proTraining mit Spielern)
   const brauchtBezahlAbfrage = training &&
-    (abrechnungsart === 'proTraining' || abrechnungsart === 'proSpieler') &&
+    abrechnungsart === 'proTraining' &&
     selectedSpieler.length > 0
 
   const toggleSpieler = async (id: string) => {
     const isRemoving = selectedSpieler.includes(id)
 
     // Nur bei existierendem Training und relevanter Abrechnungsart nachfragen
-    if (isRemoving && training && (abrechnungsart === 'proTraining' || abrechnungsart === 'proSpieler')) {
+    if (isRemoving && training && abrechnungsart === 'proTraining') {
       const spielerObj = spieler.find(s => s.id === id)
       setRemoveDialog({ spielerId: id, spielerName: spielerObj?.name || 'Spieler' })
     } else {
@@ -1654,7 +1654,7 @@ function TrainingModal({
   const handleDelete = async () => {
     if (!training) return
 
-    // Bei proTraining/proSpieler erst Bezahl-Abfrage zeigen
+    // Bei proTraining erst Bezahl-Abfrage zeigen
     if (brauchtBezahlAbfrage) {
       setCancelDialog({ type: 'delete' })
       return
@@ -2323,11 +2323,7 @@ function VerwaltungView({
                     <td>{t.name}</td>
                     <td>{t.preis_pro_stunde} €</td>
                     <td>
-                      {t.abrechnung === 'proTraining'
-                        ? 'Pro Training'
-                        : t.abrechnung === 'proSpieler'
-                          ? 'Pro Spieler'
-                          : 'Monatlich'}
+                      {t.abrechnung === 'proTraining' ? 'Pro Training' : 'Monatlich'}
                     </td>
                     <td>{t.beschreibung || '-'}</td>
                     <td>
@@ -2366,11 +2362,7 @@ function VerwaltungView({
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">Abrechnung</span>
                     <span className="mobile-card-value">
-                      {t.abrechnung === 'proTraining'
-                        ? 'Pro Training'
-                        : t.abrechnung === 'proSpieler'
-                          ? 'Pro Spieler'
-                          : 'Monatlich'}
+                      {t.abrechnung === 'proTraining' ? 'Pro Training' : 'Monatlich'}
                     </span>
                   </div>
                   {t.beschreibung && (
@@ -2620,7 +2612,6 @@ function TarifModal({
               onChange={(e) => setAbrechnung(e.target.value as Tarif['abrechnung'])}
             >
               <option value="proTraining">Pro Training</option>
-              <option value="proSpieler">Pro Spieler</option>
               <option value="monatlich">Monatlich</option>
             </select>
           </div>
@@ -2745,11 +2736,10 @@ function AbrechnungView({
     } = {}
 
     monthTrainings.forEach((t) => {
-      // Bei proSpieler: Anzahl zahlungspflichtiger Spieler = aktive + entfernte mit muss_bezahlen
       const entfernteMitBezahlung = (t.entfernte_spieler || []).filter(es => es.muss_bezahlen)
       // Abrechnungsart des Trainings (nur fuer Fallback bei entfernten Spielern)
       const tarif = tarife.find((ta) => ta.id === t.tarif_id)
-      const abrechnungsart = t.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+      const abrechnungsart = tarif?.abrechnung || 'proTraining'
 
       t.spieler_ids.forEach((spielerId) => {
         if (!summary[spielerId]) {
@@ -2809,7 +2799,7 @@ function AbrechnungView({
         }
       })
 
-      // Entfernte Spieler mit Bezahlpflicht (nur bei proTraining oder proSpieler)
+      // Entfernte Spieler mit Bezahlpflicht (nur bei proTraining)
       if (abrechnungsart !== 'monatlich') {
         entfernteMitBezahlung.forEach((entfernter) => {
           const spielerId = entfernter.spieler_id
@@ -4207,11 +4197,7 @@ function AbrechnungView({
         const tarif = tarife.find(t => t.id === training.tarif_id)
         const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
         const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
-        const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
-        let basisBetrag = preis * duration
-        if (abrechnungsart === 'proSpieler') {
-          basisBetrag = basisBetrag / training.spieler_ids.length
-        }
+        const basisBetrag = preis * duration
 
         return (
           <div className="modal-overlay" onClick={() => setShowTrainingKorrekturModal(null)}>

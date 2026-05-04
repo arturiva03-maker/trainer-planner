@@ -22,7 +22,7 @@ export interface Tarif {
   user_id: string
   name: string
   preis_pro_stunde: number
-  abrechnung: 'proTraining' | 'proSpieler' | 'monatlich'
+  abrechnung: 'proTraining' | 'monatlich'
   beschreibung?: string
   created_at: string
 }
@@ -55,7 +55,6 @@ export interface Training {
   name?: string
   serie_id?: string
   custom_preis_pro_stunde?: number
-  custom_abrechnung?: 'proTraining' | 'proSpieler'
   spieler_tarife?: Record<string, SpielerTarifOverride> | null
   bar_bezahlt: boolean
   bezahlt: boolean

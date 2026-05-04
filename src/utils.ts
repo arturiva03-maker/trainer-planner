@@ -46,7 +46,7 @@ export function calculateSpielerPreisForTraining(
   tarife: import('./types').Tarif[]
 ): {
   spielerPreis: number
-  abrechnungsart: 'proTraining' | 'proSpieler' | 'monatlich'
+  abrechnungsart: 'proTraining' | 'monatlich'
   tarifId: string | null
   istIndividuell: boolean
 } {
@@ -80,7 +80,7 @@ export function calculateSpielerPreisForTraining(
   const preis = training.custom_preis_pro_stunde != null
     ? training.custom_preis_pro_stunde
     : (tarif?.preis_pro_stunde || 0)
-  const abrechnungsart = training.custom_abrechnung || tarif?.abrechnung || 'proTraining'
+  const abrechnungsart = tarif?.abrechnung || 'proTraining'
 
   if (abrechnungsart === 'monatlich') {
     return {
@@ -91,16 +91,8 @@ export function calculateSpielerPreisForTraining(
     }
   }
 
-  let spielerPreis = preis * duration
-  if (abrechnungsart === 'proSpieler') {
-    const entfernteMitBezahlung = (training.entfernte_spieler || []).filter(es => es.muss_bezahlen)
-    const zahlendeSpielerAnzahl = training.spieler_ids.length + entfernteMitBezahlung.length
-    if (zahlendeSpielerAnzahl > 0) {
-      spielerPreis = spielerPreis / zahlendeSpielerAnzahl
-    }
-  }
   return {
-    spielerPreis,
+    spielerPreis: preis * duration,
     abrechnungsart,
     tarifId: training.tarif_id || null,
     istIndividuell: false
