@@ -2541,15 +2541,7 @@ function TarifModal({
   const [preis, setPreis] = useState(tarif?.preis_pro_stunde?.toString() || '')
   const [abrechnung, setAbrechnung] = useState<Tarif['abrechnung']>(tarif?.abrechnung || 'proTraining')
   const [beschreibung, setBeschreibung] = useState(tarif?.beschreibung || '')
-  const [inklUst, setInklUst] = useState(tarif?.inkl_ust ?? true)
-  const [ustSatz, setUstSatz] = useState(tarif?.ust_satz?.toString() || '19')
   const [saving, setSaving] = useState(false)
-
-  // Berechne Netto/Brutto zur Anzeige
-  const bruttoPreis = parseFloat(preis) || 0
-  const ustSatzNum = parseFloat(ustSatz) || 19
-  const nettoPreis = inklUst ? bruttoPreis / (1 + ustSatzNum / 100) : bruttoPreis
-  const ustBetrag = inklUst ? bruttoPreis - nettoPreis : bruttoPreis * (ustSatzNum / 100)
 
   const handleSave = async () => {
     if (!name.trim() || !preis) {
@@ -2564,9 +2556,7 @@ function TarifModal({
         name: name.trim(),
         preis_pro_stunde: parseFloat(preis),
         abrechnung,
-        beschreibung: beschreibung || null,
-        inkl_ust: inklUst,
-        ust_satz: parseFloat(ustSatz) || 19
+        beschreibung: beschreibung || null
       }
 
       if (tarif) {
@@ -2611,7 +2601,7 @@ function TarifModal({
             />
           </div>
           <div className="form-group">
-            <label>Preis pro Stunde (€) * {inklUst ? '(inkl. USt)' : '(netto)'}</label>
+            <label>Preis pro Stunde (€) *</label>
             <input
               type="number"
               className="form-control"
@@ -2622,46 +2612,6 @@ function TarifModal({
               step="0.01"
             />
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="checkbox-group">
-                <input
-                  type="checkbox"
-                  checked={inklUst}
-                  onChange={(e) => setInklUst(e.target.checked)}
-                />
-                Preis inkl. USt
-              </label>
-            </div>
-            <div className="form-group">
-              <label>USt-Satz (%)</label>
-              <select
-                className="form-control"
-                value={ustSatz}
-                onChange={(e) => setUstSatz(e.target.value)}
-              >
-                <option value="19">19%</option>
-                <option value="7">7%</option>
-                <option value="0">0% (steuerfrei)</option>
-              </select>
-            </div>
-          </div>
-          {preis && parseFloat(ustSatz) > 0 && (
-            <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Netto:</span>
-                <span>{nettoPreis.toFixed(2)} €</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>USt ({ustSatz}%):</span>
-                <span>{ustBetrag.toFixed(2)} €</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                <span>Brutto:</span>
-                <span>{(inklUst ? bruttoPreis : bruttoPreis + ustBetrag).toFixed(2)} €</span>
-              </div>
-            </div>
-          )}
           <div className="form-group">
             <label>Abrechnungsart</label>
             <select

@@ -24,8 +24,6 @@ export interface Tarif {
   preis_pro_stunde: number
   abrechnung: 'proTraining' | 'proSpieler' | 'monatlich'
   beschreibung?: string
-  inkl_ust: boolean
-  ust_satz: number
   created_at: string
 }
 
