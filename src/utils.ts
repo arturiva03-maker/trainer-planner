@@ -32,11 +32,6 @@ export function getMonthString(date: Date): string {
   return `${year}-${month}`
 }
 
-export function parseMonthString(monthStr: string): { year: number; month: number } {
-  const [year, month] = monthStr.split('-').map(Number)
-  return { year, month }
-}
-
 export function calculateDuration(von: string, bis: string): number {
   const [vonH, vonM] = von.split(':').map(Number)
   const [bisH, bisM] = bis.split(':').map(Number)
@@ -45,11 +40,6 @@ export function calculateDuration(von: string, bis: string): number {
 
 // Berechnet den Preis eines einzelnen Spielers fuer ein Training.
 // Beruecksichtigt individuelle Tarife pro Spieler (spieler_tarife) falls vorhanden.
-// Rueckgabewerte:
-//   spielerPreis: zu zahlender Betrag des Spielers (bei "monatlich" Monatsbetrag, sonst bereits geteilter Betrag)
-//   abrechnungsart: effektive Abrechnungsart (proTraining, proSpieler, monatlich)
-//   tarifId: effektiver Tarif des Spielers (fuer "monatlich" Tracking)
-//   istIndividuell: true wenn der Spieler einen individuellen Tarif hat
 export function calculateSpielerPreisForTraining(
   training: import('./types').Training,
   spielerId: string,
@@ -77,8 +67,6 @@ export function calculateSpielerPreisForTraining(
         istIndividuell: true
       }
     }
-    // Bei individuellem Tarif zahlt jeder Spieler seinen eigenen Betrag
-    // (kein Aufteilen auf mehrere Spieler mehr, da individuell)
     return {
       spielerPreis: preis * duration,
       abrechnungsart: 'proTraining',
@@ -119,42 +107,4 @@ export function calculateSpielerPreisForTraining(
   }
 }
 
-export function generateRechnungsnummer(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  const h = String(now.getHours()).padStart(2, '0')
-  const min = String(now.getMinutes()).padStart(2, '0')
-  const s = String(now.getSeconds()).padStart(2, '0')
-  return `RG-${y}${m}${d}-${h}${min}${s}`
-}
-
-export function debounce<T extends (...args: Parameters<T>) => void>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout)
-    timeout = setTimeout(() => func(...args), wait)
-  }
-}
-
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-export const WOCHENTAGE_LANG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
-
-const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
-
-export function formatMonthGerman(monthStr: string): string {
-  const [year, month] = monthStr.split('-')
-  return `${MONATE[parseInt(month) - 1]} ${year}`
-}
-
-export function formatQuartal(year: number, quartal: number): string {
-  return `Q${quartal} ${year}`
-}
-
-export function getQuartalFromMonth(month: number): number {
-  return Math.ceil(month / 3)
-}

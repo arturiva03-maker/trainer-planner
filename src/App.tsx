@@ -137,8 +137,6 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
           await supabase.from('trainer_profiles').insert({
             user_id: data.user.id,
             name: name,
-            stundensatz: 25,
-            kleinunternehmer: false,
             approved: false
           })
           onLogin(data.user)
@@ -1642,106 +1640,6 @@ function TrainingModal({
         await supabase.from('trainings').insert(trainingsToCreate)
       } else {
         await supabase.from('trainings').insert(trainingData)
-      }
-
-      // Automatische Guthaben-Verrechnung bei Status-Wechsel auf "durchgefuehrt"
-      const statusWurdeAufDurchgefuehrtGeaendert = status === 'durchgefuehrt' && (!training || training.status !== 'durchgefuehrt')
-      if (statusWurdeAufDurchgefuehrtGeaendert && selectedSpieler.length > 0) {
-        // Pseudo-Training fuer Preisberechnung (spiegelt trainingData)
-        const pseudoTraining = {
-          ...(training || {} as Training),
-          datum,
-          uhrzeit_von: uhrzeitVon,
-          uhrzeit_bis: uhrzeitBis,
-          spieler_ids: selectedSpieler,
-          entfernte_spieler: entfernteSpieler,
-          tarif_id: tarifId || undefined,
-          custom_preis_pro_stunde: customPreis ? parseFloat(customPreis) : undefined,
-          spieler_tarife: spielerTarifeJson || undefined
-        } as Training
-
-        // Training-ID ermitteln (bei neuem Training aus DB laden)
-        let trainingId = training?.id
-        if (!trainingId) {
-          const { data: neuesTraining } = await supabase
-            .from('trainings')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('datum', datum)
-            .eq('uhrzeit_von', uhrzeitVon)
-            .eq('uhrzeit_bis', uhrzeitBis)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-          trainingId = neuesTraining?.id
-        }
-
-        // Für jeden Spieler prüfen ob Guthaben vorhanden
-        for (const spielerId of selectedSpieler) {
-          // Individueller Betrag pro Spieler
-          const calc = calculateSpielerPreisForTraining(pseudoTraining, spielerId, tarife)
-          const betragProSpieler = calc.spielerPreis
-
-          const { data: guthaben } = await supabase
-            .from('guthaben')
-            .select('*')
-            .eq('spieler_id', spielerId)
-            .eq('user_id', userId)
-            .single()
-
-          if (guthaben && guthaben.aktuell >= betragProSpieler && betragProSpieler > 0) {
-            // Guthaben abbuchen
-            await supabase
-              .from('guthaben')
-              .update({
-                aktuell: guthaben.aktuell - betragProSpieler,
-                verbraucht_gesamt: guthaben.verbraucht_gesamt + betragProSpieler,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', guthaben.id)
-
-            // Transaktion speichern
-            await supabase
-              .from('guthaben_transaktionen')
-              .insert({
-                user_id: userId,
-                spieler_id: spielerId,
-                betrag: -betragProSpieler,
-                typ: 'abbuchung',
-                training_id: trainingId,
-                beschreibung: `Training vom ${datum.split('-').reverse().join('.')}`,
-                bar: false,
-                datum: formatDate(new Date())
-              })
-
-            // Training als bezahlt markieren für diesen Spieler
-            if (trainingId) {
-              const { data: existingPayment } = await supabase
-                .from('spieler_training_payments')
-                .select('id')
-                .eq('training_id', trainingId)
-                .eq('spieler_id', spielerId)
-                .single()
-
-              if (existingPayment) {
-                await supabase
-                  .from('spieler_training_payments')
-                  .update({ bezahlt: true })
-                  .eq('id', existingPayment.id)
-              } else {
-                await supabase
-                  .from('spieler_training_payments')
-                  .insert({
-                    user_id: userId,
-                    training_id: trainingId,
-                    spieler_id: spielerId,
-                    bezahlt: true,
-                    bar_bezahlt: false
-                  })
-              }
-            }
-          }
-        }
       }
 
       onSave()
