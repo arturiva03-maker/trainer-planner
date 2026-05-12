@@ -14,6 +14,8 @@
   --status-geplant-text: #374151;
   --status-durchgefuehrt-bg: #D4EDDA;
   --status-durchgefuehrt-text: #155724;
+  --status-durchgefuehrt_halb-bg: #FEF3C7;
+  --status-durchgefuehrt_halb-text: #92400E;
   --status-abgesagt-bg: #F8D7DA;
   --status-abgesagt-text: #721C24;
   --status-bezahlt-bg: #EFF6FF;
@@ -1538,6 +1540,15 @@ tbody tr:last-child td {
   box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
 }
 
+.training-block.status-durchgefuehrt_halb {
+  background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+}
+
+.training-block.status-durchgefuehrt_halb:hover {
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4);
+}
+
 .training-block.status-abgesagt {
   background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
   opacity: 0.85;
@@ -1685,6 +1696,11 @@ tbody tr:last-child td {
 .status-badge.durchgefuehrt {
   background: var(--status-durchgefuehrt-bg);
   color: var(--status-durchgefuehrt-text);
+}
+
+.status-badge.durchgefuehrt_halb {
+  background: var(--status-durchgefuehrt_halb-bg);
+  color: var(--status-durchgefuehrt_halb-text);
 }
 
 .status-badge.abgesagt {

@@ -51,6 +51,9 @@ export function calculateSpielerPreisForTraining(
   istIndividuell: boolean
 } {
   const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
+  // 50%-Trainings (z.B. wg. Regen abgebrochen): nur Hälfte berechnen.
+  // Gilt nur fuer proTraining-Abrechnung; monatliche Tarife bleiben unveraendert.
+  const halbFaktor = training.status === 'durchgefuehrt_halb' ? 0.5 : 1
 
   // Individueller Tarif fuer diesen Spieler?
   const individuell = training.spieler_tarife?.[spielerId]
@@ -68,7 +71,7 @@ export function calculateSpielerPreisForTraining(
       }
     }
     return {
-      spielerPreis: preis * duration,
+      spielerPreis: preis * duration * halbFaktor,
       abrechnungsart: 'proTraining',
       tarifId: individuell.tarif_id || null,
       istIndividuell: true
@@ -92,7 +95,7 @@ export function calculateSpielerPreisForTraining(
   }
 
   return {
-    spielerPreis: preis * duration,
+    spielerPreis: preis * duration * halbFaktor,
     abrechnungsart,
     tarifId: training.tarif_id || null,
     istIndividuell: false

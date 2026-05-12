@@ -50,7 +50,7 @@ export interface Training {
   entfernte_spieler?: EntfernterSpieler[]
   tarif_id?: string
   trainer_id?: string
-  status: 'geplant' | 'durchgefuehrt' | 'abgesagt'
+  status: 'geplant' | 'durchgefuehrt' | 'durchgefuehrt_halb' | 'abgesagt'
   notiz?: string
   name?: string
   serie_id?: string

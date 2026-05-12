@@ -1035,7 +1035,8 @@ function KalenderView({
     const selectedTrainings = trainings.filter(t => selectedTrainingIds.has(t.id))
 
     for (const training of selectedTrainings) {
-      if (training.status === 'durchgefuehrt') continue // Schon durchgeführt
+      // 50%-Status nicht ueberschreiben
+      if (training.status === 'durchgefuehrt' || training.status === 'durchgefuehrt_halb') continue
       await supabase.from('trainings').update({ status: 'durchgefuehrt' }).eq('id', training.id)
     }
 
@@ -1269,7 +1270,11 @@ function KalenderView({
         const t = tooltip.training
         const tarifName = getTarifName(t.tarif_id)
         const customPreis = t.custom_preis_pro_stunde
-        const statusLabel = t.status === 'geplant' ? 'Geplant' : t.status === 'durchgefuehrt' ? 'Durchgeführt' : 'Abgesagt'
+        const statusLabel =
+          t.status === 'geplant' ? 'Geplant' :
+          t.status === 'durchgefuehrt' ? 'Durchgeführt' :
+          t.status === 'durchgefuehrt_halb' ? 'Durchgeführt – 50%' :
+          'Abgesagt'
         const renderSpielerRow = (spielerId: string, isEntfernt: boolean) => {
           const sp = spieler.find(s => s.id === spielerId)
           if (!sp) return null
@@ -1861,6 +1866,7 @@ function TrainingModal({
               >
                 <option value="geplant">Geplant</option>
                 <option value="durchgefuehrt">Durchgeführt</option>
+                <option value="durchgefuehrt_halb">Durchgeführt – 50% (z.B. Regen)</option>
                 <option value="abgesagt">Abgesagt</option>
               </select>
             </div>
@@ -2689,8 +2695,8 @@ function AbrechnungView({
       const tMonth = t.datum.substring(0, 7)
       if (tMonth !== selectedMonth) return false
 
-      // Durchgeführte Trainings immer einbeziehen
-      if (t.status === 'durchgefuehrt') return true
+      // Durchgeführte Trainings (auch 50%) immer einbeziehen
+      if (t.status === 'durchgefuehrt' || t.status === 'durchgefuehrt_halb') return true
 
       // Abgesagte Trainings nur wenn entfernte Spieler mit Bezahlpflicht vorhanden
       if (t.status === 'abgesagt') {
@@ -4197,7 +4203,8 @@ function AbrechnungView({
         const tarif = tarife.find(t => t.id === training.tarif_id)
         const preis = training.custom_preis_pro_stunde || tarif?.preis_pro_stunde || 0
         const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
-        const basisBetrag = preis * duration
+        const halbFaktor = training.status === 'durchgefuehrt_halb' ? 0.5 : 1
+        const basisBetrag = preis * duration * halbFaktor
 
         return (
           <div className="modal-overlay" onClick={() => setShowTrainingKorrekturModal(null)}>
@@ -4298,16 +4305,17 @@ function AbrechnungTrainerView({
   const trainerSummary = useMemo(() => {
     const monthTrainings = trainings.filter((t) => {
       const tMonth = t.datum.substring(0, 7)
-      return tMonth === selectedMonth && t.status === 'durchgefuehrt'
+      return tMonth === selectedMonth && (t.status === 'durchgefuehrt' || t.status === 'durchgefuehrt_halb')
     })
 
     return trainer.map((tr) => {
       // Filter trainings for this trainer
       const trainerTrainings = monthTrainings.filter((t) => t.trainer_id === tr.id)
-      
-      // Calculate total hours
+
+      // Calculate total hours (50%-Trainings nur zur Haelfte)
       const totalStunden = trainerTrainings.reduce((sum, t) => {
-        return sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+        const faktor = t.status === 'durchgefuehrt_halb' ? 0.5 : 1
+        return sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis) * faktor
       }, 0)
 
       const summe = totalStunden * tr.stundensatz
