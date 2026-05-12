@@ -2909,6 +2909,7 @@ function AbrechnungView({
           let tagSumme = 0
           let tagBarSumme = 0
           let tagBezahltSumme = 0
+          let tagAusstehendSumme = 0
           let tagOffeneSumme = 0
 
           tagTrainings.forEach(t => {
@@ -2939,6 +2940,8 @@ function AbrechnungView({
                 tagBarSumme += spielerPreis
               } else if (paymentStatus.bezahlt) {
                 tagBezahltSumme += spielerPreis
+              } else if (paymentStatus.ausstehend) {
+                tagAusstehendSumme += spielerPreis
               } else {
                 tagOffeneSumme += spielerPreis
               }
@@ -2951,6 +2954,7 @@ function AbrechnungView({
             summe: tagSumme,
             barSumme: tagBarSumme,
             bezahltSumme: tagBezahltSumme,
+            ausstehendSumme: tagAusstehendSumme,
             offeneSumme: tagOffeneSumme
             // bezahlt bleibt vom Original (Monatsstatus)
           }
@@ -2990,18 +2994,18 @@ function AbrechnungView({
   }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag, tarife, getSpielerPaymentStatus])
 
   const stats = useMemo(() => {
-    // Trainings-Stats
+    // Trainings-Stats: vier disjunkte Kategorien (Bar + Bezahlt + Ausstehend + Offen = Gesamtumsatz)
     const trainingsTotal = filteredSummary.reduce((sum, s) => sum + s.summe, 0)
     const trainingsBar = filteredSummary.reduce((sum, s) => sum + s.barSumme, 0)
-    const trainingsBezahlt = trainingsBar + filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
+    const trainingsBezahlt = filteredSummary.reduce((sum, s) => sum + s.bezahltSumme, 0)
+    const trainingsAusstehend = filteredSummary.reduce((sum, s) => sum + (s.ausstehendSumme || 0), 0)
     const trainingsOffen = filteredSummary.reduce((sum, s) => sum + s.offeneSumme, 0)
 
-    // Stats zeigen NUR Trainings, keine manuellen Rechnungen
-    // Manuelle Rechnungen werden separat in Buchhaltung > Offene Posten verwaltet
     return {
       total: trainingsTotal,
       bar: trainingsBar,
       bezahlt: trainingsBezahlt,
+      ausstehend: trainingsAusstehend,
       offen: trainingsOffen
     }
   }, [filteredSummary])
@@ -3454,9 +3458,15 @@ function AbrechnungView({
           <div className="stat-value" style={{ color: '#10B981' }}>{stats.bar.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Bezahlt</div>
+          <div className="stat-label">Bezahlt (Überweisung)</div>
           <div className="stat-value" style={{ color: '#22C55E' }}>
             {stats.bezahlt.toFixed(2)} €
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Ausstehend</div>
+          <div className="stat-value" style={{ color: '#F59E0B' }}>
+            {stats.ausstehend.toFixed(2)} €
           </div>
         </div>
         <div className="stat-card">
