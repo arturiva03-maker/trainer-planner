@@ -1595,7 +1595,8 @@ function TrainingModal({
           }
         } else {
           // Nur dieses eine Training aktualisieren
-          await supabase.from('trainings').update(trainingData).eq('id', training.id)
+          const { error: updateError } = await supabase.from('trainings').update(trainingData).eq('id', training.id)
+          if (updateError) throw updateError
 
           // Wenn bar_bezahlt geändert wurde, auch spielerPayments aktualisieren
           if (training.bar_bezahlt !== barBezahlt) {
@@ -1650,7 +1651,8 @@ function TrainingModal({
       onSave()
     } catch (err) {
       console.error('Error saving training:', err)
-      alert('Fehler beim Speichern')
+      const msg = (err as { message?: string })?.message
+      alert('Fehler beim Speichern' + (msg ? `: ${msg}` : ''))
     } finally {
       setSaving(false)
     }
