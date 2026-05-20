@@ -451,7 +451,9 @@ function MainApp({ user }: { user: User }) {
   }, [user.id])
 
   const loadAllData = async () => {
-    setDataLoading(true)
+    // Kein setDataLoading(true) hier: Sonst wuerde bei jedem Refresh die aktuelle
+    // View (z.B. Abrechnung mit gewaehltem Monat/Filter/Detail-Modal) unmounted
+    // und alle internen States zurueckgesetzt. Initial ist dataLoading bereits true.
     try {
       const [
         profileRes,
@@ -2677,7 +2679,6 @@ function AbrechnungView({
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar'>('alle')
-  const [filterType, setFilterType] = useState<'keine' | 'spieler' | 'tag'>('keine')
   const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
   const [spielerSuche, setSpielerSuche] = useState('')
   const [selectedTag, setSelectedTag] = useState<string>('')
@@ -2888,7 +2889,7 @@ function AbrechnungView({
     let result = spielerSummary
 
     // Bei Tag-Filter: Zeige nur Trainings des Tages mit korrekten Tages-Summen
-    if (filterType === 'tag' && selectedTag) {
+    if (selectedTag) {
       result = result
         .filter(s => s.trainings.some(t => t.datum === selectedTag))
         .map(s => {
@@ -2988,12 +2989,12 @@ function AbrechnungView({
     }
 
     // Zusätzlicher Filter nach Spieler
-    if (filterType === 'spieler' && selectedSpielerId) {
+    if (selectedSpielerId) {
       result = result.filter((s) => s.spieler.id === selectedSpielerId)
     }
 
     return result
-  }, [spielerSummary, filter, filterType, selectedSpielerId, selectedTag, tarife, getSpielerPaymentStatus])
+  }, [spielerSummary, filter, selectedSpielerId, selectedTag, tarife, getSpielerPaymentStatus])
 
   const stats = useMemo(() => {
     // Trainings-Stats: vier disjunkte Kategorien (Bar + Bezahlt + Ausstehend + Offen = Gesamtumsatz)
@@ -3505,110 +3506,92 @@ function AbrechnungView({
                 <option value="offen">Nur offen</option>
                 <option value="bar">Nur bar</option>
               </select>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Spieler suchen..."
+                  value={spielerSuche}
+                  onChange={(e) => {
+                    setSpielerSuche(e.target.value)
+                    if (!e.target.value) setSelectedSpielerId('')
+                  }}
+                  style={{ width: 'auto', minWidth: 180 }}
+                />
+                {spielerSuche && !selectedSpielerId && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'white',
+                    border: '1px solid var(--gray-200)',
+                    borderRadius: 8,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    maxHeight: 200,
+                    overflowY: 'auto'
+                  }}>
+                    {spielerSummary
+                      .filter(s => s.spieler.name.toLowerCase().includes(spielerSuche.toLowerCase()))
+                      .map(s => (
+                        <div
+                          key={s.spieler.id}
+                          onClick={() => {
+                            setSelectedSpielerId(s.spieler.id)
+                            setSpielerSuche(s.spieler.name)
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid var(--gray-100)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-50)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                          {s.spieler.name}
+                        </div>
+                      ))}
+                    {spielerSummary.filter(s => s.spieler.name.toLowerCase().includes(spielerSuche.toLowerCase())).length === 0 && (
+                      <div style={{ padding: '8px 12px', color: 'var(--gray-500)' }}>Kein Spieler gefunden</div>
+                    )}
+                  </div>
+                )}
+                {selectedSpielerId && (
+                  <button
+                    onClick={() => {
+                      setSelectedSpielerId('')
+                      setSpielerSuche('')
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--gray-500)',
+                      fontSize: 16
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
               <select
                 className="form-control"
-                value={filterType}
-                onChange={(e) => {
-                  setFilterType(e.target.value as typeof filterType)
-                  setSelectedSpielerId('')
-                  setSelectedTag('')
-                }}
-                style={{ width: 'auto' }}
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                style={{ width: 'auto', minWidth: 150 }}
               >
-                <option value="keine">Weitere Filter...</option>
-                <option value="spieler">Nach Spieler</option>
-                <option value="tag">Nach Tag</option>
+                <option value="">Tag wählen...</option>
+                {tageImMonat.map(tag => (
+                  <option key={tag} value={tag}>
+                    {formatDateGerman(tag)}
+                  </option>
+                ))}
               </select>
-              {filterType === 'spieler' && (
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Spieler suchen..."
-                    value={spielerSuche}
-                    onChange={(e) => {
-                      setSpielerSuche(e.target.value)
-                      if (!e.target.value) setSelectedSpielerId('')
-                    }}
-                    style={{ width: 'auto', minWidth: 180 }}
-                  />
-                  {spielerSuche && !selectedSpielerId && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      right: 0,
-                      background: 'white',
-                      border: '1px solid var(--gray-200)',
-                      borderRadius: 8,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      zIndex: 1000,
-                      maxHeight: 200,
-                      overflowY: 'auto'
-                    }}>
-                      {spielerSummary
-                        .filter(s => s.spieler.name.toLowerCase().includes(spielerSuche.toLowerCase()))
-                        .map(s => (
-                          <div
-                            key={s.spieler.id}
-                            onClick={() => {
-                              setSelectedSpielerId(s.spieler.id)
-                              setSpielerSuche(s.spieler.name)
-                            }}
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              borderBottom: '1px solid var(--gray-100)'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--gray-50)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                          >
-                            {s.spieler.name}
-                          </div>
-                        ))}
-                      {spielerSummary.filter(s => s.spieler.name.toLowerCase().includes(spielerSuche.toLowerCase())).length === 0 && (
-                        <div style={{ padding: '8px 12px', color: 'var(--gray-500)' }}>Kein Spieler gefunden</div>
-                      )}
-                    </div>
-                  )}
-                  {selectedSpielerId && (
-                    <button
-                      onClick={() => {
-                        setSelectedSpielerId('')
-                        setSpielerSuche('')
-                      }}
-                      style={{
-                        position: 'absolute',
-                        right: 8,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--gray-500)',
-                        fontSize: 16
-                      }}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              )}
-              {filterType === 'tag' && (
-                <select
-                  className="form-control"
-                  value={selectedTag}
-                  onChange={(e) => setSelectedTag(e.target.value)}
-                  style={{ width: 'auto', minWidth: 150 }}
-                >
-                  <option value="">Tag wählen...</option>
-                  {tageImMonat.map(tag => (
-                    <option key={tag} value={tag}>
-                      {formatDateGerman(tag)}
-                    </option>
-                  ))}
-                </select>
-              )}
             </div>
           </div>
         </div>
@@ -3806,7 +3789,7 @@ function AbrechnungView({
         })
 
         // Filtere Trainings nach Tag wenn Tag-Filter aktiv
-        const gefilterteTrainings = filterType === 'tag' && selectedTag
+        const gefilterteTrainings = selectedTag
           ? detail.trainings.filter(t => t.datum === selectedTag)
           : detail.trainings
 
@@ -3866,7 +3849,7 @@ function AbrechnungView({
               <div className="modal-body">
                 <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
                   <div>
-                    <strong>{filterType === 'tag' && selectedTag ? 'Tag:' : 'Monat:'}</strong> {filterType === 'tag' && selectedTag ? formatDateGerman(selectedTag) : selectedMonth}
+                    <strong>{selectedTag ? 'Tag:' : 'Monat:'}</strong> {selectedTag ? formatDateGerman(selectedTag) : selectedMonth}
                   </div>
                   <div>
                     <strong>Gesamt:</strong> {gefilterteSumme.toFixed(2)} €
@@ -4098,7 +4081,7 @@ function AbrechnungView({
                 </div>
 
                 {/* Korrektur Sektion - nur im Monats-View (nicht Tag-Filter) */}
-                {!(filterType === 'tag' && selectedTag) && (
+                {!selectedTag && (
                   <div style={{
                     marginTop: 16,
                     padding: 12,
