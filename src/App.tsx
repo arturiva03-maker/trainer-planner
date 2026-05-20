@@ -44,19 +44,19 @@ const preserveScroll = () => {
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
     {/* Racket head */}
-    <ellipse cx="26" cy="22" rx="18" ry="20" stroke="#3B82F6" strokeWidth="3" fill="none"/>
+    <ellipse cx="26" cy="22" rx="18" ry="20" stroke="#6366F1" strokeWidth="3" fill="none"/>
     {/* Racket strings horizontal */}
-    <line x1="10" y1="16" x2="42" y2="16" stroke="#3B82F6" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="9" y1="22" x2="43" y2="22" stroke="#3B82F6" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="10" y1="28" x2="42" y2="28" stroke="#3B82F6" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="10" y1="16" x2="42" y2="16" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="9" y1="22" x2="43" y2="22" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="10" y1="28" x2="42" y2="28" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
     {/* Racket strings vertical */}
-    <line x1="18" y1="4" x2="18" y2="40" stroke="#3B82F6" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="26" y1="2" x2="26" y2="42" stroke="#3B82F6" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="34" y1="4" x2="34" y2="40" stroke="#3B82F6" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="18" y1="4" x2="18" y2="40" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="26" y1="2" x2="26" y2="42" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
+    <line x1="34" y1="4" x2="34" y2="40" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
     {/* Racket handle */}
-    <rect x="22" y="40" width="8" height="20" rx="2" fill="#3B82F6"/>
-    <rect x="22" y="44" width="8" height="3" fill="#2563EB"/>
-    <rect x="22" y="50" width="8" height="3" fill="#2563EB"/>
+    <rect x="22" y="40" width="8" height="20" rx="2" fill="#6366F1"/>
+    <rect x="22" y="44" width="8" height="3" fill="#4F46E5"/>
+    <rect x="22" y="50" width="8" height="3" fill="#4F46E5"/>
     {/* Tennis ball */}
     <circle cx="50" cy="14" r="10" fill="#a3e635"/>
     <path d="M43 8 Q50 14 43 20" stroke="white" strokeWidth="2" fill="none"/>
@@ -3454,7 +3454,7 @@ function AbrechnungView({
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Gesamtumsatz</div>
-          <div className="stat-value" style={{ color: '#3B82F6' }}>{stats.total.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: '#6366F1' }}>{stats.total.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Bar bezahlt</div>
