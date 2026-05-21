@@ -94,4 +94,27 @@ export interface MonthlyAdjustment {
   created_at?: string
 }
 
-export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer'
+export interface Pool {
+  id: string
+  user_id: string
+  name: string
+  wochentag: number // 0 = Mo ... 6 = So
+  uhrzeit_von: string
+  uhrzeit_bis: string
+  pauschalpreis_pro_woche: number
+  start_datum?: string | null
+  end_datum?: string | null
+  notiz?: string | null
+  created_at: string
+  updated_at?: string
+}
+
+export interface PoolSpieler {
+  id: string
+  pool_id: string
+  spieler_id: string
+  pauschalpreis_override?: number | null
+  created_at: string
+}
+
+export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'pool'

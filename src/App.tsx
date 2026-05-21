@@ -9,8 +9,16 @@ import type {
   Trainer,
   MonthlyAdjustment,
   Tab,
-  SpielerTrainingPayment
+  SpielerTrainingPayment,
+  Pool,
+  PoolSpieler
 } from './types'
+
+// Pool-Feature-Whitelist. Leeres Array = alle Trainer; sonst nur die gelisteten E-Mails.
+// TODO: später auf ['zlatanpalazov60@gmail.com'] umstellen.
+const POOL_ALLOWED_EMAILS: readonly string[] = []
+const isPoolAllowed = (email?: string | null) =>
+  POOL_ALLOWED_EMAILS.length === 0 || (!!email && POOL_ALLOWED_EMAILS.includes(email.toLowerCase()))
 import {
   formatDate,
   formatDateGerman,
@@ -440,6 +448,8 @@ function MainApp({ user }: { user: User }) {
   const [trainer, setTrainer] = useState<Trainer[]>([])
   const [adjustments, setAdjustments] = useState<MonthlyAdjustment[]>([])
   const [spielerPayments, setSpielerPayments] = useState<SpielerTrainingPayment[]>([])
+  const [pools, setPools] = useState<Pool[]>([])
+  const [poolSpieler, setPoolSpieler] = useState<PoolSpieler[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
   // Persistenter Navigation-State (wird nicht bei Daten-Refresh zurückgesetzt)
@@ -485,6 +495,19 @@ function MainApp({ user }: { user: User }) {
     } finally {
       setDataLoading(false)
     }
+
+    // Pools separat laden: wenn die Migration noch nicht eingespielt wurde,
+    // soll der Rest der App weiter funktionieren.
+    try {
+      const [poolsRes, poolSpielerRes] = await Promise.all([
+        supabase.from('pools').select('*').eq('user_id', user.id).order('name'),
+        supabase.from('pool_spieler').select('*')
+      ])
+      if (poolsRes.data) setPools(poolsRes.data)
+      if (poolSpielerRes.data) setPoolSpieler(poolSpielerRes.data)
+    } catch (err) {
+      console.warn('Pools nicht verfügbar (Migration evtl. fehlt):', err)
+    }
   }
 
   const handleLogout = async () => {
@@ -497,21 +520,24 @@ function MainApp({ user }: { user: User }) {
     setActiveTab('kalender')
   }
 
-  const baseTabs = [
-    { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
-    { id: 'verwaltung' as Tab, label: 'Verwaltung', icon: '👥' },
-    { id: 'abrechnung' as Tab, label: 'Abrechnung', icon: '💰' },
+  const poolEnabled = isPoolAllowed(user.email)
+
+  const baseTabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'kalender', label: 'Kalender', icon: '📅' },
+    { id: 'verwaltung', label: 'Verwaltung', icon: '👥' },
+    { id: 'abrechnung', label: 'Abrechnung', icon: '💰' },
   ]
 
-  const tabs = trainer.length > 0
-    ? [...baseTabs, { id: 'abrechnung-trainer' as Tab, label: 'Abr. Trainer', icon: '👨‍🏫' }]
-    : baseTabs
+  const tabs: { id: Tab; label: string; icon: string }[] = [...baseTabs]
+  if (poolEnabled) tabs.push({ id: 'pool', label: 'Pool', icon: '🏊' })
+  if (trainer.length > 0) tabs.push({ id: 'abrechnung-trainer', label: 'Abr. Trainer', icon: '👨‍🏫' })
 
-  const mobileNavTabs = [
-    { id: 'kalender' as Tab, label: 'Kalender', icon: '📅' },
-    { id: 'verwaltung' as Tab, label: 'Verwalten', icon: '👥' },
-    { id: 'abrechnung' as Tab, label: 'Rechnung', icon: '💰' },
+  const mobileNavTabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'kalender', label: 'Kalender', icon: '📅' },
+    { id: 'verwaltung', label: 'Verwalten', icon: '👥' },
+    { id: 'abrechnung', label: 'Rechnung', icon: '💰' },
   ]
+  if (poolEnabled) mobileNavTabs.push({ id: 'pool', label: 'Pool', icon: '🏊' })
 
   // Warte-Bildschirm für nicht freigeschaltete User
   if (!dataLoading && profile && profile.approved !== true) {
@@ -641,6 +667,15 @@ function MainApp({ user }: { user: User }) {
               <AbrechnungTrainerView
                 trainings={trainings}
                 trainer={trainer}
+                onUpdate={loadAllData}
+                userId={user.id}
+              />
+            )}
+            {activeTab === 'pool' && poolEnabled && (
+              <PoolView
+                pools={pools}
+                poolSpieler={poolSpieler}
+                spieler={spieler}
                 onUpdate={loadAllData}
                 userId={user.id}
               />
@@ -4453,6 +4488,645 @@ function AbrechnungTrainerView({
         <p style={{ color: 'var(--gray-500)', fontSize: 14 }}>
           <strong>Hinweis:</strong> Um Trainings einem Trainer zuzuordnen, müssen Sie bei der Trainingserfassung den Trainer auswählen.
         </p>
+      </div>
+    </div>
+  )
+}
+
+
+// ============ POOL VIEW ============
+function PoolView({
+  pools,
+  poolSpieler,
+  spieler,
+  onUpdate,
+  userId
+}: {
+  pools: Pool[]
+  poolSpieler: PoolSpieler[]
+  spieler: Spieler[]
+  onUpdate: () => void
+  userId: string
+}) {
+  const [showPoolModal, setShowPoolModal] = useState(false)
+  const [editingPool, setEditingPool] = useState<Pool | null>(null)
+  const [openPoolId, setOpenPoolId] = useState<string | null>(null)
+
+  const poolsSorted = useMemo(
+    () => [...pools].sort((a, b) =>
+      a.wochentag - b.wochentag || a.uhrzeit_von.localeCompare(b.uhrzeit_von)
+    ),
+    [pools]
+  )
+
+  const spielerCount = (poolId: string) =>
+    poolSpieler.filter((ps) => ps.pool_id === poolId).length
+
+  const wochenInZeitraum = (pool: Pool) => {
+    if (!pool.start_datum || !pool.end_datum) return null
+    const start = new Date(pool.start_datum)
+    const end = new Date(pool.end_datum)
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return null
+    const ms = end.getTime() - start.getTime()
+    return Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1
+  }
+
+  return (
+    <div>
+      <div className="card">
+        <div className="card-header">
+          <h3>Pool-Verwaltung</h3>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setEditingPool(null)
+              setShowPoolModal(true)
+            }}
+          >
+            + Neuer Pool
+          </button>
+        </div>
+
+        <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 0 }}>
+          Wiederkehrende Gruppentrainings mit Pauschalpreis pro Spieler pro Woche
+          (z.B. „Mittwoch 18–21 Uhr, 30 €/Woche").
+        </p>
+
+        {poolsSorted.length === 0 && (
+          <div className="empty-state">Noch keine Pools angelegt</div>
+        )}
+
+        <div className="mobile-card-list" style={{ marginTop: 12 }}>
+          {poolsSorted.map((pool) => {
+            const wochen = wochenInZeitraum(pool)
+            const dauer = calculateDuration(pool.uhrzeit_von, pool.uhrzeit_bis)
+            return (
+              <div key={pool.id} className="mobile-card">
+                <div className="mobile-card-header">
+                  <div className="mobile-card-title">{pool.name}</div>
+                  <div className="mobile-card-subtitle">
+                    {WOCHENTAGE[pool.wochentag]} · {formatTime(pool.uhrzeit_von)}–{formatTime(pool.uhrzeit_bis)}
+                    {' '}({dauer.toFixed(1)} h)
+                  </div>
+                </div>
+                <div className="mobile-card-body">
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Pauschale/Woche</span>
+                    <span className="mobile-card-value" style={{ fontWeight: 600 }}>
+                      {pool.pauschalpreis_pro_woche.toFixed(2)} €
+                    </span>
+                  </div>
+                  <div className="mobile-card-row">
+                    <span className="mobile-card-label">Spieler</span>
+                    <span className="mobile-card-value">{spielerCount(pool.id)}</span>
+                  </div>
+                  {pool.start_datum && pool.end_datum && (
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">Zeitraum</span>
+                      <span className="mobile-card-value">
+                        {formatDateGerman(pool.start_datum)} – {formatDateGerman(pool.end_datum)}
+                        {wochen ? ` (${wochen} Wo.)` : ''}
+                      </span>
+                    </div>
+                  )}
+                  {wochen && (
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">Pro Spieler gesamt</span>
+                      <span className="mobile-card-value" style={{ fontWeight: 600 }}>
+                        {(pool.pauschalpreis_pro_woche * wochen).toFixed(2)} €
+                      </span>
+                    </div>
+                  )}
+                  {pool.notiz && (
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">Notiz</span>
+                      <span className="mobile-card-value">{pool.notiz}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mobile-card-actions">
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => setOpenPoolId(pool.id)}
+                  >
+                    Spieler verwalten
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      setEditingPool(pool)
+                      setShowPoolModal(true)
+                    }}
+                  >
+                    Bearbeiten
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {showPoolModal && (
+        <PoolModal
+          pool={editingPool}
+          userId={userId}
+          onClose={() => {
+            setShowPoolModal(false)
+            setEditingPool(null)
+          }}
+          onSave={() => {
+            setShowPoolModal(false)
+            setEditingPool(null)
+            onUpdate()
+          }}
+        />
+      )}
+
+      {openPoolId && (
+        <PoolSpielerModal
+          pool={pools.find((p) => p.id === openPoolId)!}
+          spieler={spieler}
+          poolSpieler={poolSpieler.filter((ps) => ps.pool_id === openPoolId)}
+          onClose={() => setOpenPoolId(null)}
+          onSave={() => {
+            setOpenPoolId(null)
+            onUpdate()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============ POOL MODAL ============
+function PoolModal({
+  pool,
+  userId,
+  onClose,
+  onSave
+}: {
+  pool: Pool | null
+  userId: string
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [name, setName] = useState(pool?.name || '')
+  const [wochentag, setWochentag] = useState<number>(pool?.wochentag ?? 2) // Default Mi
+  const [von, setVon] = useState(pool?.uhrzeit_von || '18:00')
+  const [bis, setBis] = useState(pool?.uhrzeit_bis || '21:00')
+  const [pauschale, setPauschale] = useState<string>(
+    pool ? String(pool.pauschalpreis_pro_woche) : '30'
+  )
+  const [startDatum, setStartDatum] = useState(pool?.start_datum || '')
+  const [endDatum, setEndDatum] = useState(pool?.end_datum || '')
+  const [notiz, setNotiz] = useState(pool?.notiz || '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      alert('Name ist erforderlich')
+      return
+    }
+    if (!von || !bis || von >= bis) {
+      alert('Uhrzeit ungültig')
+      return
+    }
+    const preis = parseFloat(pauschale.replace(',', '.'))
+    if (isNaN(preis) || preis < 0) {
+      alert('Pauschalpreis ungültig')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const data = {
+        user_id: userId,
+        name: name.trim(),
+        wochentag,
+        uhrzeit_von: von,
+        uhrzeit_bis: bis,
+        pauschalpreis_pro_woche: preis,
+        start_datum: startDatum || null,
+        end_datum: endDatum || null,
+        notiz: notiz.trim() || null
+      }
+
+      if (pool) {
+        const { error } = await supabase.from('pools').update(data).eq('id', pool.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('pools').insert(data)
+        if (error) throw error
+      }
+      onSave()
+    } catch (err) {
+      console.error('Error saving pool:', err)
+      alert('Fehler beim Speichern: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!pool) return
+    const confirmed = await showConfirm(
+      'Pool löschen',
+      'Pool wirklich löschen? Alle zugeordneten Spieler-Einträge werden ebenfalls entfernt.'
+    )
+    if (!confirmed) return
+    await supabase.from('pools').delete().eq('id', pool.id)
+    onSave()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{pool ? 'Pool bearbeiten' : 'Neuer Pool'}</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Name *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="z.B. Sommertraining Mittwoch"
+              autoFocus
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Wochentag</label>
+            <select
+              className="form-control"
+              value={wochentag}
+              onChange={(e) => setWochentag(parseInt(e.target.value))}
+            >
+              {WOCHENTAGE.map((w, i) => (
+                <option key={i} value={i}>{w}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Von *</label>
+              <input
+                type="time"
+                className="form-control"
+                value={von}
+                onChange={(e) => setVon(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Bis *</label>
+              <input
+                type="time"
+                className="form-control"
+                value={bis}
+                onChange={(e) => setBis(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Pauschalpreis pro Spieler / Woche (€) *</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className="form-control"
+              value={pauschale}
+              onChange={(e) => setPauschale(e.target.value)}
+              placeholder="30"
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Zeitraum von</label>
+              <input
+                type="date"
+                className="form-control"
+                value={startDatum}
+                onChange={(e) => setStartDatum(e.target.value)}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Zeitraum bis</label>
+              <input
+                type="date"
+                className="form-control"
+                value={endDatum}
+                onChange={(e) => setEndDatum(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Notiz</label>
+            <textarea
+              className="form-control"
+              value={notiz}
+              onChange={(e) => setNotiz(e.target.value)}
+              rows={2}
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          {pool && (
+            <button className="btn btn-danger" onClick={handleDelete}>
+              Löschen
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichere...' : 'Speichern'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============ POOL SPIELER MODAL ============
+function PoolSpielerModal({
+  pool,
+  spieler,
+  poolSpieler,
+  onClose,
+  onSave
+}: {
+  pool: Pool
+  spieler: Spieler[]
+  poolSpieler: PoolSpieler[]
+  onClose: () => void
+  onSave: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const [overrideEdits, setOverrideEdits] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+
+  const zugeordnet = useMemo(() => {
+    const map = new Map<string, PoolSpieler>()
+    poolSpieler.forEach((ps) => map.set(ps.spieler_id, ps))
+    return map
+  }, [poolSpieler])
+
+  const verfuegbare = useMemo(() => {
+    const term = search.toLowerCase().trim()
+    return spieler
+      .filter((s) => !zugeordnet.has(s.id))
+      .filter((s) => !term || s.name.toLowerCase().includes(term))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [spieler, zugeordnet, search])
+
+  const zugeordnetListe = useMemo(() => {
+    return poolSpieler
+      .map((ps) => ({ ps, sp: spieler.find((s) => s.id === ps.spieler_id) }))
+      .filter((x) => !!x.sp)
+      .sort((a, b) => a.sp!.name.localeCompare(b.sp!.name))
+  }, [poolSpieler, spieler])
+
+  const handleAdd = async (spielerId: string) => {
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('pool_spieler').insert({
+        pool_id: pool.id,
+        spieler_id: spielerId,
+        pauschalpreis_override: null
+      })
+      if (error) throw error
+      onSave()
+    } catch (err) {
+      console.error('Error adding spieler:', err)
+      alert('Fehler: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemove = async (psId: string) => {
+    const confirmed = await showConfirm('Spieler entfernen', 'Spieler aus dem Pool entfernen?')
+    if (!confirmed) return
+    await supabase.from('pool_spieler').delete().eq('id', psId)
+    onSave()
+  }
+
+  const handleOverrideSave = async (psId: string) => {
+    const raw = overrideEdits[psId]
+    if (raw === undefined) return
+    const val = raw.trim() === '' ? null : parseFloat(raw.replace(',', '.'))
+    if (val !== null && (isNaN(val) || val < 0)) {
+      alert('Preis ungültig')
+      return
+    }
+    try {
+      const { error } = await supabase
+        .from('pool_spieler')
+        .update({ pauschalpreis_override: val })
+        .eq('id', psId)
+      if (error) throw error
+      setOverrideEdits((prev) => {
+        const next = { ...prev }
+        delete next[psId]
+        return next
+      })
+      onSave()
+    } catch (err) {
+      alert('Fehler: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
+    }
+  }
+
+  const wochenInZeitraum = (() => {
+    if (!pool.start_datum || !pool.end_datum) return null
+    const start = new Date(pool.start_datum)
+    const end = new Date(pool.end_datum)
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return null
+    const ms = end.getTime() - start.getTime()
+    return Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1
+  })()
+
+  const summePool = zugeordnetListe.reduce((sum, { ps }) => {
+    const wochenpreis = ps.pauschalpreis_override ?? pool.pauschalpreis_pro_woche
+    return sum + wochenpreis * (wochenInZeitraum ?? 1)
+  }, 0)
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+        <div className="modal-header">
+          <h3>{pool.name} – Spieler</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ marginBottom: 16, color: 'var(--gray-600)', fontSize: 14 }}>
+            {WOCHENTAGE[pool.wochentag]} {formatTime(pool.uhrzeit_von)}–{formatTime(pool.uhrzeit_bis)}
+            {' · '}Standard-Pauschale: <strong>{pool.pauschalpreis_pro_woche.toFixed(2)} €/Woche</strong>
+            {wochenInZeitraum && <> · Zeitraum: <strong>{wochenInZeitraum} Wochen</strong></>}
+          </div>
+
+          <h4 style={{ marginTop: 0 }}>Zugeordnete Spieler ({zugeordnetListe.length})</h4>
+          {zugeordnetListe.length === 0 && (
+            <div className="empty-state" style={{ padding: 12 }}>Noch keine Spieler im Pool</div>
+          )}
+          {zugeordnetListe.map(({ ps, sp }) => {
+            const editingVal = overrideEdits[ps.id]
+            const isEditing = editingVal !== undefined
+            const wochenpreis = ps.pauschalpreis_override ?? pool.pauschalpreis_pro_woche
+            const gesamt = wochenInZeitraum ? wochenpreis * wochenInZeitraum : null
+            return (
+              <div
+                key={ps.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 0',
+                  borderBottom: '1px solid var(--gray-200)',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div style={{ flex: '1 1 160px', fontWeight: 500 }}>{sp!.name}</div>
+                {isEditing ? (
+                  <>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="form-control"
+                      style={{ width: 110 }}
+                      value={editingVal}
+                      onChange={(e) =>
+                        setOverrideEdits((prev) => ({ ...prev, [ps.id]: e.target.value }))
+                      }
+                      placeholder="€/Woche"
+                    />
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => handleOverrideSave(ps.id)}
+                    >
+                      OK
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() =>
+                        setOverrideEdits((prev) => {
+                          const n = { ...prev }
+                          delete n[ps.id]
+                          return n
+                        })
+                      }
+                    >
+                      Abbr.
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 14, color: 'var(--gray-600)', minWidth: 110 }}>
+                      {wochenpreis.toFixed(2)} €/Wo
+                      {ps.pauschalpreis_override != null && (
+                        <span style={{ color: 'var(--accent)', marginLeft: 4 }}>•</span>
+                      )}
+                    </div>
+                    {gesamt != null && (
+                      <div style={{ fontSize: 14, fontWeight: 600, minWidth: 80, textAlign: 'right' }}>
+                        {gesamt.toFixed(2)} €
+                      </div>
+                    )}
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() =>
+                        setOverrideEdits((prev) => ({
+                          ...prev,
+                          [ps.id]: ps.pauschalpreis_override != null
+                            ? String(ps.pauschalpreis_override)
+                            : ''
+                        }))
+                      }
+                    >
+                      Preis
+                    </button>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => handleRemove(ps.id)}
+                    >
+                      Entf.
+                    </button>
+                  </>
+                )}
+              </div>
+            )
+          })}
+
+          {wochenInZeitraum && zugeordnetListe.length > 0 && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 10,
+                background: 'var(--gray-100)',
+                borderRadius: 6,
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontWeight: 600
+              }}
+            >
+              <span>Summe Pool ({wochenInZeitraum} Wo.)</span>
+              <span>{summePool.toFixed(2)} €</span>
+            </div>
+          )}
+
+          <h4 style={{ marginTop: 24 }}>Spieler hinzufügen</h4>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Suchen..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ marginBottom: 8 }}
+          />
+          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+            {verfuegbare.length === 0 && (
+              <div className="empty-state" style={{ padding: 8 }}>
+                {spieler.length === 0
+                  ? 'Noch keine Spieler in der Verwaltung angelegt'
+                  : 'Keine passenden Spieler gefunden'}
+              </div>
+            )}
+            {verfuegbare.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 0',
+                  borderBottom: '1px solid var(--gray-100)'
+                }}
+              >
+                <span>{s.name}</span>
+                <button
+                  className="btn btn-sm btn-primary"
+                  disabled={saving}
+                  onClick={() => handleAdd(s.id)}
+                >
+                  + Hinzufügen
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Schließen
+          </button>
+        </div>
       </div>
     </div>
   )
