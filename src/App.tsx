@@ -12,9 +12,8 @@ import type {
   SpielerTrainingPayment
 } from './types'
 
-// Pool-Modus-Whitelist. Leeres Array = alle Trainer; sonst nur die gelisteten E-Mails.
-// TODO: später auf ['zlatanpalazov60@gmail.com'] umstellen.
-const POOL_ALLOWED_EMAILS: readonly string[] = []
+// Pauschalpreis-Abrechnung-Whitelist. Leeres Array = alle Trainer; sonst nur die gelisteten E-Mails.
+const POOL_ALLOWED_EMAILS: readonly string[] = ['zlatanpalazov60@gmail.com']
 const isPoolAllowed = (email?: string | null) =>
   POOL_ALLOWED_EMAILS.length === 0 || (!!email && POOL_ALLOWED_EMAILS.includes(email.toLowerCase()))
 import {
