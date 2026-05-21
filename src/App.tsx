@@ -4571,7 +4571,7 @@ function PoolView({
                 </div>
                 <div className="mobile-card-body">
                   <div className="mobile-card-row">
-                    <span className="mobile-card-label">Pauschale/Woche</span>
+                    <span className="mobile-card-label">Pauschale/Einheit</span>
                     <span className="mobile-card-value" style={{ fontWeight: 600 }}>
                       {pool.pauschalpreis_pro_woche.toFixed(2)} €
                     </span>
@@ -4648,11 +4648,9 @@ function PoolView({
           pool={pools.find((p) => p.id === openPoolId)!}
           spieler={spieler}
           poolSpieler={poolSpieler.filter((ps) => ps.pool_id === openPoolId)}
+          userId={userId}
           onClose={() => setOpenPoolId(null)}
-          onSave={() => {
-            setOpenPoolId(null)
-            onUpdate()
-          }}
+          onChange={onUpdate}
         />
       )}
     </div>
@@ -4794,7 +4792,7 @@ function PoolModal({
           </div>
 
           <div className="form-group">
-            <label>Pauschalpreis pro Spieler / Woche (€) *</label>
+            <label>Pauschalpreis pro Einheit (€) *</label>
             <input
               type="number"
               step="0.01"
@@ -4804,6 +4802,9 @@ function PoolModal({
               onChange={(e) => setPauschale(e.target.value)}
               placeholder="30"
             />
+            <small style={{ color: 'var(--gray-500)' }}>
+              Standard 1 Einheit/Woche; bei Spielern, die mehrfach teilnehmen, kann die Einheiten-Zahl pro Spieler erhöht werden.
+            </small>
           </div>
 
           <div style={{ display: 'flex', gap: 12 }}>
@@ -4860,18 +4861,22 @@ function PoolSpielerModal({
   pool,
   spieler,
   poolSpieler,
+  userId,
   onClose,
-  onSave
+  onChange
 }: {
   pool: Pool
   spieler: Spieler[]
   poolSpieler: PoolSpieler[]
+  userId: string
   onClose: () => void
-  onSave: () => void
+  onChange: () => void
 }) {
   const [search, setSearch] = useState('')
   const [overrideEdits, setOverrideEdits] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [neuerName, setNeuerName] = useState('')
+  const [creatingNew, setCreatingNew] = useState(false)
 
   const zugeordnet = useMemo(() => {
     const map = new Map<string, PoolSpieler>()
@@ -4900,10 +4905,11 @@ function PoolSpielerModal({
       const { error } = await supabase.from('pool_spieler').insert({
         pool_id: pool.id,
         spieler_id: spielerId,
-        pauschalpreis_override: null
+        pauschalpreis_override: null,
+        einheiten_pro_woche: 1
       })
       if (error) throw error
-      onSave()
+      onChange()
     } catch (err) {
       console.error('Error adding spieler:', err)
       alert('Fehler: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
@@ -4912,11 +4918,38 @@ function PoolSpielerModal({
     }
   }
 
+  const handleCreateAndAdd = async () => {
+    const name = neuerName.trim()
+    if (!name) return
+    setCreatingNew(true)
+    try {
+      const { data, error } = await supabase
+        .from('spieler')
+        .insert({ user_id: userId, name })
+        .select()
+        .single()
+      if (error) throw error
+      const { error: linkErr } = await supabase.from('pool_spieler').insert({
+        pool_id: pool.id,
+        spieler_id: data.id,
+        pauschalpreis_override: null,
+        einheiten_pro_woche: 1
+      })
+      if (linkErr) throw linkErr
+      setNeuerName('')
+      onChange()
+    } catch (err) {
+      alert('Fehler: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
+    } finally {
+      setCreatingNew(false)
+    }
+  }
+
   const handleRemove = async (psId: string) => {
     const confirmed = await showConfirm('Spieler entfernen', 'Spieler aus dem Pool entfernen?')
     if (!confirmed) return
     await supabase.from('pool_spieler').delete().eq('id', psId)
-    onSave()
+    onChange()
   }
 
   const handleOverrideSave = async (psId: string) => {
@@ -4938,7 +4971,22 @@ function PoolSpielerModal({
         delete next[psId]
         return next
       })
-      onSave()
+      onChange()
+    } catch (err) {
+      alert('Fehler: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
+    }
+  }
+
+  const handleEinheitenChange = async (psId: string, raw: string) => {
+    const val = parseFloat(raw.replace(',', '.'))
+    if (isNaN(val) || val <= 0) return
+    try {
+      const { error } = await supabase
+        .from('pool_spieler')
+        .update({ einheiten_pro_woche: val })
+        .eq('id', psId)
+      if (error) throw error
+      onChange()
     } catch (err) {
       alert('Fehler: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
     }
@@ -4954,8 +5002,9 @@ function PoolSpielerModal({
   })()
 
   const summePool = zugeordnetListe.reduce((sum, { ps }) => {
-    const wochenpreis = ps.pauschalpreis_override ?? pool.pauschalpreis_pro_woche
-    return sum + wochenpreis * (wochenInZeitraum ?? 1)
+    const basis = ps.pauschalpreis_override ?? pool.pauschalpreis_pro_woche
+    const einheiten = ps.einheiten_pro_woche ?? 1
+    return sum + basis * einheiten * (wochenInZeitraum ?? 1)
   }, 0)
 
   return (
@@ -4968,8 +5017,12 @@ function PoolSpielerModal({
         <div className="modal-body">
           <div style={{ marginBottom: 16, color: 'var(--gray-600)', fontSize: 14 }}>
             {WOCHENTAGE[pool.wochentag]} {formatTime(pool.uhrzeit_von)}–{formatTime(pool.uhrzeit_bis)}
-            {' · '}Standard-Pauschale: <strong>{pool.pauschalpreis_pro_woche.toFixed(2)} €/Woche</strong>
+            {' · '}Standard-Pauschale: <strong>{pool.pauschalpreis_pro_woche.toFixed(2)} €/Einheit</strong>
             {wochenInZeitraum && <> · Zeitraum: <strong>{wochenInZeitraum} Wochen</strong></>}
+            <br />
+            <span style={{ fontSize: 13 }}>
+              Einheiten = wie oft der Spieler pro Woche teilnimmt (Default 1). Preis pro Spieler/Woche = Einheiten × Pauschale.
+            </span>
           </div>
 
           <h4 style={{ marginTop: 0 }}>Zugeordnete Spieler ({zugeordnetListe.length})</h4>
@@ -4979,7 +5032,9 @@ function PoolSpielerModal({
           {zugeordnetListe.map(({ ps, sp }) => {
             const editingVal = overrideEdits[ps.id]
             const isEditing = editingVal !== undefined
-            const wochenpreis = ps.pauschalpreis_override ?? pool.pauschalpreis_pro_woche
+            const basis = ps.pauschalpreis_override ?? pool.pauschalpreis_pro_woche
+            const einheiten = ps.einheiten_pro_woche ?? 1
+            const wochenpreis = basis * einheiten
             const gesamt = wochenInZeitraum ? wochenpreis * wochenInZeitraum : null
             return (
               <div
@@ -5006,7 +5061,7 @@ function PoolSpielerModal({
                       onChange={(e) =>
                         setOverrideEdits((prev) => ({ ...prev, [ps.id]: e.target.value }))
                       }
-                      placeholder="€/Woche"
+                      placeholder="€/Einheit"
                     />
                     <button
                       className="btn btn-sm btn-primary"
@@ -5029,15 +5084,39 @@ function PoolSpielerModal({
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: 14, color: 'var(--gray-600)', minWidth: 110 }}>
-                      {wochenpreis.toFixed(2)} €/Wo
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 14,
+                        color: 'var(--gray-600)'
+                      }}
+                      title="Einheiten pro Woche"
+                    >
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0.5"
+                        className="form-control"
+                        style={{ width: 64, padding: '4px 6px', textAlign: 'right' }}
+                        defaultValue={einheiten}
+                        onBlur={(e) => {
+                          const v = parseFloat(e.target.value.replace(',', '.'))
+                          if (!isNaN(v) && v !== einheiten) handleEinheitenChange(ps.id, e.target.value)
+                        }}
+                      />
+                      <span>× {basis.toFixed(2)} €</span>
                       {ps.pauschalpreis_override != null && (
-                        <span style={{ color: 'var(--accent)', marginLeft: 4 }}>•</span>
+                        <span style={{ color: 'var(--accent)' }}>•</span>
                       )}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, minWidth: 90, textAlign: 'right' }}>
+                      {wochenpreis.toFixed(2)} €/Wo
                     </div>
                     {gesamt != null && (
                       <div style={{ fontSize: 14, fontWeight: 600, minWidth: 80, textAlign: 'right' }}>
-                        {gesamt.toFixed(2)} €
+                        = {gesamt.toFixed(2)} €
                       </div>
                     )}
                     <button
@@ -5083,10 +5162,34 @@ function PoolSpielerModal({
           )}
 
           <h4 style={{ marginTop: 24 }}>Spieler hinzufügen</h4>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Neuer Spielername..."
+              value={neuerName}
+              onChange={(e) => setNeuerName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && neuerName.trim() && !creatingNew) {
+                  handleCreateAndAdd()
+                }
+              }}
+              style={{ flex: 1 }}
+            />
+            <button
+              className="btn btn-primary"
+              disabled={!neuerName.trim() || creatingNew}
+              onClick={handleCreateAndAdd}
+            >
+              + Anlegen & zuweisen
+            </button>
+          </div>
+
           <input
             type="text"
             className="form-control"
-            placeholder="Suchen..."
+            placeholder="Bestehende Spieler suchen..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ marginBottom: 8 }}

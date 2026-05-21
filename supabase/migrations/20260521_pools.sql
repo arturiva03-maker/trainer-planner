@@ -19,15 +19,21 @@ CREATE TABLE IF NOT EXISTS pools (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Tabelle: pool_spieler (Spieler-Zuordnung mit optionalem Preis-Override)
+-- 2. Tabelle: pool_spieler (Spieler-Zuordnung mit optionalem Preis-Override
+--    und Anzahl Einheiten pro Woche, falls ein Spieler mehrfach teilnimmt)
 CREATE TABLE IF NOT EXISTS pool_spieler (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   pool_id UUID NOT NULL REFERENCES pools(id) ON DELETE CASCADE,
   spieler_id UUID NOT NULL REFERENCES spieler(id) ON DELETE CASCADE,
   pauschalpreis_override NUMERIC(10,2),
+  einheiten_pro_woche NUMERIC(6,2) NOT NULL DEFAULT 1,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(pool_id, spieler_id)
 );
+
+-- Idempotenter Add-Column falls die Tabelle bereits existierte
+ALTER TABLE pool_spieler
+  ADD COLUMN IF NOT EXISTS einheiten_pro_woche NUMERIC(6,2) NOT NULL DEFAULT 1;
 
 -- 3. Indizes
 CREATE INDEX IF NOT EXISTS idx_pools_user_id ON pools(user_id);

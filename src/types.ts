@@ -114,6 +114,7 @@ export interface PoolSpieler {
   pool_id: string
   spieler_id: string
   pauschalpreis_override?: number | null
+  einheiten_pro_woche: number
   created_at: string
 }
 
