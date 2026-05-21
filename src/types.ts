@@ -34,10 +34,13 @@ export interface EntfernterSpieler {
   entfernt_am: string
 }
 
-// Individueller Tarif fuer einen Spieler in einem Gruppentraining
+// Individueller Tarif fuer einen Spieler in einem Gruppentraining.
+// einheiten zaehlt fuer Pool-Trainings, wie oft der Spieler teilnimmt
+// (Default 1; > 1 wenn er mehrfach pro Einheit dabei ist).
 export interface SpielerTarifOverride {
   tarif_id?: string | null
   custom_preis?: number | null
+  einheiten?: number | null
 }
 
 export interface Training {
@@ -60,6 +63,8 @@ export interface Training {
   bezahlt: boolean
   korrektur_betrag?: number
   korrektur_grund?: string
+  ist_pool?: boolean
+  pool_pauschalpreis_pro_einheit?: number | null
   created_at: string
 }
 
@@ -94,28 +99,4 @@ export interface MonthlyAdjustment {
   created_at?: string
 }
 
-export interface Pool {
-  id: string
-  user_id: string
-  name: string
-  wochentag: number // 0 = Mo ... 6 = So
-  uhrzeit_von: string
-  uhrzeit_bis: string
-  pauschalpreis_pro_woche: number
-  start_datum?: string | null
-  end_datum?: string | null
-  notiz?: string | null
-  created_at: string
-  updated_at?: string
-}
-
-export interface PoolSpieler {
-  id: string
-  pool_id: string
-  spieler_id: string
-  pauschalpreis_override?: number | null
-  einheiten_pro_woche: number
-  created_at: string
-}
-
-export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer' | 'pool'
+export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer'

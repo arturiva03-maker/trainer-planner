@@ -40,6 +40,9 @@ export function calculateDuration(von: string, bis: string): number {
 
 // Berechnet den Preis eines einzelnen Spielers fuer ein Training.
 // Beruecksichtigt individuelle Tarife pro Spieler (spieler_tarife) falls vorhanden.
+// Pool-Trainings (ist_pool): Pauschalpreis pro Einheit x einheiten (aus
+// spieler_tarife[sid].einheiten, Default 1). Tarif/Dauer/Status spielen
+// keine Rolle.
 export function calculateSpielerPreisForTraining(
   training: import('./types').Training,
   spielerId: string,
@@ -50,6 +53,19 @@ export function calculateSpielerPreisForTraining(
   tarifId: string | null
   istIndividuell: boolean
 } {
+  // Pool-Training: feste Pauschale pro Einheit x Einheiten des Spielers
+  if (training.ist_pool) {
+    const pauschale = training.pool_pauschalpreis_pro_einheit ?? 0
+    const einheiten = training.spieler_tarife?.[spielerId]?.einheiten ?? 1
+    const halb = training.status === 'durchgefuehrt_halb' ? 0.5 : 1
+    return {
+      spielerPreis: pauschale * einheiten * halb,
+      abrechnungsart: 'proTraining',
+      tarifId: null,
+      istIndividuell: true
+    }
+  }
+
   const duration = calculateDuration(training.uhrzeit_von, training.uhrzeit_bis)
   // 50%-Trainings (z.B. wg. Regen abgebrochen): nur Hälfte berechnen.
   // Gilt nur fuer proTraining-Abrechnung; monatliche Tarife bleiben unveraendert.
