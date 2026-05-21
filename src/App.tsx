@@ -4635,10 +4635,12 @@ function PoolView({
             setShowPoolModal(false)
             setEditingPool(null)
           }}
-          onSave={() => {
+          onSave={(newPoolId) => {
+            const wasNew = !editingPool && !!newPoolId
             setShowPoolModal(false)
             setEditingPool(null)
             onUpdate()
+            if (wasNew) setOpenPoolId(newPoolId!)
           }}
         />
       )}
@@ -4667,7 +4669,7 @@ function PoolModal({
   pool: Pool | null
   userId: string
   onClose: () => void
-  onSave: () => void
+  onSave: (newPoolId?: string) => void
 }) {
   const [name, setName] = useState(pool?.name || '')
   const [wochentag, setWochentag] = useState<number>(pool?.wochentag ?? 2) // Default Mi
@@ -4713,11 +4715,16 @@ function PoolModal({
       if (pool) {
         const { error } = await supabase.from('pools').update(data).eq('id', pool.id)
         if (error) throw error
+        onSave()
       } else {
-        const { error } = await supabase.from('pools').insert(data)
+        const { data: inserted, error } = await supabase
+          .from('pools')
+          .insert(data)
+          .select()
+          .single()
         if (error) throw error
+        onSave(inserted?.id)
       }
-      onSave()
     } catch (err) {
       console.error('Error saving pool:', err)
       alert('Fehler beim Speichern: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'))
@@ -4837,6 +4844,21 @@ function PoolModal({
               rows={2}
             />
           </div>
+
+          <div
+            style={{
+              marginTop: 8,
+              padding: 10,
+              background: 'var(--gray-100)',
+              borderRadius: 6,
+              fontSize: 13,
+              color: 'var(--gray-600)'
+            }}
+          >
+            ℹ️ <strong>Spieler kommen nach dem Speichern dazu:</strong> auf der Pool-Karte
+            den Button „Spieler verwalten" öffnen — dort kannst du bestehende Spieler suchen,
+            neue direkt anlegen und die Einheiten pro Spieler einstellen.
+          </div>
         </div>
         <div className="modal-footer">
           {pool && (
@@ -4848,7 +4870,7 @@ function PoolModal({
             Abbrechen
           </button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Speichere...' : 'Speichern'}
+            {saving ? 'Speichere...' : 'Speichern & Spieler zuweisen'}
           </button>
         </div>
       </div>
