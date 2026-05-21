@@ -1909,7 +1909,7 @@ function TrainingModal({
                   checked={poolMode}
                   onChange={(e) => setPoolMode(e.target.checked)}
                 />
-                🏊 Pool-Abrechnung (Pauschale pro Spieler × Einheiten)
+                Pauschalpreis-Abrechnung (Pauschale pro Spieler × Einheiten)
               </label>
               <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block' }}>
                 Tarif/Stundenpreis werden ignoriert. Spieler, die mehrfach teilnehmen, bekommen mehr Einheiten.
