@@ -119,3 +119,57 @@ export function calculateSpielerPreisForTraining(
 }
 
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+// Wandelt einen deutschen Betrags-String ("1.234,56", "50,00", "-12,99",
+// "45 €") in eine Zahl um. Tausenderpunkte werden entfernt, Komma als
+// Dezimaltrenner interpretiert. Gibt null zurueck, wenn nichts Sinnvolles drin steht.
+function parseGermanAmount(s: string): number | null {
+  const cleaned = s.replace(/EUR/i, '').replace(/[€\s]/g, '')
+  const normalized = cleaned.replace(/\./g, '').replace(',', '.')
+  const v = Number(normalized)
+  return Number.isFinite(v) ? v : null
+}
+
+// Formatiert eine Zahl als deutschen Betrag ("1.234,56") mit genau 2 Nachkommastellen.
+function formatGermanAmount(v: number): string {
+  return v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// Extrahiert aus Rechnungs-/Transaktionstext zeilenweise Datum + Betrag und
+// bildet die exakte Summe. Reines Copy-Paste-Format ohne Meta-Text:
+//   Datum
+//   Betrag
+//   <Leerzeile>
+//   ...
+//   Gesamtbetrag: <Summe>
+// Pro Zeile wird das erste Datum und der erste Geldbetrag gepaart. Zeilen ohne
+// beides werden ignoriert. Die Summe wird in Cent gerechnet (kein Float-Drift).
+export function extractDatumBetrag(input: string): string {
+  // Datum: DD.MM.YYYY / DD.MM.YY / ISO YYYY-MM-DD / DD.MM. (ohne Jahr)
+  const dateRe = /\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\./
+  // Betrag: deutsches Format mit Komma-Dezimalen, optional Tausenderpunkte und
+  // Vorzeichen, ODER eine ganze/dezimale Zahl direkt vor € / EUR.
+  const amountRe = /-?\d{1,3}(?:\.\d{3})+,\d{2}|-?\d+,\d{2}|-?\d+(?:\.\d{3})*(?=\s*(?:€|EUR))/i
+
+  const entries: { datum: string; betrag: string; value: number }[] = []
+
+  for (const raw of input.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line) continue
+    const dateMatch = line.match(dateRe)
+    if (!dateMatch) continue
+    // Datum aus der Zeile entfernen, damit seine Punkte nicht als Betrag zaehlen.
+    const rest = line.replace(dateMatch[0], ' ')
+    const amountMatch = rest.match(amountRe)
+    if (!amountMatch) continue
+    const value = parseGermanAmount(amountMatch[0])
+    if (value == null) continue
+    entries.push({ datum: dateMatch[0], betrag: amountMatch[0].trim(), value })
+  }
+
+  if (entries.length === 0) return ''
+
+  const sumCents = entries.reduce((acc, e) => acc + Math.round(e.value * 100), 0)
+  const blocks = entries.map((e) => `${e.datum}\n${e.betrag}`)
+  return `${blocks.join('\n\n')}\n\nGesamtbetrag: ${formatGermanAmount(sumCents / 100)}`
+}

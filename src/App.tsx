@@ -24,6 +24,7 @@ import {
   getMonthString,
   calculateDuration,
   calculateSpielerPreisForTraining,
+  extractDatumBetrag,
   WOCHENTAGE
 } from './utils'
 
@@ -513,11 +514,13 @@ function MainApp({ user }: { user: User }) {
 
   const tabs: { id: Tab; label: string; icon: string }[] = [...baseTabs]
   if (trainer.length > 0) tabs.push({ id: 'abrechnung-trainer', label: 'Abr. Trainer', icon: '👨‍🏫' })
+  tabs.push({ id: 'extraktor', label: 'Extraktor', icon: '🧾' })
 
   const mobileNavTabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'kalender', label: 'Kalender', icon: '📅' },
     { id: 'verwaltung', label: 'Verwalten', icon: '👥' },
     { id: 'abrechnung', label: 'Rechnung', icon: '💰' },
+    { id: 'extraktor', label: 'Extraktor', icon: '🧾' },
   ]
 
   // Warte-Bildschirm für nicht freigeschaltete User
@@ -653,9 +656,105 @@ function MainApp({ user }: { user: User }) {
                 userId={user.id}
               />
             )}
+            {activeTab === 'extraktor' && <ExtraktorView />}
           </>
         )}
       </main>
+    </div>
+  )
+}
+
+// ============ EXTRAKTOR VIEW ============
+// Mini-Tool: Aus eingefuegten Rechnungs-/Transaktionsdaten zeilenweise
+// Datum + Betrag extrahieren und die exakte Summe bilden. Rein algorithmisch,
+// ohne Server/AI – der Output ist fuer Copy-Paste gedacht.
+function ExtraktorView() {
+  const [input, setInput] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const output = useMemo(() => extractDatumBetrag(input), [input])
+
+  const handleCopy = async () => {
+    if (!output) return
+    try {
+      await navigator.clipboard.writeText(output)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Fallback fuer aeltere Browser / unsichere Kontexte
+      const ta = document.createElement('textarea')
+      ta.value = output
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } catch { /* ignore */ }
+      document.body.removeChild(ta)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h3>🧾 Datum & Betrag Extraktor</h3>
+        {output && (
+          <button className="btn btn-primary" onClick={handleCopy}>
+            {copied ? '✓ Kopiert' : 'Ergebnis kopieren'}
+          </button>
+        )}
+      </div>
+
+      <p style={{ color: 'var(--gray-600)', marginBottom: 16, fontSize: 14 }}>
+        Rechnungs- oder Transaktionsdaten unten einfügen. Pro Zeile werden Datum
+        und Betrag erkannt und exakt aufsummiert.
+      </p>
+
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
+            Eingabe
+          </label>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={'z.B.\n30.05.2026  Training Max  50,00 €\n29.05.2026  Lastschrift  -12,99 €'}
+            rows={10}
+            style={{
+              width: '100%',
+              fontFamily: 'monospace',
+              fontSize: 14,
+              padding: 12,
+              borderRadius: 8,
+              border: '1px solid var(--gray-300)',
+              resize: 'vertical',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
+        <div>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
+            Ergebnis
+          </label>
+          <textarea
+            value={output}
+            readOnly
+            placeholder="Hier erscheint das Ergebnis automatisch …"
+            rows={12}
+            style={{
+              width: '100%',
+              fontFamily: 'monospace',
+              fontSize: 14,
+              padding: 12,
+              borderRadius: 8,
+              border: '1px solid var(--gray-300)',
+              background: 'var(--gray-100)',
+              resize: 'vertical',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+      </div>
     </div>
   )
 }
