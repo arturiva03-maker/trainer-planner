@@ -120,14 +120,41 @@ export function calculateSpielerPreisForTraining(
 
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-// Wandelt einen deutschen Betrags-String ("1.234,56", "50,00", "-12,99",
-// "45 €") in eine Zahl um. Tausenderpunkte werden entfernt, Komma als
-// Dezimaltrenner interpretiert. Gibt null zurueck, wenn nichts Sinnvolles drin steht.
-function parseGermanAmount(s: string): number | null {
-  const cleaned = s.replace(/EUR/i, '').replace(/[€\s]/g, '')
-  const normalized = cleaned.replace(/\./g, '').replace(',', '.')
-  const v = Number(normalized)
-  return Number.isFinite(v) ? v : null
+// Wandelt einen Betrags-String in eine Zahl um – egal ob deutsches Format
+// ("1.234,56", "24,75") oder Punkt-Dezimalformat ("1,234.56", "24.75").
+// Regeln:
+//  - Kommt . UND , vor: das LETZTE Trennzeichen ist das Dezimaltrennzeichen,
+//    der Rest sind Tausendertrenner.
+//  - Kommt nur eines vor: 3 Nachkommastellen => Tausendertrenner (z.B. 1.234),
+//    sonst (1-2 Stellen) => Dezimaltrenner (z.B. 24.75 / 24,75).
+function parseAmount(raw: string): number | null {
+  let s = raw.replace(/EUR/gi, '').replace(/[€\s]/g, '')
+  const neg = s.startsWith('-')
+  s = s.replace(/^[+-]/, '')
+
+  const hasDot = s.includes('.')
+  const hasComma = s.includes(',')
+
+  if (hasDot && hasComma) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.')
+    } else {
+      s = s.replace(/,/g, '')
+    }
+  } else if (hasDot || hasComma) {
+    const sep = hasComma ? ',' : '.'
+    const idx = s.lastIndexOf(sep)
+    const after = s.length - idx - 1
+    if (after === 3) {
+      s = s.split(sep).join('') // Tausendertrenner -> entfernen
+    } else {
+      s = s.slice(0, idx).split(sep).join('') + '.' + s.slice(idx + 1)
+    }
+  }
+
+  const v = Number(s)
+  if (!Number.isFinite(v)) return null
+  return neg ? -v : v
 }
 
 // Formatiert eine Zahl als deutschen Betrag ("1.234,56") mit genau 2 Nachkommastellen.
@@ -147,9 +174,11 @@ function formatGermanAmount(v: number): string {
 export function extractDatumBetrag(input: string): string {
   // Datum: DD.MM.YYYY / DD.MM.YY / ISO YYYY-MM-DD / DD.MM. (ohne Jahr)
   const dateRe = /\d{1,2}\.\d{1,2}\.\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\./
-  // Betrag: deutsches Format mit Komma-Dezimalen, optional Tausenderpunkte und
-  // Vorzeichen, ODER eine ganze/dezimale Zahl direkt vor € / EUR.
-  const amountRe = /-?\d{1,3}(?:\.\d{3})+,\d{2}|-?\d+,\d{2}|-?\d+(?:\.\d{3})*(?=\s*(?:€|EUR))/i
+  // Betrag bevorzugt direkt vor € / EUR (egal welches Zahlenformat).
+  const amountCurrencyRe = /(-?\d[\d.,]*)\s*(?:€|EUR)/i
+  // Fallback ohne Waehrung: Zahl mit Dezimaltrenner (so werden Uhrzeiten mit
+  // Doppelpunkt nicht faelschlich als Betrag erkannt).
+  const amountFallbackRe = /-?\d[\d.,]*[.,]\d{1,2}(?!\d)/
 
   const entries: { datum: string; betrag: string; value: number }[] = []
 
@@ -160,11 +189,13 @@ export function extractDatumBetrag(input: string): string {
     if (!dateMatch) continue
     // Datum aus der Zeile entfernen, damit seine Punkte nicht als Betrag zaehlen.
     const rest = line.replace(dateMatch[0], ' ')
-    const amountMatch = rest.match(amountRe)
-    if (!amountMatch) continue
-    const value = parseGermanAmount(amountMatch[0])
+    const curMatch = rest.match(amountCurrencyRe)
+    const amountStr = curMatch ? curMatch[1] : rest.match(amountFallbackRe)?.[0]
+    if (!amountStr) continue
+    const value = parseAmount(amountStr)
     if (value == null) continue
-    entries.push({ datum: dateMatch[0], betrag: amountMatch[0].trim(), value })
+    // Betrag einheitlich im deutschen Format ausgeben.
+    entries.push({ datum: dateMatch[0], betrag: formatGermanAmount(value), value })
   }
 
   if (entries.length === 0) return ''
