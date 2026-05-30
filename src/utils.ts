@@ -201,6 +201,6 @@ export function extractDatumBetrag(input: string): string {
   if (entries.length === 0) return ''
 
   const sumCents = entries.reduce((acc, e) => acc + Math.round(e.value * 100), 0)
-  const blocks = entries.map((e) => `${e.datum}\n${e.betrag}`)
-  return `${blocks.join('\n\n')}\n\nGesamtbetrag: ${formatGermanAmount(sumCents / 100)}`
+  const blocks = entries.map((e) => `${e.datum}\n${e.betrag} €`)
+  return `${blocks.join('\n\n')}\n\nGesamtbetrag: ${formatGermanAmount(sumCents / 100)} €`
 }
