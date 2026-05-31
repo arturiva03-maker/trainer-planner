@@ -2852,6 +2852,15 @@ function LexofficeRechnungModal({
 
   const total = lineItems.reduce((s, li) => s + li.amount * (li.quantity ?? 1), 0)
 
+  // "2026-05" -> "Mai 2026" fuer den Einleitungstext
+  const monthLabel = (() => {
+    const names = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+    const [y, m] = monthStr.split('-').map(Number)
+    return names[m - 1] ? `${names[m - 1]} ${y}` : monthStr
+  })()
+  const introductionText = `Für das Tennistraining im ${monthLabel} stelle ich Ihnen vereinbarungsgemäß folgende Leistungen in Rechnung:`
+  const [intro, setIntro] = useState(introductionText)
+
   const doSearch = async () => {
     setSearching(true); setSearchError(null)
     const r = await searchLexofficeContacts(query)
@@ -2900,7 +2909,7 @@ function LexofficeRechnungModal({
       shippingStart,
       shippingEnd,
       title: 'Rechnung',
-      introduction: `Tennistraining ${monthStr}`
+      introduction: introductionText
     })
     setCreating(false)
     setResult(r)
@@ -2966,6 +2975,17 @@ function LexofficeRechnungModal({
                 )}
               </div>
             )}
+          </div>
+
+          {/* Einleitungstext */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 600, fontSize: 14 }}>Einleitungstext</label>
+            <textarea
+              value={intro}
+              onChange={e => setIntro(e.target.value)}
+              rows={2}
+              style={{ width: '100%', marginTop: 6, padding: 8, borderRadius: 6, border: '1px solid var(--gray-300)', fontSize: 13, boxSizing: 'border-box' }}
+            />
           </div>
 
           {/* Positionen */}
