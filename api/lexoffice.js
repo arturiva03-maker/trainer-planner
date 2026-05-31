@@ -14,7 +14,7 @@
 // UND eine freigeschaltete E-Mail (nur der Inhaber des Lexoffice-Kontos).
 
 const LEXOFFICE_BASE = 'https://api.lexware.io/v1'
-const LEXOFFICE_APP = 'https://app.lexware.io'
+const LEXOFFICE_APP = 'https://app.lexoffice.de'
 
 // Supabase-Werte sind oeffentlich (stehen so auch im Frontend-Bundle) – nur zur
 // Verifikation des Login-Tokens, daher hier fest hinterlegt.
