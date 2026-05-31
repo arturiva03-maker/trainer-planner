@@ -3857,6 +3857,57 @@ function AbrechnungView({
     onUpdate()
   }
 
+  // Baut die offenen Rechnungspositionen eines Spielers (Monat) und oeffnet das
+  // Lexoffice-Modal. Beruecksichtigt monatliche Tarife (nur erstes Training),
+  // Korrekturen und Stunden (Menge = Dauer, Preis pro Stunde).
+  const openLexofficeRechnung = (item: { spieler: Spieler; trainings: Training[] }) => {
+    const sorted = [...item.trainings].sort((a, b) => a.datum.localeCompare(b.datum))
+    const monatlichErstes = new Map<string, string>()
+    sorted.forEach(t => {
+      const calc = calculateSpielerPreisForTraining(t, item.spieler.id, tarife)
+      if (calc.abrechnungsart === 'monatlich') {
+        const key = calc.tarifId || t.id
+        if (!monatlichErstes.has(key)) monatlichErstes.set(key, t.id)
+      }
+    })
+    const lines: LexofficeLineItem[] = sorted
+      .map(t => {
+        const calc = calculateSpielerPreisForTraining(t, item.spieler.id, tarife)
+        let basis = 0
+        if (calc.abrechnungsart === 'monatlich') {
+          const key = calc.tarifId || t.id
+          if (monatlichErstes.get(key) === t.id) basis = calc.spielerPreis
+        } else {
+          basis = calc.spielerPreis
+        }
+        const betrag = basis + (t.korrektur_betrag || 0)
+        const tarif = calc.tarifId ? tarife.find(ta => ta.id === calc.tarifId) : undefined
+        return { t, betrag, tarif }
+      })
+      .filter(x => {
+        const ps = getSpielerPaymentStatus(item.spieler.id, x.t)
+        return !ps.bezahlt && !ps.barBezahlt && x.betrag > 0
+      })
+      .map(x => {
+        const dur = calculateDuration(x.t.uhrzeit_von, x.t.uhrzeit_bis)
+        const hours = dur > 0 ? dur : 1
+        return {
+          name: `${x.tarif?.name || x.t.name || 'Tennistraining'} – ${formatDateGerman(x.t.datum)}`,
+          amount: Number((x.betrag / hours).toFixed(2)),
+          quantity: hours
+        }
+      })
+    const [yy, mm] = selectedMonth.split('-').map(Number)
+    const lastDay = String(new Date(yy, mm, 0).getDate()).padStart(2, '0')
+    setLexofficeData({
+      spieler: item.spieler,
+      lineItems: lines,
+      monthStr: selectedMonth,
+      shippingStart: `${selectedMonth}-01`,
+      shippingEnd: `${selectedMonth}-${lastDay}`
+    })
+  }
+
   return (
     <div>
       <div className="stats-grid">
@@ -4040,6 +4091,16 @@ function AbrechnungView({
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {lexofficeEnabled && (
+                        <button
+                          className="btn btn-sm"
+                          onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
+                          style={{ background: '#6366F1', color: 'white', borderColor: '#6366F1' }}
+                          title="Lexoffice-Rechnung erstellen"
+                        >
+                          📄
+                        </button>
+                      )}
                       <button
                         className="btn btn-sm btn-secondary"
                         onClick={(e) => {
@@ -4129,6 +4190,16 @@ function AbrechnungView({
                 )}
               </div>
               <div className="mobile-card-actions">
+                {lexofficeEnabled && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
+                    style={{ background: '#6366F1', color: 'white', borderColor: '#6366F1' }}
+                    title="Lexoffice-Rechnung erstellen"
+                  >
+                    📄
+                  </button>
+                )}
                 <button
                   className="btn btn-sm btn-secondary"
                   onClick={(e) => {
@@ -4518,35 +4589,7 @@ function AbrechnungView({
               </div>
               <div className="modal-footer">
                 {lexofficeEnabled && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      // Offene Trainings (nicht bar/bezahlt) als Rechnungspositionen
-                      const lines: LexofficeLineItem[] = trainingsDetail
-                        .filter(td => {
-                          const ps = getSpielerPaymentStatus(detail.spieler.id, td.training)
-                          return !ps.bezahlt && !ps.barBezahlt && td.betrag > 0
-                        })
-                        .map(td => {
-                          const dur = calculateDuration(td.training.uhrzeit_von, td.training.uhrzeit_bis)
-                          const hours = dur > 0 ? dur : 1
-                          return {
-                            name: `${td.tarif?.name || td.training.name || 'Tennistraining'} – ${formatDateGerman(td.training.datum)}`,
-                            amount: Number((td.betrag / hours).toFixed(2)),
-                            quantity: hours
-                          }
-                        })
-                      const [yy, mm] = selectedMonth.split('-').map(Number)
-                      const lastDay = String(new Date(yy, mm, 0).getDate()).padStart(2, '0')
-                      setLexofficeData({
-                        spieler: detail.spieler,
-                        lineItems: lines,
-                        monthStr: selectedMonth,
-                        shippingStart: `${selectedMonth}-01`,
-                        shippingEnd: `${selectedMonth}-${lastDay}`
-                      })
-                    }}
-                  >
+                  <button className="btn btn-primary" onClick={() => openLexofficeRechnung(detail)}>
                     📄 Lexoffice-Rechnung
                   </button>
                 )}
