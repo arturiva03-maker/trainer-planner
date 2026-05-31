@@ -130,26 +130,36 @@ async function handleCreateInvoice(req, res) {
   const today = new Date().toISOString().slice(0, 10)
   const vDate = voucherDate || today
 
-  // Adresse aufloesen: Hat der Kontakt eine Rechnungsadresse, referenzieren wir
-  // ihn per contactId (Adresse + Verknuepfung). Hat er keine, schickt Lexoffice
-  // bei contactId einen Fehler – dann nutzen wir eine Einmal-Adresse mit nur dem
-  // Namen (genau wie die Lexoffice-Oberflaeche es erlaubt).
-  let address = { contactId }
+  // Wir referenzieren IMMER den bestehenden Kontakt per contactId (damit die
+  // Rechnung am richtigen Kontakt haengt). Lexoffice verlangt dafuer aber genau
+  // eine Rechnungsadresse. Hat der Kontakt keine, haengen wir ihm eine minimale
+  // an (nur Laendercode DE) – dann ist er referenzierbar und es entsteht kein
+  // neuer Kontakt.
   const cr = await lexofficeFetch(`/contacts/${contactId}`)
   if (cr.ok) {
     const contact = await cr.json()
-    const hasBilling = !!contact.addresses?.billing?.[0]?.city
+    const hasBilling = Array.isArray(contact.addresses?.billing) && contact.addresses.billing.length > 0
     if (!hasBilling) {
-      const name = contact.company?.name
-        || [contact.person?.firstName, contact.person?.lastName].filter(Boolean).join(' ')
-        || 'Kunde'
-      address = { name, countryCode: 'DE' }
+      contact.addresses = contact.addresses || {}
+      contact.addresses.billing = [{ countryCode: 'DE' }]
+      const pr = await lexofficeFetch(`/contacts/${contactId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contact)
+      })
+      if (!pr.ok) {
+        const d = await pr.json().catch(() => null)
+        return res.status(200).json({
+          ok: false,
+          error: `Konnte dem Kontakt keine Rechnungsadresse anlegen: ${d?.message || pr.status}`
+        })
+      }
     }
   }
 
   const payload = {
     voucherDate: germanIso(vDate),
-    address,
+    address: { contactId },
     lineItems: lineItems.map((li) => ({
       type: 'custom',
       name: li.name,
