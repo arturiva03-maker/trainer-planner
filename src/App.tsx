@@ -3574,11 +3574,19 @@ function AbrechnungView({
 
     const newAusstehend = !currentAusstehend
 
-    // Optimistisches Update - sofort alle UI aktualisieren
+    // NUR offene bzw. bereits ausstehende Trainings betreffen – schon (bar oder
+    // per Überweisung) bezahlte bleiben unangetastet, damit ihr Bezahlstatus
+    // nicht verloren geht.
+    const betroffene = spielerData.trainings.filter(t => {
+      const ps = getSpielerPaymentStatus(spielerId, t)
+      return !ps.bezahlt && !ps.barBezahlt
+    })
+
+    // Optimistisches Update - sofort UI aktualisieren
     const updatedPayments: SpielerTrainingPayment[] = []
     const newPayments: SpielerTrainingPayment[] = []
 
-    for (const training of spielerData.trainings) {
+    for (const training of betroffene) {
       const existingPayment = spielerPayments.find(
         p => p.training_id === training.id && p.spieler_id === spielerId
       )
@@ -3607,9 +3615,8 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank: upsert auf (training_id, spieler_id) – kein INSERT/UPDATE-Raten
-    // anhand veralteten States, kein Duplicate-Key mehr.
-    const rows = spielerData.trainings.map(training => ({
+    // Datenbank: nur die betroffenen (nicht bezahlten) Trainings upserten.
+    const rows = betroffene.map(training => ({
       user_id: userId,
       training_id: training.id,
       spieler_id: spielerId,
@@ -3617,12 +3624,14 @@ function AbrechnungView({
       bar_bezahlt: false,
       ausstehend: newAusstehend
     }))
-    const { error: dbError } = await supabase
-      .from('spieler_training_payments')
-      .upsert(rows, { onConflict: 'training_id,spieler_id' })
-    if (dbError) {
-      console.error('Ausstehend speichern fehlgeschlagen:', dbError)
-      alert('Konnte „Ausstehend" nicht speichern:\n' + dbError.message)
+    if (rows.length > 0) {
+      const { error: dbError } = await supabase
+        .from('spieler_training_payments')
+        .upsert(rows, { onConflict: 'training_id,spieler_id' })
+      if (dbError) {
+        console.error('Ausstehend speichern fehlgeschlagen:', dbError)
+        alert('Konnte „Ausstehend" nicht speichern:\n' + dbError.message)
+      }
     }
     onUpdate()
   }
