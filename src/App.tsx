@@ -24,6 +24,26 @@ const isPoolAllowed = (email?: string | null) =>
 const LEXOFFICE_ALLOWED_EMAILS: readonly string[] = ['arturiva03@gmail.com']
 const isLexofficeAllowed = (email?: string | null) =>
   !!email && LEXOFFICE_ALLOWED_EMAILS.includes(email.toLowerCase())
+
+// Supabase liefert pro Request max. 1000 Zeilen. Diese Hilfsfunktion holt ALLE
+// Zeilen seitenweise. Die uebergebene Query MUSS stabil sortiert sein (.order),
+// sonst koennen Seiten Zeilen doppeln/auslassen.
+async function fetchAllRows<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const pageSize = 1000
+  const all: T[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await buildPage(from, from + pageSize - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+  return all
+}
 import {
   formatDate,
   formatDateGerman,
@@ -472,27 +492,34 @@ function MainApp({ user }: { user: User }) {
         profileRes,
         spielerRes,
         tarifeRes,
-        trainingsRes,
         trainerRes,
         adjustmentsRes,
-        spielerPaymentsRes
+        // trainings und payments koennen >1000 Zeilen haben -> seitenweise laden
+        trainingsAll,
+        spielerPaymentsAll
       ] = await Promise.all([
         supabase.from('trainer_profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('spieler').select('*').eq('user_id', user.id).order('name'),
         supabase.from('tarife').select('*').eq('user_id', user.id).order('name'),
-        supabase.from('trainings').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
         supabase.from('trainer').select('*').eq('user_id', user.id).order('name'),
         supabase.from('monthly_adjustments').select('*').eq('user_id', user.id),
-        supabase.from('spieler_training_payments').select('*').eq('user_id', user.id)
+        fetchAllRows<Training>((from, to) =>
+          supabase.from('trainings').select('*').eq('user_id', user.id)
+            .order('datum', { ascending: false }).order('id').range(from, to)
+        ),
+        fetchAllRows<SpielerTrainingPayment>((from, to) =>
+          supabase.from('spieler_training_payments').select('*').eq('user_id', user.id)
+            .order('id').range(from, to)
+        )
       ])
 
       if (profileRes.data) setProfile(profileRes.data)
       if (spielerRes.data) setSpieler(spielerRes.data)
       if (tarifeRes.data) setTarife(tarifeRes.data)
-      if (trainingsRes.data) setTrainings(trainingsRes.data)
+      setTrainings(trainingsAll)
       if (trainerRes.data) setTrainer(trainerRes.data)
       if (adjustmentsRes.data) setAdjustments(adjustmentsRes.data)
-      if (spielerPaymentsRes.data) setSpielerPayments(spielerPaymentsRes.data)
+      setSpielerPayments(spielerPaymentsAll)
     } catch (err) {
       console.error('Error loading data:', err)
     } finally {
