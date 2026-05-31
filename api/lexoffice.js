@@ -130,9 +130,26 @@ async function handleCreateInvoice(req, res) {
   const today = new Date().toISOString().slice(0, 10)
   const vDate = voucherDate || today
 
+  // Adresse aufloesen: Hat der Kontakt eine Rechnungsadresse, referenzieren wir
+  // ihn per contactId (Adresse + Verknuepfung). Hat er keine, schickt Lexoffice
+  // bei contactId einen Fehler – dann nutzen wir eine Einmal-Adresse mit nur dem
+  // Namen (genau wie die Lexoffice-Oberflaeche es erlaubt).
+  let address = { contactId }
+  const cr = await lexofficeFetch(`/contacts/${contactId}`)
+  if (cr.ok) {
+    const contact = await cr.json()
+    const hasBilling = !!contact.addresses?.billing?.[0]?.city
+    if (!hasBilling) {
+      const name = contact.company?.name
+        || [contact.person?.firstName, contact.person?.lastName].filter(Boolean).join(' ')
+        || 'Kunde'
+      address = { name, countryCode: 'DE' }
+    }
+  }
+
   const payload = {
     voucherDate: germanIso(vDate),
-    address: { contactId },
+    address,
     lineItems: lineItems.map((li) => ({
       type: 'custom',
       name: li.name,
