@@ -3486,6 +3486,10 @@ function AbrechnungView({
           })
       }
     }
+
+    // Frisch laden, damit temp-IDs durch echte DB-IDs ersetzt werden
+    // (sonst schlagen Folge-Updates auf temp-IDs still fehl).
+    onUpdate()
   }
 
   // Alle Trainings eines Spielers im Monat als bar bezahlt markieren
@@ -3551,6 +3555,8 @@ function AbrechnungView({
           })
       }
     }
+
+    onUpdate()
   }
 
   // Alle Trainings eines Spielers im Monat als ausstehend/offen markieren (Toggle)
@@ -3618,6 +3624,8 @@ function AbrechnungView({
           })
       }
     }
+
+    onUpdate()
   }
 
   // Einzelnes Training für einen Spieler als bezahlt markieren
@@ -3670,6 +3678,8 @@ function AbrechnungView({
           ausstehend: false
         })
     }
+
+    onUpdate()
   }
 
 
