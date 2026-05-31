@@ -3600,19 +3600,21 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank-Operationen
+    // Datenbank-Operationen (Fehler nicht mehr verschlucken)
+    let dbError: { message: string } | null = null
     for (const training of spielerData.trainings) {
       const existingPayment = spielerPayments.find(
         p => p.training_id === training.id && p.spieler_id === spielerId
       )
 
       if (existingPayment) {
-        await supabase
+        const { error } = await supabase
           .from('spieler_training_payments')
           .update({ bezahlt: false, bar_bezahlt: false, ausstehend: newAusstehend })
           .eq('id', existingPayment.id)
+        if (error) dbError = error
       } else {
-        await supabase
+        const { error } = await supabase
           .from('spieler_training_payments')
           .insert({
             user_id: userId,
@@ -3622,9 +3624,14 @@ function AbrechnungView({
             bar_bezahlt: false,
             ausstehend: newAusstehend
           })
+        if (error) dbError = error
       }
     }
 
+    if (dbError) {
+      console.error('Ausstehend speichern fehlgeschlagen:', dbError)
+      alert('Konnte „Ausstehend" nicht speichern:\n' + dbError.message)
+    }
     onUpdate()
   }
 
