@@ -14,6 +14,9 @@ export interface Spieler {
   id: string
   user_id: string
   name: string
+  // Verknuepfung zum Lexoffice-Kontakt (Rechnungsempfaenger, i.d.R. das Elternteil)
+  lexoffice_contact_id?: string | null
+  lexoffice_contact_name?: string | null
   created_at: string
 }
 

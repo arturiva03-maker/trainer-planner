@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from './supabaseClient'
+import { searchLexofficeContacts, createLexofficeInvoice } from './lexoffice'
+import type { LexofficeContact, LexofficeLineItem } from './lexoffice'
 import type { User, Session } from '@supabase/supabase-js'
 import type {
   TrainerProfile,
@@ -16,6 +18,12 @@ import type {
 const POOL_ALLOWED_EMAILS: readonly string[] = ['zlatanpalazov60@gmail.com']
 const isPoolAllowed = (email?: string | null) =>
   POOL_ALLOWED_EMAILS.length === 0 || (!!email && POOL_ALLOWED_EMAILS.includes(email.toLowerCase()))
+
+// Lexoffice-Rechnungen: nur der Inhaber des Lexoffice-Kontos (muss zur
+// ALLOWED_EMAILS-Liste in api/lexoffice.js passen).
+const LEXOFFICE_ALLOWED_EMAILS: readonly string[] = ['arturiva03@gmail.com']
+const isLexofficeAllowed = (email?: string | null) =>
+  !!email && LEXOFFICE_ALLOWED_EMAILS.includes(email.toLowerCase())
 import {
   formatDate,
   formatDateGerman,
@@ -504,6 +512,7 @@ function MainApp({ user }: { user: User }) {
   }
 
   const poolEnabled = isPoolAllowed(user.email)
+  const lexofficeEnabled = isLexofficeAllowed(user.email)
 
   const baseTabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'kalender', label: 'Kalender', icon: '📅' },
@@ -643,6 +652,7 @@ function MainApp({ user }: { user: User }) {
                 onUpdate={loadAllData}
                 onNavigateToTraining={handleNavigateToTraining}
                 userId={user.id}
+                lexofficeEnabled={lexofficeEnabled}
               />
             )}
             {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
@@ -2806,6 +2816,221 @@ function TarifModal({
 
 
 // ============ ABRECHNUNG VIEW ============
+// ============ LEXOFFICE RECHNUNG MODAL ============
+// Verknuepft den Spieler mit einem Lexoffice-Kontakt (Rechnungsempfaenger,
+// i.d.R. das Elternteil) und legt eine Rechnung mit den uebergebenen Positionen
+// an. Versand passiert danach in Lexoffice selbst (die API kann nicht mailen) –
+// wir oeffnen den Permalink.
+function LexofficeRechnungModal({
+  spieler,
+  lineItems,
+  monthStr,
+  shippingStart,
+  shippingEnd,
+  onClose,
+  onSaved
+}: {
+  spieler: Spieler
+  lineItems: LexofficeLineItem[]
+  monthStr: string
+  shippingStart: string
+  shippingEnd: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [contactId, setContactId] = useState<string | null>(spieler.lexoffice_contact_id ?? null)
+  const [contactName, setContactName] = useState<string | null>(spieler.lexoffice_contact_name ?? null)
+  const [query, setQuery] = useState(spieler.name.trim().split(/\s+/).pop() || spieler.name)
+  const [results, setResults] = useState<LexofficeContact[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [linking, setLinking] = useState(false)
+  const [taxRate, setTaxRate] = useState(19)
+  const [finalize, setFinalize] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; permalink?: string; error?: string } | null>(null)
+
+  const total = lineItems.reduce((s, li) => s + li.amount, 0)
+
+  const doSearch = async () => {
+    setSearching(true); setSearchError(null)
+    const r = await searchLexofficeContacts(query)
+    setSearching(false)
+    if (!r.ok) { setSearchError(r.error || 'Suche fehlgeschlagen.'); return }
+    setResults(r.contacts || [])
+  }
+
+  // Beim Oeffnen ohne verknuepften Kontakt automatisch nach Nachname suchen.
+  useEffect(() => {
+    if (!contactId) doSearch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const linkContact = async (c: LexofficeContact) => {
+    setLinking(true)
+    const { error } = await supabase
+      .from('spieler')
+      .update({ lexoffice_contact_id: c.id, lexoffice_contact_name: c.name })
+      .eq('id', spieler.id)
+    setLinking(false)
+    if (error) { setSearchError('Speichern fehlgeschlagen: ' + error.message); return }
+    setContactId(c.id); setContactName(c.name); setResults(null)
+    onSaved()
+  }
+
+  const unlink = async () => {
+    setLinking(true)
+    await supabase.from('spieler')
+      .update({ lexoffice_contact_id: null, lexoffice_contact_name: null })
+      .eq('id', spieler.id)
+    setLinking(false)
+    setContactId(null); setContactName(null)
+    onSaved(); doSearch()
+  }
+
+  const create = async () => {
+    if (!contactId) return
+    setCreating(true); setResult(null)
+    const r = await createLexofficeInvoice({
+      contactId,
+      lineItems,
+      finalize,
+      taxType: 'gross',
+      taxRatePercentage: taxRate,
+      shippingStart,
+      shippingEnd,
+      title: 'Rechnung',
+      introduction: `Tennistraining ${monthStr}`
+    })
+    setCreating(false)
+    setResult(r)
+    if (r.ok && r.permalink) window.open(r.permalink, '_blank')
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Lexoffice-Rechnung – {spieler.name}</h3>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          {/* Empfaenger */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 600, fontSize: 14 }}>Rechnungsempfänger (Lexoffice-Kontakt)</label>
+            {contactId ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                <span style={{ padding: '6px 10px', background: 'var(--gray-100)', borderRadius: 6 }}>✓ {contactName}</span>
+                <button className="btn btn-secondary" disabled={linking} onClick={unlink}>ändern</button>
+              </div>
+            ) : (
+              <div style={{ marginTop: 6 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') doSearch() }}
+                    placeholder="Nachname suchen…"
+                    style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid var(--gray-300)' }}
+                  />
+                  <button className="btn btn-secondary" disabled={searching} onClick={doSearch}>
+                    {searching ? '…' : 'Suchen'}
+                  </button>
+                </div>
+                {searchError && <div style={{ color: 'var(--danger, #c00)', fontSize: 13, marginTop: 6 }}>{searchError}</div>}
+                {results && results.length === 0 && (
+                  <div style={{ fontSize: 13, color: 'var(--gray-600)', marginTop: 6 }}>
+                    Kein Kontakt gefunden. In Lexoffice anlegen, dann erneut suchen.
+                  </div>
+                )}
+                {results && results.length > 0 && (
+                  <div style={{ marginTop: 8, display: 'grid', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                    {results.map(c => (
+                      <button
+                        key={c.id}
+                        className="btn btn-secondary"
+                        disabled={linking}
+                        onClick={() => linkContact(c)}
+                        style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+                      >
+                        <span>
+                          <strong>{c.name}</strong>
+                          <span style={{ display: 'block', fontSize: 12, color: 'var(--gray-600)' }}>
+                            {c.address ? `${c.address.street}, ${c.address.zip} ${c.address.city}` : (c.email || 'keine Adresse')}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Positionen */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontWeight: 600, fontSize: 14 }}>Positionen ({lineItems.length})</label>
+            {lineItems.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--gray-600)', marginTop: 6 }}>
+                Keine offenen Trainings in diesem Monat – nichts zu berechnen.
+              </div>
+            ) : (
+              <div style={{ marginTop: 6, fontSize: 13 }}>
+                {lineItems.map((li, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                    <span>{li.name}</span>
+                    <span>{li.amount.toFixed(2)} €</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontWeight: 700 }}>
+                  <span>Gesamt (brutto)</span>
+                  <span>{total.toFixed(2)} €</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Steuer + Modus */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 14 }}>
+              USt %:{' '}
+              <input
+                type="number"
+                value={taxRate}
+                onChange={e => setTaxRate(Number(e.target.value))}
+                style={{ width: 64, padding: 6, borderRadius: 6, border: '1px solid var(--gray-300)' }}
+              />
+            </label>
+            <label style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="checkbox" checked={finalize} onChange={e => setFinalize(e.target.checked)} />
+              direkt finalisieren (sonst Entwurf)
+            </label>
+          </div>
+
+          {result && (
+            <div style={{ marginTop: 14, padding: 10, borderRadius: 6, background: result.ok ? 'var(--gray-100)' : '#fde8e8' }}>
+              {result.ok
+                ? <>✓ Rechnung {finalize ? 'angelegt' : 'als Entwurf angelegt'}. {result.permalink && <a href={result.permalink} target="_blank" rel="noreferrer">In Lexoffice öffnen</a>}</>
+                : <>Fehler: {result.error}</>}
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button
+            className="btn btn-primary"
+            disabled={!contactId || lineItems.length === 0 || creating}
+            onClick={create}
+          >
+            {creating ? 'Wird angelegt…' : (finalize ? 'Rechnung anlegen' : 'Entwurf in Lexoffice anlegen')}
+          </button>
+          <button className="btn btn-secondary" onClick={onClose}>Schließen</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AbrechnungView({
   trainings,
   spieler,
@@ -2815,7 +3040,8 @@ function AbrechnungView({
   setSpielerPayments,
   onUpdate,
   onNavigateToTraining,
-  userId
+  userId,
+  lexofficeEnabled
 }: {
   trainings: Training[]
   spieler: Spieler[]
@@ -2826,6 +3052,7 @@ function AbrechnungView({
   onUpdate: () => void
   onNavigateToTraining: (training: Training) => void
   userId: string
+  lexofficeEnabled: boolean
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar'>('alle')
@@ -2842,6 +3069,14 @@ function AbrechnungView({
   const [trainingKorrekturGrund, setTrainingKorrekturGrund] = useState('')
   // Bulk-Auswahl für Trainings eines Spielers
   const [selectedTrainingsForBulk, setSelectedTrainingsForBulk] = useState<Set<string>>(new Set())
+  // Lexoffice-Rechnung: Daten fuer das Rechnungs-Modal (null = geschlossen)
+  const [lexofficeData, setLexofficeData] = useState<null | {
+    spieler: Spieler
+    lineItems: LexofficeLineItem[]
+    monthStr: string
+    shippingStart: string
+    shippingEnd: string
+  }>(null)
 
   const monthTrainings = useMemo(() => {
     return trainings.filter((t) => {
@@ -4259,6 +4494,34 @@ function AbrechnungView({
 
               </div>
               <div className="modal-footer">
+                {lexofficeEnabled && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      // Offene Trainings (nicht bar/bezahlt) als Rechnungspositionen
+                      const lines: LexofficeLineItem[] = trainingsDetail
+                        .filter(td => {
+                          const ps = getSpielerPaymentStatus(detail.spieler.id, td.training)
+                          return !ps.bezahlt && !ps.barBezahlt && td.betrag > 0
+                        })
+                        .map(td => ({
+                          name: `${td.tarif?.name || td.training.name || 'Tennistraining'} – ${formatDateGerman(td.training.datum)}`,
+                          amount: Number(td.betrag.toFixed(2))
+                        }))
+                      const [yy, mm] = selectedMonth.split('-').map(Number)
+                      const lastDay = String(new Date(yy, mm, 0).getDate()).padStart(2, '0')
+                      setLexofficeData({
+                        spieler: detail.spieler,
+                        lineItems: lines,
+                        monthStr: selectedMonth,
+                        shippingStart: `${selectedMonth}-01`,
+                        shippingEnd: `${selectedMonth}-${lastDay}`
+                      })
+                    }}
+                  >
+                    📄 Lexoffice-Rechnung
+                  </button>
+                )}
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
                   Schließen
                 </button>
@@ -4267,6 +4530,18 @@ function AbrechnungView({
           </div>
         )
       })()}
+
+      {lexofficeData && (
+        <LexofficeRechnungModal
+          spieler={lexofficeData.spieler}
+          lineItems={lexofficeData.lineItems}
+          monthStr={lexofficeData.monthStr}
+          shippingStart={lexofficeData.shippingStart}
+          shippingEnd={lexofficeData.shippingEnd}
+          onClose={() => setLexofficeData(null)}
+          onSaved={onUpdate}
+        />
+      )}
 
       {/* Korrektur Modal */}
       {showKorrekturModal && (() => {
