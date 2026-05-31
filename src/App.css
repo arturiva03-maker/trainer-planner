@@ -41,6 +41,21 @@
   /* Weichere, luftigere Schatten */
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
   --shadow-lg: 0 4px 12px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.08);
+  /* Bezahlstatus – EINE feste Farbe je Status, app-weit einheitlich.
+     Bar = Grün (Bargeld), Bezahlt = Blau (Überweisung),
+     Ausstehend = Amber (Rechnung raus), Offen = Grau (noch nichts). */
+  --pay-bar: #059669;
+  --pay-bar-bg: #D1FAE5;
+  --pay-bar-text: #065F46;
+  --pay-bezahlt: #2563EB;
+  --pay-bezahlt-bg: #DBEAFE;
+  --pay-bezahlt-text: #1E40AF;
+  --pay-ausstehend: #D97706;
+  --pay-ausstehend-bg: #FEF3C7;
+  --pay-ausstehend-text: #92400E;
+  --pay-offen: #64748B;
+  --pay-offen-bg: #F1F5F9;
+  --pay-offen-text: #475569;
 }
 
 /* Spinner Animation */
@@ -1721,20 +1736,82 @@ tbody tr:last-child td {
   color: var(--status-abgesagt-text);
 }
 
+.status-badge.bar {
+  background: var(--pay-bar-bg);
+  color: var(--pay-bar-text);
+}
+
 .status-badge.bezahlt {
-  background: var(--status-bezahlt-bg);
-  color: var(--status-bezahlt-text);
+  background: var(--pay-bezahlt-bg);
+  color: var(--pay-bezahlt-text);
 }
 
 .status-badge.ausstehend {
-  background: #F59E0B;
-  color: white;
+  background: var(--pay-ausstehend-bg);
+  color: var(--pay-ausstehend-text);
 }
 
 .status-badge.offen {
-  background: var(--status-geplant-bg);
-  color: var(--status-geplant-text);
+  background: var(--pay-offen-bg);
+  color: var(--pay-offen-text);
 }
+
+/* Abrechnung – Status-Filter als Pills */
+.filter-pill-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pay-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-200);
+  background: #fff;
+  color: var(--gray-600);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pay-pill:hover {
+  border-color: var(--gray-300);
+  background: var(--gray-50);
+}
+
+.pay-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pay-pill.active {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.pay-pill.active .pay-pill-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.pay-pill-alle.active { background: var(--gray-700); }
+.pay-pill-offen.active { background: var(--pay-offen); }
+.pay-pill-ausstehend.active { background: var(--pay-ausstehend); }
+.pay-pill-bar.active { background: var(--pay-bar); }
+.pay-pill-bezahlt.active { background: var(--pay-bezahlt); }
 
 /* Tabs */
 /* Tabs - Modernized */

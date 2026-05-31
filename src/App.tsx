@@ -3110,12 +3110,19 @@ function AbrechnungView({
   userId: string
   lexofficeEnabled: boolean
 }) {
-  const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
-  const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar'>('alle')
+  const [selectedMonth, setSelectedMonth] = useState(() => localStorage.getItem('abrechnung_monat') || getMonthString(new Date()))
+  const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar'>(
+    () => (localStorage.getItem('abrechnung_filter') as 'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar') || 'alle'
+  )
   const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
   const [spielerSuche, setSpielerSuche] = useState('')
   const [selectedTag, setSelectedTag] = useState<string>('')
   const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
+
+  // Monat + Status-Filter merken, damit der Tab beim Zurueckkommen den letzten
+  // Stand zeigt statt auf aktuellen Monat / "Alle" zurueckzuspringen.
+  useEffect(() => { localStorage.setItem('abrechnung_monat', selectedMonth) }, [selectedMonth])
+  useEffect(() => { localStorage.setItem('abrechnung_filter', filter) }, [filter])
   const [showKorrekturModal, setShowKorrekturModal] = useState<string | null>(null)
   const [korrekturBetrag, setKorrekturBetrag] = useState('')
   const [korrekturGrund, setKorrekturGrund] = useState('')
@@ -3326,7 +3333,7 @@ function AbrechnungView({
     return Array.from(tage).sort()
   }, [monthTrainings])
 
-  const filteredSummary = useMemo(() => {
+  const summaryBeforeStatus = useMemo(() => {
     let result = spielerSummary
 
     // Bei Tag-Filter: Zeige nur Trainings des Tages mit korrekten Tages-Summen
@@ -3413,6 +3420,31 @@ function AbrechnungView({
         })
     }
 
+    // Zusätzlicher Filter nach Spieler
+    if (selectedSpielerId) {
+      result = result.filter((s) => s.spieler.id === selectedSpielerId)
+    }
+
+    return result
+  }, [spielerSummary, selectedSpielerId, selectedTag, tarife, getSpielerPaymentStatus])
+
+  // Anzahl Spieler je Status – fuer die Filter-Pills. Basis: nach Tag-/Spieler-
+  // Filter, aber VOR dem Status-Filter, damit die Zahlen konstant bleiben.
+  const statusCounts = useMemo(() => {
+    const c = { alle: 0, offen: 0, ausstehend: 0, bar: 0, bezahlt: 0 }
+    summaryBeforeStatus.forEach((s) => {
+      c.alle++
+      if (s.bezahlt) c.bezahlt++
+      else if (s.ausstehend) c.ausstehend++
+      else c.offen++
+      if (s.barSumme > 0) c.bar++
+    })
+    return c
+  }, [summaryBeforeStatus])
+
+  const filteredSummary = useMemo(() => {
+    let result = summaryBeforeStatus
+
     // Status-Filter (bezahlt/offen/ausstehend/bar)
     switch (filter) {
       case 'bezahlt':
@@ -3429,13 +3461,15 @@ function AbrechnungView({
         break
     }
 
-    // Zusätzlicher Filter nach Spieler
-    if (selectedSpielerId) {
-      result = result.filter((s) => s.spieler.id === selectedSpielerId)
+    // Offene/ausstehende Spieler nach oben (brauchen noch Aktion), bezahlte nach
+    // unten. Bei Tag-Filter bleibt die chronologische Sortierung erhalten.
+    if (!selectedTag) {
+      const rang = (s: typeof result[number]) => (s.bezahlt ? 2 : s.ausstehend ? 1 : 0)
+      result = [...result].sort((a, b) => rang(a) - rang(b) || a.spieler.name.localeCompare(b.spieler.name))
     }
 
     return result
-  }, [spielerSummary, filter, selectedSpielerId, selectedTag, tarife, getSpielerPaymentStatus])
+  }, [summaryBeforeStatus, filter, selectedTag])
 
   const stats = useMemo(() => {
     // Trainings-Stats: vier disjunkte Kategorien (Bar + Bezahlt + Ausstehend + Offen = Gesamtumsatz)
@@ -3716,6 +3750,53 @@ function AbrechnungView({
     onUpdate()
   }
 
+  // Einzelnes Training eines Spielers wieder auf "offen" setzen (z.B. eine bar
+  // bezahlte Einheit zuruecknehmen, ohne das Trainingsfenster oeffnen zu muessen).
+  const resetTrainingToOffen = async (trainingId: string, spielerId: string) => {
+    preserveScroll()
+    const existingPayment = spielerPayments.find(
+      p => p.training_id === trainingId && p.spieler_id === spielerId
+    )
+
+    // Optimistisches Update
+    if (existingPayment) {
+      setSpielerPayments(prev => prev.map(p =>
+        p.id === existingPayment.id ? { ...p, bezahlt: false, bar_bezahlt: false, ausstehend: false } : p
+      ))
+    } else {
+      const tempPayment: SpielerTrainingPayment = {
+        id: `temp-${trainingId}-${spielerId}`,
+        user_id: userId,
+        training_id: trainingId,
+        spieler_id: spielerId,
+        bezahlt: false,
+        bar_bezahlt: false,
+        ausstehend: false,
+        created_at: new Date().toISOString()
+      }
+      setSpielerPayments(prev => [...prev, tempPayment])
+    }
+
+    // Datenbank: upsert mit allen Flags false -> die Spieler-Zeile gewinnt ueber
+    // ein evtl. noch gesetztes Training-Feld bar_bezahlt.
+    const { error: dbError } = await supabase
+      .from('spieler_training_payments')
+      .upsert({
+        user_id: userId,
+        training_id: trainingId,
+        spieler_id: spielerId,
+        bezahlt: false,
+        bar_bezahlt: false,
+        ausstehend: false
+      }, { onConflict: 'training_id,spieler_id' })
+    if (dbError) {
+      console.error('Zurücksetzen fehlgeschlagen:', dbError)
+      alert('Konnte nicht zurücksetzen:\n' + dbError.message)
+    }
+
+    onUpdate()
+  }
+
 
   // Korrektur speichern oder aktualisieren
   const saveKorrektur = async (spielerId: string) => {
@@ -3975,27 +4056,27 @@ function AbrechnungView({
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Gesamtumsatz</div>
-          <div className="stat-value" style={{ color: '#6366F1' }}>{stats.total.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: '#1E293B' }}>{stats.total.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Bar bezahlt</div>
-          <div className="stat-value" style={{ color: '#10B981' }}>{stats.bar.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: 'var(--pay-bar)' }}>{stats.bar.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Bezahlt (Überweisung)</div>
-          <div className="stat-value" style={{ color: '#22C55E' }}>
+          <div className="stat-value" style={{ color: 'var(--pay-bezahlt)' }}>
             {stats.bezahlt.toFixed(2)} €
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Ausstehend</div>
-          <div className="stat-value" style={{ color: '#F59E0B' }}>
+          <div className="stat-value" style={{ color: 'var(--pay-ausstehend)' }}>
             {stats.ausstehend.toFixed(2)} €
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Offen</div>
-          <div className="stat-value" style={{ color: '#6B7280' }}>
+          <div className="stat-value" style={{ color: 'var(--pay-offen)' }}>
             {stats.offen.toFixed(2)} €
           </div>
         </div>
@@ -4015,18 +4096,25 @@ function AbrechnungView({
                 }}
                 style={{ width: 'auto', minWidth: 140 }}
               />
-              <select
-                className="form-control"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as typeof filter)}
-                style={{ width: 'auto' }}
-              >
-                <option value="alle">Alle</option>
-                <option value="bezahlt">Nur bezahlt</option>
-                <option value="ausstehend">Nur ausstehend</option>
-                <option value="offen">Nur offen</option>
-                <option value="bar">Nur bar</option>
-              </select>
+              <div className="filter-pill-group">
+                {([
+                  ['alle', 'Alle'],
+                  ['offen', 'Offen'],
+                  ['ausstehend', 'Ausstehend'],
+                  ['bar', 'Bar'],
+                  ['bezahlt', 'Bezahlt']
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`pay-pill pay-pill-${key} ${filter === key ? 'active' : ''}`}
+                    onClick={() => setFilter(key)}
+                  >
+                    {label}
+                    <span className="pay-pill-count">{statusCounts[key]}</span>
+                  </button>
+                ))}
+              </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
@@ -4141,7 +4229,7 @@ function AbrechnungView({
                   <td>
                     {item.summe.toFixed(2)} €
                     {item.barSumme > 0 && (
-                      <span style={{ color: 'var(--warning)', fontSize: 12, marginLeft: 8 }}>
+                      <span style={{ color: 'var(--pay-bar)', fontSize: 12, marginLeft: 8, fontWeight: 600 }}>
                         ({item.barSumme.toFixed(2)} € bar)
                       </span>
                     )}
@@ -4181,9 +4269,9 @@ function AbrechnungView({
                               toggleAlleAusstehend(item.spieler.id, item.ausstehend)
                             }}
                             style={{
-                              background: item.ausstehend ? '#6B7280' : '#F59E0B',
+                              background: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)',
                               color: 'white',
-                              borderColor: item.ausstehend ? '#6B7280' : '#F59E0B'
+                              borderColor: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)'
                             }}
                             title={item.ausstehend ? "Zurück auf offen setzen" : "Als ausstehend markieren"}
                           >
@@ -4195,7 +4283,7 @@ function AbrechnungView({
                               e.stopPropagation()
                               toggleAlleBarBezahlt(item.spieler.id)
                             }}
-                            style={{ background: '#10B981', color: 'white', borderColor: '#10B981' }}
+                            style={{ background: 'var(--pay-bar)', color: 'white', borderColor: 'var(--pay-bar)' }}
                             title="Alle Trainings als bar bezahlt markieren"
                           >
                             Bar
@@ -4245,7 +4333,7 @@ function AbrechnungView({
                 {item.barSumme > 0 && (
                   <div className="mobile-card-row">
                     <span className="mobile-card-label">davon bar</span>
-                    <span className="mobile-card-value" style={{ color: 'var(--warning)' }}>
+                    <span className="mobile-card-value" style={{ color: 'var(--pay-bar)', fontWeight: 600 }}>
                       {item.barSumme.toFixed(2)} €
                     </span>
                   </div>
@@ -4280,9 +4368,9 @@ function AbrechnungView({
                         toggleAlleAusstehend(item.spieler.id, item.ausstehend)
                       }}
                       style={{
-                        background: item.ausstehend ? '#6B7280' : '#F59E0B',
+                        background: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)',
                         color: 'white',
-                        borderColor: item.ausstehend ? '#6B7280' : '#F59E0B'
+                        borderColor: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)'
                       }}
                     >
                       {item.ausstehend ? 'Offen' : 'Ausstehend'}
@@ -4293,7 +4381,7 @@ function AbrechnungView({
                         e.stopPropagation()
                         toggleAlleBarBezahlt(item.spieler.id)
                       }}
-                      style={{ background: '#10B981', color: 'white', borderColor: '#10B981' }}
+                      style={{ background: 'var(--pay-bar)', color: 'white', borderColor: 'var(--pay-bar)' }}
                     >
                       Bar
                     </button>
@@ -4396,17 +4484,17 @@ function AbrechnungView({
                     <strong>Gesamt:</strong> {gefilterteSumme.toFixed(2)} €
                   </div>
                   {gefilterteBarSumme > 0 && (
-                    <div style={{ color: 'var(--warning)' }}>
+                    <div style={{ color: 'var(--pay-bar)' }}>
                       <strong>Bar:</strong> {gefilterteBarSumme.toFixed(2)} €
                     </div>
                   )}
                   {gefilterteBezahltSumme > 0 && (
-                    <div style={{ color: 'var(--success)' }}>
+                    <div style={{ color: 'var(--pay-bezahlt)' }}>
                       <strong>Bezahlt:</strong> {gefilterteBezahltSumme.toFixed(2)} €
                     </div>
                   )}
                   {gefilterteOffeneSumme > 0 && (
-                    <div style={{ color: 'var(--danger)' }}>
+                    <div style={{ color: 'var(--pay-offen)' }}>
                       <strong>Offen:</strong> {gefilterteOffeneSumme.toFixed(2)} €
                     </div>
                   )}
@@ -4489,9 +4577,9 @@ function AbrechnungView({
                             key={training.id}
                             style={{
                               ...(paymentStatusRow.barBezahlt
-                                ? { background: 'var(--warning-light)' }
+                                ? { background: 'var(--pay-bar-bg)' }
                                 : paymentStatusRow.bezahlt
-                                ? { background: 'var(--success-light)' }
+                                ? { background: 'var(--pay-bezahlt-bg)' }
                                 : {}),
                               ...(istMonatlich && !istMonatlicheSerieErstesTraining ? { opacity: 0.6 } : {})
                             }}
@@ -4550,13 +4638,32 @@ function AbrechnungView({
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               {paymentStatusRow.barBezahlt ? (
-                                <span className="status-badge" style={{ background: 'var(--warning)', color: '#1E40AF', fontSize: 11 }}>
-                                  Bar
-                                </span>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <span className="status-badge bar" style={{ fontSize: 11 }}>
+                                    Bar
+                                  </span>
+                                  <button
+                                    className="btn btn-sm btn-secondary"
+                                    style={{ fontSize: 10, padding: '2px 6px' }}
+                                    title="Bar zurücknehmen – Training auf offen setzen"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      resetTrainingToOffen(training.id, detail.spieler.id)
+                                    }}
+                                  >
+                                    → offen
+                                  </button>
+                                </div>
                               ) : (
                                 <button
-                                  className={`btn btn-sm ${paymentStatusRow.bezahlt ? 'btn-success' : 'btn-secondary'}`}
-                                  style={{ fontSize: 11, padding: '2px 8px' }}
+                                  className="btn btn-sm"
+                                  style={{
+                                    fontSize: 11,
+                                    padding: '2px 8px',
+                                    ...(paymentStatusRow.bezahlt
+                                      ? { background: 'var(--pay-bezahlt)', borderColor: 'var(--pay-bezahlt)', color: '#fff' }
+                                      : { background: 'var(--gray-200)', color: 'var(--gray-700)' })
+                                  }}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatusRow.bezahlt)
