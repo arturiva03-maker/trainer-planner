@@ -3462,33 +3462,22 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank-Operationen
-    for (const training of spielerData.trainings) {
-      const existingPayment = spielerPayments.find(
-        p => p.training_id === training.id && p.spieler_id === spielerId
-      )
-
-      if (existingPayment) {
-        await supabase
-          .from('spieler_training_payments')
-          .update({ bezahlt: newStatus, ausstehend: false })
-          .eq('id', existingPayment.id)
-      } else {
-        await supabase
-          .from('spieler_training_payments')
-          .insert({
-            user_id: userId,
-            training_id: training.id,
-            spieler_id: spielerId,
-            bezahlt: newStatus,
-            bar_bezahlt: training.bar_bezahlt || false,
-            ausstehend: false
-          })
-      }
+    // Datenbank: upsert auf (training_id, spieler_id)
+    const rows = spielerData.trainings.map(training => ({
+      user_id: userId,
+      training_id: training.id,
+      spieler_id: spielerId,
+      bezahlt: newStatus,
+      bar_bezahlt: training.bar_bezahlt || false,
+      ausstehend: false
+    }))
+    const { error: dbError } = await supabase
+      .from('spieler_training_payments')
+      .upsert(rows, { onConflict: 'training_id,spieler_id' })
+    if (dbError) {
+      console.error('Bezahlt speichern fehlgeschlagen:', dbError)
+      alert('Konnte „Bezahlt" nicht speichern:\n' + dbError.message)
     }
-
-    // Frisch laden, damit temp-IDs durch echte DB-IDs ersetzt werden
-    // (sonst schlagen Folge-Updates auf temp-IDs still fehl).
     onUpdate()
   }
 
@@ -3531,31 +3520,22 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank-Operationen
-    for (const training of spielerData.trainings) {
-      const existingPayment = spielerPayments.find(
-        p => p.training_id === training.id && p.spieler_id === spielerId
-      )
-
-      if (existingPayment) {
-        await supabase
-          .from('spieler_training_payments')
-          .update({ bezahlt: true, bar_bezahlt: true, ausstehend: false })
-          .eq('id', existingPayment.id)
-      } else {
-        await supabase
-          .from('spieler_training_payments')
-          .insert({
-            user_id: userId,
-            training_id: training.id,
-            spieler_id: spielerId,
-            bezahlt: true,
-            bar_bezahlt: true,
-            ausstehend: false
-          })
-      }
+    // Datenbank: upsert auf (training_id, spieler_id)
+    const rows = spielerData.trainings.map(training => ({
+      user_id: userId,
+      training_id: training.id,
+      spieler_id: spielerId,
+      bezahlt: true,
+      bar_bezahlt: true,
+      ausstehend: false
+    }))
+    const { error: dbError } = await supabase
+      .from('spieler_training_payments')
+      .upsert(rows, { onConflict: 'training_id,spieler_id' })
+    if (dbError) {
+      console.error('Bar speichern fehlgeschlagen:', dbError)
+      alert('Konnte „Bar bezahlt" nicht speichern:\n' + dbError.message)
     }
-
     onUpdate()
   }
 
@@ -3600,34 +3580,19 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank-Operationen (Fehler nicht mehr verschlucken)
-    let dbError: { message: string } | null = null
-    for (const training of spielerData.trainings) {
-      const existingPayment = spielerPayments.find(
-        p => p.training_id === training.id && p.spieler_id === spielerId
-      )
-
-      if (existingPayment) {
-        const { error } = await supabase
-          .from('spieler_training_payments')
-          .update({ bezahlt: false, bar_bezahlt: false, ausstehend: newAusstehend })
-          .eq('id', existingPayment.id)
-        if (error) dbError = error
-      } else {
-        const { error } = await supabase
-          .from('spieler_training_payments')
-          .insert({
-            user_id: userId,
-            training_id: training.id,
-            spieler_id: spielerId,
-            bezahlt: false,
-            bar_bezahlt: false,
-            ausstehend: newAusstehend
-          })
-        if (error) dbError = error
-      }
-    }
-
+    // Datenbank: upsert auf (training_id, spieler_id) – kein INSERT/UPDATE-Raten
+    // anhand veralteten States, kein Duplicate-Key mehr.
+    const rows = spielerData.trainings.map(training => ({
+      user_id: userId,
+      training_id: training.id,
+      spieler_id: spielerId,
+      bezahlt: false,
+      bar_bezahlt: false,
+      ausstehend: newAusstehend
+    }))
+    const { error: dbError } = await supabase
+      .from('spieler_training_payments')
+      .upsert(rows, { onConflict: 'training_id,spieler_id' })
     if (dbError) {
       console.error('Ausstehend speichern fehlgeschlagen:', dbError)
       alert('Konnte „Ausstehend" nicht speichern:\n' + dbError.message)
@@ -3667,23 +3632,20 @@ function AbrechnungView({
       setSpielerPayments(prev => [...prev, tempPayment])
     }
 
-    // Datenbank-Operation
-    if (existingPayment) {
-      await supabase
-        .from('spieler_training_payments')
-        .update({ bezahlt: newStatus, ausstehend: false })
-        .eq('id', existingPayment.id)
-    } else {
-      await supabase
-        .from('spieler_training_payments')
-        .insert({
-          user_id: userId,
-          training_id: trainingId,
-          spieler_id: spielerId,
-          bezahlt: newStatus,
-          bar_bezahlt: trainingBarBezahlt,
-          ausstehend: false
-        })
+    // Datenbank: upsert auf (training_id, spieler_id)
+    const { error: dbError } = await supabase
+      .from('spieler_training_payments')
+      .upsert({
+        user_id: userId,
+        training_id: trainingId,
+        spieler_id: spielerId,
+        bezahlt: newStatus,
+        bar_bezahlt: trainingBarBezahlt,
+        ausstehend: false
+      }, { onConflict: 'training_id,spieler_id' })
+    if (dbError) {
+      console.error('Speichern fehlgeschlagen:', dbError)
+      alert('Konnte nicht speichern:\n' + dbError.message)
     }
 
     onUpdate()
@@ -3844,30 +3806,22 @@ function AbrechnungView({
     preserveScroll()
     if (selectedTrainingsForBulk.size === 0) return
 
-    for (const trainingId of selectedTrainingsForBulk) {
-      const existingPayment = spielerPayments.find(
-        p => p.training_id === trainingId && p.spieler_id === spielerId
-      )
-
-      if (existingPayment) {
-        if (!existingPayment.bezahlt) {
-          await supabase
-            .from('spieler_training_payments')
-            .update({ bezahlt: true })
-            .eq('id', existingPayment.id)
-        }
-      } else {
-        const training = monthTrainings.find(t => t.id === trainingId)
-        await supabase
-          .from('spieler_training_payments')
-          .insert({
-            user_id: userId,
-            training_id: trainingId,
-            spieler_id: spielerId,
-            bezahlt: true,
-            bar_bezahlt: training?.bar_bezahlt || false
-          })
+    const rows = Array.from(selectedTrainingsForBulk).map(trainingId => {
+      const training = monthTrainings.find(t => t.id === trainingId)
+      return {
+        user_id: userId,
+        training_id: trainingId,
+        spieler_id: spielerId,
+        bezahlt: true,
+        bar_bezahlt: training?.bar_bezahlt || false
       }
+    })
+    const { error: dbError } = await supabase
+      .from('spieler_training_payments')
+      .upsert(rows, { onConflict: 'training_id,spieler_id' })
+    if (dbError) {
+      console.error('Speichern fehlgeschlagen:', dbError)
+      alert('Konnte nicht speichern:\n' + dbError.message)
     }
 
     setSelectedTrainingsForBulk(new Set())
