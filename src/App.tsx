@@ -2855,7 +2855,8 @@ function LexofficeRechnungModal({
   shippingStart,
   shippingEnd,
   onClose,
-  onSaved
+  onSaved,
+  onInvoiced
 }: {
   spieler: Spieler
   lineItems: LexofficeLineItem[]
@@ -2864,6 +2865,7 @@ function LexofficeRechnungModal({
   shippingEnd: string
   onClose: () => void
   onSaved: () => void
+  onInvoiced: () => void | Promise<void>
 }) {
   const [contactId, setContactId] = useState<string | null>(spieler.lexoffice_contact_id ?? null)
   const [contactName, setContactName] = useState<string | null>(spieler.lexoffice_contact_name ?? null)
@@ -2936,11 +2938,15 @@ function LexofficeRechnungModal({
       shippingStart,
       shippingEnd,
       title: 'Rechnung',
-      introduction: introductionText
+      introduction: intro
     })
     setCreating(false)
     setResult(r)
-    if (r.ok && r.permalink) window.open(r.permalink, '_blank')
+    if (r.ok) {
+      if (r.permalink) window.open(r.permalink, '_blank')
+      // Rechnung erstellt -> berechnete (offene) Trainings auf "ausstehend"
+      try { await onInvoiced() } catch { /* nicht blockierend */ }
+    }
   }
 
   return (
@@ -3885,6 +3891,32 @@ function AbrechnungView({
     onUpdate()
   }
 
+  // Nach Erstellen einer Lexoffice-Rechnung: die berechneten (offenen) Trainings
+  // des Spielers automatisch auf "ausstehend" setzen (Rechnung raus, Zahlung
+  // erwartet). Bereits bezahlte/bar bleiben unangetastet.
+  const markSpielerAusstehendNachRechnung = async (spielerId: string) => {
+    const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
+    if (!spielerData) return
+    const betroffene = spielerData.trainings.filter(t => {
+      const ps = getSpielerPaymentStatus(spielerId, t)
+      return !ps.bezahlt && !ps.barBezahlt
+    })
+    if (betroffene.length === 0) { onUpdate(); return }
+    const rows = betroffene.map(training => ({
+      user_id: userId,
+      training_id: training.id,
+      spieler_id: spielerId,
+      bezahlt: false,
+      bar_bezahlt: false,
+      ausstehend: true
+    }))
+    const { error } = await supabase
+      .from('spieler_training_payments')
+      .upsert(rows, { onConflict: 'training_id,spieler_id' })
+    if (error) console.error('Auto-Ausstehend nach Rechnung fehlgeschlagen:', error)
+    onUpdate()
+  }
+
   // Baut die offenen Rechnungspositionen eines Spielers (Monat) und oeffnet das
   // Lexoffice-Modal. Beruecksichtigt monatliche Tarife (nur erstes Training),
   // Korrekturen und Stunden (Menge = Dauer, Preis pro Stunde).
@@ -4639,6 +4671,7 @@ function AbrechnungView({
           shippingEnd={lexofficeData.shippingEnd}
           onClose={() => setLexofficeData(null)}
           onSaved={onUpdate}
+          onInvoiced={() => markSpielerAusstehendNachRechnung(lexofficeData.spieler.id)}
         />
       )}
 
