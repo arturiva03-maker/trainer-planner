@@ -3456,17 +3456,26 @@ function AbrechnungView({
 
     const newStatus = !currentStatus
 
-    // Optimistisches Update - sofort alle UI aktualisieren
+    // Bar bezahlte Trainings NIE anfassen (sonst stimmt die Bar-Einnahme nicht).
+    // Markieren (newStatus=true): offene/ausstehende -> bezahlt (Überweisung).
+    // Zurücksetzen (newStatus=false): per Überweisung bezahlte -> offen.
+    const betroffene = spielerData.trainings.filter(t => {
+      const ps = getSpielerPaymentStatus(spielerId, t)
+      if (ps.barBezahlt) return false
+      return newStatus ? !ps.bezahlt : ps.bezahlt
+    })
+
+    // Optimistisches Update
     const updatedPayments: SpielerTrainingPayment[] = []
     const newPayments: SpielerTrainingPayment[] = []
 
-    for (const training of spielerData.trainings) {
+    for (const training of betroffene) {
       const existingPayment = spielerPayments.find(
         p => p.training_id === training.id && p.spieler_id === spielerId
       )
 
       if (existingPayment) {
-        updatedPayments.push({ ...existingPayment, bezahlt: newStatus, ausstehend: false })
+        updatedPayments.push({ ...existingPayment, bezahlt: newStatus, bar_bezahlt: false, ausstehend: false })
       } else {
         newPayments.push({
           id: `temp-${training.id}-${spielerId}`,
@@ -3474,7 +3483,7 @@ function AbrechnungView({
           training_id: training.id,
           spieler_id: spielerId,
           bezahlt: newStatus,
-          bar_bezahlt: training.bar_bezahlt || false,
+          bar_bezahlt: false,
           ausstehend: false,
           created_at: new Date().toISOString()
         })
@@ -3489,21 +3498,23 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank: upsert auf (training_id, spieler_id)
-    const rows = spielerData.trainings.map(training => ({
+    // Datenbank: nur betroffene upserten
+    const rows = betroffene.map(training => ({
       user_id: userId,
       training_id: training.id,
       spieler_id: spielerId,
       bezahlt: newStatus,
-      bar_bezahlt: training.bar_bezahlt || false,
+      bar_bezahlt: false,
       ausstehend: false
     }))
-    const { error: dbError } = await supabase
-      .from('spieler_training_payments')
-      .upsert(rows, { onConflict: 'training_id,spieler_id' })
-    if (dbError) {
-      console.error('Bezahlt speichern fehlgeschlagen:', dbError)
-      alert('Konnte „Bezahlt" nicht speichern:\n' + dbError.message)
+    if (rows.length > 0) {
+      const { error: dbError } = await supabase
+        .from('spieler_training_payments')
+        .upsert(rows, { onConflict: 'training_id,spieler_id' })
+      if (dbError) {
+        console.error('Bezahlt speichern fehlgeschlagen:', dbError)
+        alert('Konnte „Bezahlt" nicht speichern:\n' + dbError.message)
+      }
     }
     onUpdate()
   }
@@ -3514,11 +3525,19 @@ function AbrechnungView({
     const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
     if (!spielerData) return
 
-    // Optimistisches Update - sofort alle UI aktualisieren
+    // Nur offene/ausstehende Trainings als bar markieren – bereits per
+    // Überweisung bezahlte bleiben erhalten (sonst stimmt die Aufteilung
+    // bar/Überweisung nicht).
+    const betroffene = spielerData.trainings.filter(t => {
+      const ps = getSpielerPaymentStatus(spielerId, t)
+      return !ps.bezahlt && !ps.barBezahlt
+    })
+
+    // Optimistisches Update
     const updatedPayments: SpielerTrainingPayment[] = []
     const newPayments: SpielerTrainingPayment[] = []
 
-    for (const training of spielerData.trainings) {
+    for (const training of betroffene) {
       const existingPayment = spielerPayments.find(
         p => p.training_id === training.id && p.spieler_id === spielerId
       )
@@ -3547,8 +3566,8 @@ function AbrechnungView({
       return [...updated, ...newPayments]
     })
 
-    // Datenbank: upsert auf (training_id, spieler_id)
-    const rows = spielerData.trainings.map(training => ({
+    // Datenbank: nur betroffene upserten
+    const rows = betroffene.map(training => ({
       user_id: userId,
       training_id: training.id,
       spieler_id: spielerId,
@@ -3556,12 +3575,14 @@ function AbrechnungView({
       bar_bezahlt: true,
       ausstehend: false
     }))
-    const { error: dbError } = await supabase
-      .from('spieler_training_payments')
-      .upsert(rows, { onConflict: 'training_id,spieler_id' })
-    if (dbError) {
-      console.error('Bar speichern fehlgeschlagen:', dbError)
-      alert('Konnte „Bar bezahlt" nicht speichern:\n' + dbError.message)
+    if (rows.length > 0) {
+      const { error: dbError } = await supabase
+        .from('spieler_training_payments')
+        .upsert(rows, { onConflict: 'training_id,spieler_id' })
+      if (dbError) {
+        console.error('Bar speichern fehlgeschlagen:', dbError)
+        alert('Konnte „Bar bezahlt" nicht speichern:\n' + dbError.message)
+      }
     }
     onUpdate()
   }
