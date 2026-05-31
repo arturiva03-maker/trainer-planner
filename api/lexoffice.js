@@ -155,7 +155,7 @@ async function handleCreateInvoice(req, res) {
       name: li.name,
       description: li.description || undefined,
       quantity: li.quantity ?? 1,
-      unitName: li.unitName || 'Stück',
+      unitName: li.unitName || ((li.quantity ?? 1) === 1 ? 'Stunde' : 'Stunden'),
       unitPrice: {
         currency: 'EUR',
         [amountKey]: li.amount,

@@ -2850,7 +2850,7 @@ function LexofficeRechnungModal({
   const [creating, setCreating] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; permalink?: string; error?: string } | null>(null)
 
-  const total = lineItems.reduce((s, li) => s + li.amount, 0)
+  const total = lineItems.reduce((s, li) => s + li.amount * (li.quantity ?? 1), 0)
 
   const doSearch = async () => {
     setSearching(true); setSearchError(null)
@@ -2977,12 +2977,15 @@ function LexofficeRechnungModal({
               </div>
             ) : (
               <div style={{ marginTop: 6, fontSize: 13 }}>
-                {lineItems.map((li, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--gray-100)' }}>
-                    <span>{li.name}</span>
-                    <span>{li.amount.toFixed(2)} €</span>
-                  </div>
-                ))}
+                {lineItems.map((li, i) => {
+                  const qty = li.quantity ?? 1
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                      <span>{li.name} <span style={{ color: 'var(--gray-600)' }}>({qty} × {li.amount.toFixed(2)} €)</span></span>
+                      <span>{(li.amount * qty).toFixed(2)} €</span>
+                    </div>
+                  )
+                })}
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontWeight: 700 }}>
                   <span>Gesamt (brutto)</span>
                   <span>{total.toFixed(2)} €</span>
@@ -4504,10 +4507,15 @@ function AbrechnungView({
                           const ps = getSpielerPaymentStatus(detail.spieler.id, td.training)
                           return !ps.bezahlt && !ps.barBezahlt && td.betrag > 0
                         })
-                        .map(td => ({
-                          name: `${td.tarif?.name || td.training.name || 'Tennistraining'} – ${formatDateGerman(td.training.datum)}`,
-                          amount: Number(td.betrag.toFixed(2))
-                        }))
+                        .map(td => {
+                          const dur = calculateDuration(td.training.uhrzeit_von, td.training.uhrzeit_bis)
+                          const hours = dur > 0 ? dur : 1
+                          return {
+                            name: `${td.tarif?.name || td.training.name || 'Tennistraining'} – ${formatDateGerman(td.training.datum)}`,
+                            amount: Number((td.betrag / hours).toFixed(2)),
+                            quantity: hours
+                          }
+                        })
                       const [yy, mm] = selectedMonth.split('-').map(Number)
                       const lastDay = String(new Date(yy, mm, 0).getDate()).padStart(2, '0')
                       setLexofficeData({
