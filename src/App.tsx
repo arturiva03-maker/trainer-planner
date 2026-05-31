@@ -3670,15 +3670,17 @@ function AbrechnungView({
       p => p.training_id === trainingId && p.spieler_id === spielerId
     )
 
-    // Finde das Training um den bar_bezahlt Status zu prüfen
-    const training = monthTrainings.find(t => t.id === trainingId)
-    const trainingBarBezahlt = training?.bar_bezahlt || false
+    // Dieser Button ist NUR der Umschalter "Offen <-> Bezahlt (Überweisung)" –
+    // er wird gar nicht angezeigt, wenn die Zeile bar bezahlt ist. Daher immer
+    // bar_bezahlt: false schreiben. (Früher wurde hier fälschlich das alte
+    // Training-Feld training.bar_bezahlt übernommen, wodurch beim Klick auf
+    // "Bezahlt" plötzlich "Bar" erschien.)
     const newStatus = !currentStatus
 
     // Optimistisches Update - sofort UI aktualisieren
     if (existingPayment) {
       setSpielerPayments(prev => prev.map(p =>
-        p.id === existingPayment.id ? { ...p, bezahlt: newStatus, ausstehend: false } : p
+        p.id === existingPayment.id ? { ...p, bezahlt: newStatus, bar_bezahlt: false, ausstehend: false } : p
       ))
     } else {
       // Temporärer Eintrag für optimistisches Update
@@ -3688,7 +3690,7 @@ function AbrechnungView({
         training_id: trainingId,
         spieler_id: spielerId,
         bezahlt: newStatus,
-        bar_bezahlt: trainingBarBezahlt,
+        bar_bezahlt: false,
         ausstehend: false,
         created_at: new Date().toISOString()
       }
@@ -3703,7 +3705,7 @@ function AbrechnungView({
         training_id: trainingId,
         spieler_id: spielerId,
         bezahlt: newStatus,
-        bar_bezahlt: trainingBarBezahlt,
+        bar_bezahlt: false,
         ausstehend: false
       }, { onConflict: 'training_id,spieler_id' })
     if (dbError) {
