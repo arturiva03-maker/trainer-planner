@@ -56,6 +56,12 @@
   --pay-offen: #64748B;
   --pay-offen-bg: #F1F5F9;
   --pay-offen-text: #475569;
+  /* Marken-Verlauf – EINE Quelle für alle Indigo-Flächen (Header, Bottom-Nav,
+     aktive Tabs, Primär-Buttons). Vorher hatten Kopf-/Fußzeile abweichende
+     Grau/Blau-Verläufe, dadurch wirkte das Handy farblich anders. */
+  --brand: #6366F1;
+  --brand-dark: #4F46E5;
+  --brand-gradient: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
 }
 
 /* Spinner Animation */
@@ -969,17 +975,12 @@ h2 { letter-spacing: -0.02em; }
 /* Cards - Modernized with Animations */
 .card {
   background: white;
+  border: 1px solid var(--gray-200);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   padding: 24px;
   margin-bottom: 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: fadeInUp 0.4s ease-out;
-}
-
-.card:hover {
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+  animation: fadeInUp 0.3s ease-out;
 }
 
 .card-header {
@@ -988,7 +989,7 @@ h2 { letter-spacing: -0.02em; }
   align-items: center;
   margin-bottom: 24px;
   padding-bottom: 16px;
-  border-bottom: 2px solid #E2E8F0;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .card-header h3 {
@@ -1106,7 +1107,7 @@ h2 { letter-spacing: -0.02em; }
 .table-container {
   overflow-x: auto;
   border-radius: 12px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--gray-200);
 }
 
 table {
@@ -1117,36 +1118,25 @@ table {
 th, td {
   padding: 14px 16px;
   text-align: left;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 th {
-  background: linear-gradient(180deg, #F7FAFA 0%, #E2E8F0 100%);
+  background: var(--gray-50);
   font-weight: 600;
-  color: #374151;
+  color: var(--gray-600);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 tr {
-  transition: all 0.2s ease;
+  transition: background 0.15s ease;
 }
-
-tbody tr {
-  animation: fadeIn 0.3s ease-out backwards;
-}
-
-tbody tr:nth-child(1) { animation-delay: 0.02s; }
-tbody tr:nth-child(2) { animation-delay: 0.04s; }
-tbody tr:nth-child(3) { animation-delay: 0.06s; }
-tbody tr:nth-child(4) { animation-delay: 0.08s; }
-tbody tr:nth-child(5) { animation-delay: 0.1s; }
-tbody tr:nth-child(n+6) { animation-delay: 0.12s; }
 
 tbody tr:hover {
-  background: rgba(30, 58, 95, 0.04);
-  transform: scale(1.005);
+  background: rgba(99, 102, 241, 0.05);
 }
 
 tbody tr:last-child td {
@@ -1710,8 +1700,8 @@ tbody tr:last-child td {
 /* Status Badge */
 .status-badge {
   display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
 }
@@ -1925,14 +1915,8 @@ tbody tr:last-child td {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
-  animation: fadeInUp 0.4s ease-out backwards;
+  animation: fadeInUp 0.35s ease-out backwards;
 }
-
-/* Staggered animation for stat cards */
-.stat-card:nth-child(1) { animation-delay: 0.05s; }
-.stat-card:nth-child(2) { animation-delay: 0.1s; }
-.stat-card:nth-child(3) { animation-delay: 0.15s; }
-.stat-card:nth-child(4) { animation-delay: 0.2s; }
 
 .stat-card::before {
   content: '';
@@ -1941,18 +1925,13 @@ tbody tr:last-child td {
   left: 0;
   width: 4px;
   height: 100%;
-  background: linear-gradient(180deg, #6366F1 0%, #4F46E5 100%);
+  background: var(--brand-gradient);
   border-radius: 4px 0 0 4px;
-  transition: width 0.3s ease;
-}
-
-.stat-card:hover::before {
-  width: 6px;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .stat-card-clickable {
@@ -2297,11 +2276,11 @@ tbody tr:last-child td {
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(180deg, #374151 0%, #1E40AF 100%);
+  background: var(--brand-gradient);
   z-index: 100;
   padding: 8px 12px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -4px 24px rgba(99, 102, 241, 0.25);
 }
 
 .mobile-bottom-nav-inner {
@@ -2374,7 +2353,7 @@ tbody tr:last-child td {
 
   /* ===== 2. HEADER DESIGN - Modernized ===== */
   .mobile-header {
-    background: linear-gradient(135deg, #374151 0%, #6B7280 100%);
+    background: var(--brand-gradient);
     padding: 16px 20px;
     display: flex;
     align-items: center;
@@ -2382,7 +2361,7 @@ tbody tr:last-child td {
     position: sticky;
     top: 0;
     z-index: 100;
-    box-shadow: 0 4px 16px rgba(30, 58, 95, 0.3);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
   }
 
   .mobile-header .header-content {
@@ -2748,16 +2727,8 @@ tbody tr:last-child td {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid #E2E8F0;
-    animation: fadeInUp 0.4s ease-out backwards;
+    animation: fadeInUp 0.3s ease-out backwards;
   }
-
-  /* Staggered animation for mobile cards */
-  .mobile-card:nth-child(1) { animation-delay: 0.05s; }
-  .mobile-card:nth-child(2) { animation-delay: 0.1s; }
-  .mobile-card:nth-child(3) { animation-delay: 0.15s; }
-  .mobile-card:nth-child(4) { animation-delay: 0.2s; }
-  .mobile-card:nth-child(5) { animation-delay: 0.25s; }
-  .mobile-card:nth-child(n+6) { animation-delay: 0.3s; }
 
   .mobile-card:active {
     transform: scale(0.97);
@@ -3451,13 +3422,8 @@ tbody tr:last-child td {
   gap: 8px;
 }
 
-.status-badge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
+/* (Basis-Definition von .status-badge steht weiter oben – hier nur Modifier,
+   damit Form/Größe app-weit identisch sind, auch auf dem Handy.) */
 .status-badge.active {
   background: var(--status-durchgefuehrt-bg);
   color: var(--status-durchgefuehrt-text);
