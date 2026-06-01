@@ -1955,6 +1955,15 @@ tbody tr:last-child td {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }
 
+.stat-card-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.stat-card-clickable:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
 .stat-card.success::before {
   background: linear-gradient(180deg, #6366F1 0%, #4F46E5 100%);
 }

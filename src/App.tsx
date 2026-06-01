@@ -3118,6 +3118,8 @@ function AbrechnungView({
   const [spielerSuche, setSpielerSuche] = useState('')
   const [selectedTag, setSelectedTag] = useState<string>('')
   const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
+  // Welche Statistik-Kachel ist zur Aufschluesselung geoeffnet (null = keine)
+  const [statBreakdown, setStatBreakdown] = useState<'total' | 'bar' | 'bezahlt' | 'ausstehend' | 'offen' | null>(null)
 
   // Monat + Status-Filter merken, damit der Tab beim Zurueckkommen den letzten
   // Stand zeigt statt auf aktuellen Monat / "Alle" zurueckzuspringen.
@@ -4026,33 +4028,93 @@ function AbrechnungView({
   return (
     <div>
       <div className="stats-grid">
-        <div className="stat-card">
+        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('total')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Gesamtumsatz</div>
           <div className="stat-value" style={{ color: '#1E293B' }}>{stats.total.toFixed(2)} €</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('bar')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Bar bezahlt</div>
           <div className="stat-value" style={{ color: 'var(--pay-bar)' }}>{stats.bar.toFixed(2)} €</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('bezahlt')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Bezahlt (Überweisung)</div>
           <div className="stat-value" style={{ color: 'var(--pay-bezahlt)' }}>
             {stats.bezahlt.toFixed(2)} €
           </div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('ausstehend')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Ausstehend</div>
           <div className="stat-value" style={{ color: 'var(--pay-ausstehend)' }}>
             {stats.ausstehend.toFixed(2)} €
           </div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('offen')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Offen</div>
           <div className="stat-value" style={{ color: 'var(--pay-offen)' }}>
             {stats.offen.toFixed(2)} €
           </div>
         </div>
       </div>
+
+      {statBreakdown && (() => {
+        const cfgMap = {
+          total: { label: 'Gesamtumsatz', color: '#1E293B', get: (s: (typeof filteredSummary)[number]) => s.summe },
+          bar: { label: 'Bar bezahlt', color: 'var(--pay-bar)', get: (s: (typeof filteredSummary)[number]) => s.barSumme },
+          bezahlt: { label: 'Bezahlt (Überweisung)', color: 'var(--pay-bezahlt)', get: (s: (typeof filteredSummary)[number]) => s.bezahltSumme },
+          ausstehend: { label: 'Ausstehend', color: 'var(--pay-ausstehend)', get: (s: (typeof filteredSummary)[number]) => s.ausstehendSumme },
+          offen: { label: 'Offen', color: 'var(--pay-offen)', get: (s: (typeof filteredSummary)[number]) => s.offeneSumme }
+        }
+        const cfg = cfgMap[statBreakdown]
+        const items = filteredSummary
+          .map((s) => ({ spieler: s.spieler, betrag: cfg.get(s) }))
+          .filter((x) => Math.abs(x.betrag) > 0.005)
+          .sort((a, b) => b.betrag - a.betrag)
+        const total = items.reduce((sum, x) => sum + x.betrag, 0)
+        return (
+          <div className="modal-overlay" onClick={() => setStatBreakdown(null)}>
+            <div className="modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ width: 11, height: 11, borderRadius: 3, background: cfg.color, display: 'inline-block' }} />
+                  {cfg.label}
+                  <span style={{ color: cfg.color }}>· {total.toFixed(2)} €</span>
+                </h3>
+                <button className="modal-close" onClick={() => setStatBreakdown(null)}>×</button>
+              </div>
+              <div className="modal-body">
+                <div style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 10 }}>
+                  {selectedTag ? formatDateGerman(selectedTag) : selectedMonth} · {items.length} Spieler
+                </div>
+                {items.length === 0 ? (
+                  <div className="empty-state">Keine Beträge in dieser Kategorie</div>
+                ) : (
+                  <div className="table-container">
+                    <table>
+                      <tbody>
+                        {items.map(({ spieler, betrag }) => (
+                          <tr
+                            key={spieler.id}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => { setStatBreakdown(null); setSelectedSpielerDetail(spieler.id) }}
+                            title="Detailansicht öffnen"
+                          >
+                            <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{spieler.name}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600, color: cfg.color }}>{betrag.toFixed(2)} €</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td style={{ fontWeight: 700 }}>Summe</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>{total.toFixed(2)} €</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="card">
         <div className="card-header">
