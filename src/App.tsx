@@ -3697,71 +3697,28 @@ function AbrechnungView({
     onUpdate()
   }
 
-  // Einzelnes Training für einen Spieler als bezahlt markieren
-  const toggleTrainingBezahlt = async (trainingId: string, spielerId: string, currentStatus: boolean) => {
+  // Einzelnes Training eines Spielers gezielt auf offen / bar / bezahlt setzen.
+  // Die Spieler-Zahlungszeile ist die Quelle der Wahrheit. Bei Einzeltrainings
+  // (1 Spieler) werden die Training-Felder mitgezogen, damit Kalender/Trainings-
+  // ansicht und Abrechnung nicht auseinanderlaufen (z.B. Abrechnung "bezahlt",
+  // Trainingsansicht aber weiterhin "bar").
+  const setTrainingPaymentStatus = async (
+    trainingId: string,
+    spielerId: string,
+    status: 'offen' | 'bar' | 'bezahlt'
+  ) => {
     preserveScroll()
+    const bezahlt = status === 'bar' || status === 'bezahlt'
+    const bar = status === 'bar'
+
     const existingPayment = spielerPayments.find(
       p => p.training_id === trainingId && p.spieler_id === spielerId
     )
-
-    // Dieser Button ist NUR der Umschalter "Offen <-> Bezahlt (Überweisung)" –
-    // er wird gar nicht angezeigt, wenn die Zeile bar bezahlt ist. Daher immer
-    // bar_bezahlt: false schreiben. (Früher wurde hier fälschlich das alte
-    // Training-Feld training.bar_bezahlt übernommen, wodurch beim Klick auf
-    // "Bezahlt" plötzlich "Bar" erschien.)
-    const newStatus = !currentStatus
 
     // Optimistisches Update - sofort UI aktualisieren
     if (existingPayment) {
       setSpielerPayments(prev => prev.map(p =>
-        p.id === existingPayment.id ? { ...p, bezahlt: newStatus, bar_bezahlt: false, ausstehend: false } : p
-      ))
-    } else {
-      // Temporärer Eintrag für optimistisches Update
-      const tempPayment: SpielerTrainingPayment = {
-        id: `temp-${trainingId}-${spielerId}`,
-        user_id: userId,
-        training_id: trainingId,
-        spieler_id: spielerId,
-        bezahlt: newStatus,
-        bar_bezahlt: false,
-        ausstehend: false,
-        created_at: new Date().toISOString()
-      }
-      setSpielerPayments(prev => [...prev, tempPayment])
-    }
-
-    // Datenbank: upsert auf (training_id, spieler_id)
-    const { error: dbError } = await supabase
-      .from('spieler_training_payments')
-      .upsert({
-        user_id: userId,
-        training_id: trainingId,
-        spieler_id: spielerId,
-        bezahlt: newStatus,
-        bar_bezahlt: false,
-        ausstehend: false
-      }, { onConflict: 'training_id,spieler_id' })
-    if (dbError) {
-      console.error('Speichern fehlgeschlagen:', dbError)
-      alert('Konnte nicht speichern:\n' + dbError.message)
-    }
-
-    onUpdate()
-  }
-
-  // Einzelnes Training eines Spielers wieder auf "offen" setzen (z.B. eine bar
-  // bezahlte Einheit zuruecknehmen, ohne das Trainingsfenster oeffnen zu muessen).
-  const resetTrainingToOffen = async (trainingId: string, spielerId: string) => {
-    preserveScroll()
-    const existingPayment = spielerPayments.find(
-      p => p.training_id === trainingId && p.spieler_id === spielerId
-    )
-
-    // Optimistisches Update
-    if (existingPayment) {
-      setSpielerPayments(prev => prev.map(p =>
-        p.id === existingPayment.id ? { ...p, bezahlt: false, bar_bezahlt: false, ausstehend: false } : p
+        p.id === existingPayment.id ? { ...p, bezahlt, bar_bezahlt: bar, ausstehend: false } : p
       ))
     } else {
       const tempPayment: SpielerTrainingPayment = {
@@ -3769,29 +3726,44 @@ function AbrechnungView({
         user_id: userId,
         training_id: trainingId,
         spieler_id: spielerId,
-        bezahlt: false,
-        bar_bezahlt: false,
+        bezahlt,
+        bar_bezahlt: bar,
         ausstehend: false,
         created_at: new Date().toISOString()
       }
       setSpielerPayments(prev => [...prev, tempPayment])
     }
 
-    // Datenbank: upsert mit allen Flags false -> die Spieler-Zeile gewinnt ueber
-    // ein evtl. noch gesetztes Training-Feld bar_bezahlt.
+    // Datenbank: Spieler-Zahlungszeile per upsert (training_id, spieler_id)
     const { error: dbError } = await supabase
       .from('spieler_training_payments')
       .upsert({
         user_id: userId,
         training_id: trainingId,
         spieler_id: spielerId,
-        bezahlt: false,
-        bar_bezahlt: false,
+        bezahlt,
+        bar_bezahlt: bar,
         ausstehend: false
       }, { onConflict: 'training_id,spieler_id' })
     if (dbError) {
-      console.error('Zurücksetzen fehlgeschlagen:', dbError)
-      alert('Konnte nicht zurücksetzen:\n' + dbError.message)
+      console.error('Status speichern fehlgeschlagen:', dbError)
+      alert('Konnte Status nicht speichern:\n' + dbError.message)
+    }
+
+    // Einzeltraining: Training-Felder mitziehen, damit die Trainingsansicht
+    // dasselbe zeigt. Gruppentrainings: gemeinsames Flag nicht anfassen, da dort
+    // die Spieler-Zeilen maßgeblich sind.
+    const training = monthTrainings.find(t => t.id === trainingId)
+    if (
+      training &&
+      training.spieler_ids.length === 1 &&
+      (training.bar_bezahlt !== bar || training.bezahlt !== bezahlt)
+    ) {
+      const { error: tErr } = await supabase
+        .from('trainings')
+        .update({ bar_bezahlt: bar, bezahlt })
+        .eq('id', trainingId)
+      if (tErr) console.error('Training-Status-Sync fehlgeschlagen:', tErr)
     }
 
     onUpdate()
@@ -4637,41 +4609,45 @@ function AbrechnungView({
                               )}
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              {paymentStatusRow.barBezahlt ? (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                  <span className="status-badge bar" style={{ fontSize: 11 }}>
-                                    Bar
-                                  </span>
-                                  <button
-                                    className="btn btn-sm btn-secondary"
-                                    style={{ fontSize: 10, padding: '2px 6px' }}
-                                    title="Bar zurücknehmen – Training auf offen setzen"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      resetTrainingToOffen(training.id, detail.spieler.id)
-                                    }}
-                                  >
-                                    → offen
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  className="btn btn-sm"
-                                  style={{
-                                    fontSize: 11,
-                                    padding: '2px 8px',
-                                    ...(paymentStatusRow.bezahlt
-                                      ? { background: 'var(--pay-bezahlt)', borderColor: 'var(--pay-bezahlt)', color: '#fff' }
-                                      : { background: 'var(--gray-200)', color: 'var(--gray-700)' })
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    toggleTrainingBezahlt(training.id, detail.spieler.id, paymentStatusRow.bezahlt)
-                                  }}
-                                >
-                                  {paymentStatusRow.bezahlt ? 'Bezahlt' : 'Offen'}
-                                </button>
-                              )}
+                              {(() => {
+                                const aktuell: 'offen' | 'bar' | 'bezahlt' = paymentStatusRow.barBezahlt
+                                  ? 'bar'
+                                  : paymentStatusRow.bezahlt
+                                  ? 'bezahlt'
+                                  : 'offen'
+                                const optionen = [
+                                  { key: 'offen' as const, label: 'Offen', farbe: 'var(--pay-offen)' },
+                                  { key: 'bar' as const, label: 'Bar', farbe: 'var(--pay-bar)' },
+                                  { key: 'bezahlt' as const, label: 'Bez.', farbe: 'var(--pay-bezahlt)' }
+                                ]
+                                return (
+                                  <div style={{ display: 'inline-flex', gap: 3 }}>
+                                    {optionen.map(({ key, label, farbe }) => {
+                                      const aktiv = aktuell === key
+                                      return (
+                                        <button
+                                          key={key}
+                                          className="btn btn-sm"
+                                          title={`Auf "${label}" setzen`}
+                                          style={{
+                                            fontSize: 10,
+                                            padding: '2px 7px',
+                                            ...(aktiv
+                                              ? { background: farbe, borderColor: farbe, color: '#fff' }
+                                              : { background: 'var(--gray-100)', color: 'var(--gray-500)' })
+                                          }}
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (!aktiv) setTrainingPaymentStatus(training.id, detail.spieler.id, key)
+                                          }}
+                                        >
+                                          {label}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )
+                              })()}
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               <button
