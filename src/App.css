@@ -2276,11 +2276,12 @@ tbody tr:last-child td {
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--brand-gradient);
+  background: #fff;
+  border-top: 1px solid var(--gray-200);
   z-index: 100;
   padding: 8px 12px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 24px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 -2px 12px rgba(15, 23, 42, 0.06);
 }
 
 .mobile-bottom-nav-inner {
@@ -2306,7 +2307,7 @@ tbody tr:last-child td {
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--gray-500);
   font-size: 10px;
   font-weight: 500;
   min-width: 56px;
@@ -2321,8 +2322,8 @@ tbody tr:last-child td {
 }
 
 .mobile-nav-item.active {
-  color: white;
-  background: rgba(255, 255, 255, 0.15);
+  color: var(--brand);
+  background: var(--primary-light);
 }
 
 .mobile-nav-item:active {
@@ -2353,7 +2354,8 @@ tbody tr:last-child td {
 
   /* ===== 2. HEADER DESIGN - Modernized ===== */
   .mobile-header {
-    background: var(--brand-gradient);
+    background: #fff;
+    border-bottom: 1px solid var(--gray-200);
     padding: 16px 20px;
     display: flex;
     align-items: center;
@@ -2361,7 +2363,7 @@ tbody tr:last-child td {
     position: sticky;
     top: 0;
     z-index: 100;
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
   }
 
   .mobile-header .header-content {
@@ -2373,19 +2375,19 @@ tbody tr:last-child td {
     font-weight: 600;
     margin: 0;
     line-height: 1.2;
-    color: white;
+    color: var(--gray-800);
   }
 
   .mobile-header .header-subtitle {
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--gray-500);
     margin: 4px 0 0 0;
   }
 
   .mobile-header h2 {
     font-size: 18px;
     font-weight: 600;
-    color: white;
+    color: var(--gray-800);
     margin: 0;
   }
 
