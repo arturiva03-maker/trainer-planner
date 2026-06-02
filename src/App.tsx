@@ -3626,6 +3626,21 @@ function AbrechnungView({
         alert('Konnte „Bar bezahlt" nicht speichern:\n' + dbError.message)
       }
     }
+
+    // Einzeltrainings (1 Spieler): Training-Felder mitziehen, damit die
+    // Trainingsansicht ebenfalls „bar bezahlt" zeigt. Gruppentrainings bleiben
+    // unberührt – dort ist der Status pro Spieler maßgeblich.
+    const einzelTrainingIds = betroffene
+      .filter(t => t.spieler_ids.length === 1)
+      .map(t => t.id)
+    if (einzelTrainingIds.length > 0) {
+      const { error: tErr } = await supabase
+        .from('trainings')
+        .update({ bar_bezahlt: true, bezahlt: true })
+        .in('id', einzelTrainingIds)
+      if (tErr) console.error('Training-Status-Sync fehlgeschlagen:', tErr)
+    }
+
     onUpdate()
   }
 
