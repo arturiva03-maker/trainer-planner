@@ -2930,6 +2930,10 @@ function LexofficeRechnungModal({
   const create = async () => {
     if (!contactId) return
     setCreating(true); setResult(null)
+    // Tab schon JETZT (waehrend des Klicks) oeffnen, sonst blockiert Safari/Mac
+    // das spaetere Oeffnen nach dem await als Popup. Nach Erfolg leiten wir den
+    // leeren Tab auf den Lexoffice-Permalink um, sonst schliessen wir ihn wieder.
+    const win = window.open('', '_blank')
     const r = await createLexofficeInvoice({
       contactId,
       lineItems,
@@ -2944,9 +2948,12 @@ function LexofficeRechnungModal({
     setCreating(false)
     setResult(r)
     if (r.ok) {
-      if (r.permalink) window.open(r.permalink, '_blank')
+      if (r.permalink && win) win.location.href = r.permalink
+      else if (win) win.close()
       // Rechnung erstellt -> berechnete (offene) Trainings auf "ausstehend"
       try { await onInvoiced() } catch { /* nicht blockierend */ }
+    } else if (win) {
+      win.close()
     }
   }
 
