@@ -21,32 +21,41 @@ const LEXOFFICE_APP = 'https://app.lexoffice.de'
 const SUPABASE_URL = 'https://eeeuushhiubuqesevlzt.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_zuOjODCzbtfeymLDEJ7Mzw_bbR0eKTR'
 
-// Nur diese Logins duerfen Lexoffice-Aktionen ausloesen (Konto-Inhaber).
-const ALLOWED_EMAILS = ['arturiva03@gmail.com']
+// Jeder Trainer hat sein EIGENES Lexoffice-Konto und damit seinen eigenen
+// API-Key. E-Mail -> Name der Env-Var, in der dieser Key auf dem Server liegt.
+// Neuer Trainer = Zeile hier ergaenzen + Env-Var in Vercel anlegen.
+const LEXOFFICE_KEY_ENV = {
+  'arturiva03@gmail.com': 'LEXOFFICE_API_KEY',
+  'zlatanpalazov60@gmail.com': 'LEXOFFICE_API_KEY_ZLATAN'
+}
 
-function getApiKey() {
-  const key = process.env.LEXOFFICE_API_KEY
+// Liefert den (getrimmten) API-Key fuer eine E-Mail oder null, wenn die E-Mail
+// nicht freigeschaltet ist bzw. der Key auf dem Server fehlt.
+function getApiKeyForEmail(email) {
+  const envName = LEXOFFICE_KEY_ENV[(email || '').toLowerCase()]
+  if (!envName) return null
+  const key = process.env[envName]
   return key && key.trim() ? key.trim() : null
 }
 
-async function lexofficeFetch(path, init = {}) {
-  const key = getApiKey()
-  if (!key) {
-    const err = new Error('LEXOFFICE_API_KEY ist auf dem Server nicht gesetzt.')
+async function lexofficeFetch(path, init = {}, apiKey) {
+  if (!apiKey) {
+    const err = new Error('Lexoffice-API-Key ist auf dem Server nicht gesetzt.')
     err.statusCode = 500
     throw err
   }
   return fetch(`${LEXOFFICE_BASE}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${key}`,
+      Authorization: `Bearer ${apiKey}`,
       Accept: 'application/json',
       ...(init.headers || {})
     }
   })
 }
 
-// Prueft das mitgesendete Supabase-Access-Token und die E-Mail-Freigabe.
+// Prueft das Supabase-Access-Token + die E-Mail-Freigabe und liefert den
+// passenden Lexoffice-API-Key des eingeloggten Trainers ({ user, apiKey }).
 async function requireAuthorizedUser(req) {
   const header = req.headers.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
@@ -61,11 +70,16 @@ async function requireAuthorizedUser(req) {
   }
   const user = await r.json()
   const email = (user.email || '').toLowerCase()
-  if (!ALLOWED_EMAILS.includes(email)) {
+  if (!LEXOFFICE_KEY_ENV[email]) {
     const e = new Error('Dieser Account darf keine Lexoffice-Rechnungen erstellen.')
     e.statusCode = 403; throw e
   }
-  return user
+  const apiKey = getApiKeyForEmail(email)
+  if (!apiKey) {
+    const e = new Error('Fuer diesen Account ist auf dem Server kein Lexoffice-API-Key hinterlegt.')
+    e.statusCode = 500; throw e
+  }
+  return { user, apiKey }
 }
 
 // Reduziert einen Lexoffice-Kontakt auf das, was das Frontend braucht.
@@ -93,10 +107,10 @@ function germanIso(dateStr) {
   return `${dateStr}T12:00:00.000${offset}`
 }
 
-async function handleSearchContacts(req, res) {
+async function handleSearchContacts(req, res, apiKey) {
   const q = (req.query?.q || '').toString().trim()
   if (!q) return res.status(400).json({ ok: false, error: 'Kein Suchbegriff (q) angegeben.' })
-  const r = await lexofficeFetch(`/contacts?name=${encodeURIComponent(q)}&page=0&size=25`)
+  const r = await lexofficeFetch(`/contacts?name=${encodeURIComponent(q)}&page=0&size=25`, {}, apiKey)
   if (!r.ok) {
     return res.status(200).json({ ok: false, error: `Lexoffice antwortete mit ${r.status}.` })
   }
@@ -105,7 +119,7 @@ async function handleSearchContacts(req, res) {
   return res.status(200).json({ ok: true, contacts })
 }
 
-async function handleCreateInvoice(req, res) {
+async function handleCreateInvoice(req, res, apiKey) {
   const body = req.body || {}
   const {
     contactId,
@@ -135,7 +149,7 @@ async function handleCreateInvoice(req, res) {
   // eine Rechnungsadresse. Hat der Kontakt keine, haengen wir ihm eine minimale
   // an (nur Laendercode DE) – dann ist er referenzierbar und es entsteht kein
   // neuer Kontakt.
-  const cr = await lexofficeFetch(`/contacts/${contactId}`)
+  const cr = await lexofficeFetch(`/contacts/${contactId}`, {}, apiKey)
   if (cr.ok) {
     const contact = await cr.json()
     const hasBilling = Array.isArray(contact.addresses?.billing) && contact.addresses.billing.length > 0
@@ -146,7 +160,7 @@ async function handleCreateInvoice(req, res) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(contact)
-      })
+      }, apiKey)
       if (!pr.ok) {
         const d = await pr.json().catch(() => null)
         return res.status(200).json({
@@ -186,7 +200,7 @@ async function handleCreateInvoice(req, res) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
-  })
+  }, apiKey)
 
   const data = await r.json().catch(() => null)
   if (!r.ok) {
@@ -207,9 +221,11 @@ export default async function handler(req, res) {
   const action = (req.query?.action || req.body?.action || '').toString()
 
   try {
-    // ping ist harmlos und braucht keinen Login.
+    // ping prueft den eigenen Key des eingeloggten Trainers (Login noetig, da
+    // der Key vom Account abhaengt).
     if (action === 'ping') {
-      const r = await lexofficeFetch('/profile')
+      const { apiKey } = await requireAuthorizedUser(req)
+      const r = await lexofficeFetch('/profile', {}, apiKey)
       if (r.status === 401) return res.status(200).json({ ok: false, error: 'Key ungueltig (401).' })
       if (!r.ok) return res.status(200).json({ ok: false, error: `Lexoffice antwortete mit ${r.status}.` })
       const profile = await r.json()
@@ -222,12 +238,12 @@ export default async function handler(req, res) {
 
     // Alles Weitere nur fuer eingeloggte, freigeschaltete Nutzer.
     if (action === 'search-contacts') {
-      await requireAuthorizedUser(req)
-      return handleSearchContacts(req, res)
+      const { apiKey } = await requireAuthorizedUser(req)
+      return handleSearchContacts(req, res, apiKey)
     }
     if (action === 'create-invoice') {
-      await requireAuthorizedUser(req)
-      return handleCreateInvoice(req, res)
+      const { apiKey } = await requireAuthorizedUser(req)
+      return handleCreateInvoice(req, res, apiKey)
     }
 
     return res.status(400).json({ ok: false, error: `Unbekannte action: "${action}".` })

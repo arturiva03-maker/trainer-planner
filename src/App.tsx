@@ -19,9 +19,10 @@ const POOL_ALLOWED_EMAILS: readonly string[] = ['zlatanpalazov60@gmail.com']
 const isPoolAllowed = (email?: string | null) =>
   POOL_ALLOWED_EMAILS.length === 0 || (!!email && POOL_ALLOWED_EMAILS.includes(email.toLowerCase()))
 
-// Lexoffice-Rechnungen: nur der Inhaber des Lexoffice-Kontos (muss zur
-// ALLOWED_EMAILS-Liste in api/lexoffice.js passen).
-const LEXOFFICE_ALLOWED_EMAILS: readonly string[] = ['arturiva03@gmail.com']
+// Lexoffice-Rechnungen: jeder Trainer mit eigenem Lexoffice-Konto. Muss zur
+// LEXOFFICE_KEY_ENV-Map in api/lexoffice.js passen (dort liegt pro E-Mail der
+// zugehoerige API-Key).
+const LEXOFFICE_ALLOWED_EMAILS: readonly string[] = ['arturiva03@gmail.com', 'zlatanpalazov60@gmail.com']
 const isLexofficeAllowed = (email?: string | null) =>
   !!email && LEXOFFICE_ALLOWED_EMAILS.includes(email.toLowerCase())
 
