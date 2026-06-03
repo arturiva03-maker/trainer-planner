@@ -541,8 +541,6 @@ function MainApp({ user }: { user: User }) {
 
   const poolEnabled = isPoolAllowed(user.email)
   const lexofficeEnabled = isLexofficeAllowed(user.email)
-  // TEMP (Apr+Mai-Sammelrechnung, nur Zlatan) – nach Nutzung wieder entfernen.
-  const aprMaiTempEnabled = (user.email || '').toLowerCase() === 'zlatanpalazov60@gmail.com'
 
   const baseTabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'kalender', label: 'Kalender', icon: '📅' },
@@ -683,7 +681,6 @@ function MainApp({ user }: { user: User }) {
                 onNavigateToTraining={handleNavigateToTraining}
                 userId={user.id}
                 lexofficeEnabled={lexofficeEnabled}
-                aprMaiTempEnabled={aprMaiTempEnabled}
               />
             )}
             {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
@@ -2858,7 +2855,6 @@ function LexofficeRechnungModal({
   monthStr,
   shippingStart,
   shippingEnd,
-  introOverride,
   onClose,
   onSaved,
   onInvoiced
@@ -2868,7 +2864,6 @@ function LexofficeRechnungModal({
   monthStr: string
   shippingStart: string
   shippingEnd: string
-  introOverride?: string
   onClose: () => void
   onSaved: () => void
   onInvoiced: () => void | Promise<void>
@@ -2894,7 +2889,7 @@ function LexofficeRechnungModal({
     return names[m - 1] ? `${names[m - 1]} ${y}` : monthStr
   })()
   const introductionText = `Für das Tennistraining im ${monthLabel} stelle ich Ihnen vereinbarungsgemäß folgende Leistungen in Rechnung:`
-  const [intro, setIntro] = useState(introOverride ?? introductionText)
+  const [intro, setIntro] = useState(introductionText)
 
   const doSearch = async () => {
     setSearching(true); setSearchError(null)
@@ -3110,8 +3105,7 @@ function AbrechnungView({
   onUpdate,
   onNavigateToTraining,
   userId,
-  lexofficeEnabled,
-  aprMaiTempEnabled
+  lexofficeEnabled
 }: {
   trainings: Training[]
   spieler: Spieler[]
@@ -3123,7 +3117,6 @@ function AbrechnungView({
   onNavigateToTraining: (training: Training) => void
   userId: string
   lexofficeEnabled: boolean
-  aprMaiTempEnabled: boolean // TEMP (Apr+Mai-Sammelrechnung, nur Zlatan)
 }) {
   const [selectedMonth, setSelectedMonth] = useState(() => localStorage.getItem('abrechnung_monat') || getMonthString(new Date()))
   const [filter, setFilter] = useState<'alle' | 'bezahlt' | 'offen' | 'ausstehend' | 'bar'>(
@@ -3156,8 +3149,6 @@ function AbrechnungView({
     monthStr: string
     shippingStart: string
     shippingEnd: string
-    introOverride?: string // TEMP (Apr+Mai-Sammelrechnung) – eigener Einleitungstext
-    aprMaiTemp?: boolean   // TEMP (Apr+Mai-Sammelrechnung) – beide Monate markieren
   }>(null)
 
   const monthTrainings = useMemo(() => {
@@ -4068,73 +4059,6 @@ function AbrechnungView({
     })
   }
 
-  // ===== TEMP (Apr+Mai-Sammelrechnung, nur Zlatan) – nach Nutzung entfernen. =====
-  // Liefert alle abrechenbaren Trainings eines Spielers aus April + Mai 2026
-  // (gleiche Status-/Mitgliedschafts-Regel wie die Monats-Summary).
-  const aprMaiTrainingsForSpieler = (spielerId: string): Training[] =>
-    trainings.filter(t => {
-      const monat = t.datum.substring(0, 7)
-      if (monat !== '2026-04' && monat !== '2026-05') return false
-      const statusOk = t.status === 'durchgefuehrt' || t.status === 'durchgefuehrt_halb' ||
-        (t.status === 'abgesagt' && (t.entfernte_spieler || []).some(es => es.muss_bezahlen))
-      if (!statusOk) return false
-      const aktiv = t.spieler_ids.includes(spielerId)
-      const tarif = tarife.find(ta => ta.id === t.tarif_id)
-      const istMonatlich = (tarif?.abrechnung || 'proTraining') === 'monatlich'
-      const entferntPflicht = !istMonatlich &&
-        (t.entfernte_spieler || []).some(es => es.spieler_id === spielerId && es.muss_bezahlen)
-      return aktiv || entferntPflicht
-    })
-
-  // Hat der Spieler in BEIDEN Monaten (April UND Mai) offene Trainings? Nur dann
-  // ergibt die Sammelrechnung Sinn -> sonst Button gar nicht zeigen.
-  const aprMaiHatBeideMonate = (spielerId: string): boolean => {
-    const offene = aprMaiTrainingsForSpieler(spielerId).filter(t => {
-      const ps = getSpielerPaymentStatus(spielerId, t)
-      return !ps.bezahlt && !ps.barBezahlt
-    })
-    return offene.some(t => t.datum.substring(0, 7) === '2026-04') &&
-      offene.some(t => t.datum.substring(0, 7) === '2026-05')
-  }
-
-  // Fasst April + Mai 2026 desselben Spielers in EINER Rechnung zusammen.
-  const openAprMaiRechnung = (spielerId: string) => {
-    const sp = spieler.find(s => s.id === spielerId)
-    if (!sp) return
-    setLexofficeData({
-      spieler: sp,
-      lineItems: buildLexofficeLines(sp, aprMaiTrainingsForSpieler(spielerId)),
-      monthStr: '2026-05',
-      shippingStart: '2026-04-01',
-      shippingEnd: '2026-05-31',
-      aprMaiTemp: true,
-      introOverride: 'Für das Tennistraining im April und Mai 2026 stelle ich Ihnen vereinbarungsgemäß folgende Leistungen in Rechnung:'
-    })
-  }
-
-  // Nach der Sammelrechnung: offene Trainings BEIDER Monate auf "ausstehend".
-  const markSpielerAusstehendAprMaiTemp = async (spielerId: string) => {
-    const betroffene = aprMaiTrainingsForSpieler(spielerId).filter(t => {
-      const ps = getSpielerPaymentStatus(spielerId, t)
-      return !ps.bezahlt && !ps.barBezahlt
-    })
-    if (betroffene.length === 0) { onUpdate(); return }
-    const rows = betroffene.map(training => ({
-      user_id: userId,
-      training_id: training.id,
-      spieler_id: spielerId,
-      bezahlt: false,
-      bar_bezahlt: false,
-      ausstehend: true
-    }))
-    const { error } = await supabase
-      .from('spieler_training_payments')
-      .upsert(rows, { onConflict: 'training_id,spieler_id' })
-    if (error) { console.error(error); alert('Konnte Status nicht speichern:\n' + error.message) }
-    onUpdate()
-  }
-  // ===== /TEMP =====
-
   return (
     <div>
       <div className="stats-grid">
@@ -4910,13 +4834,6 @@ function AbrechnungView({
                     📄 Lexoffice-Rechnung
                   </button>
                 )}
-                {/* TEMP (Apr+Mai-Sammelrechnung, nur Zlatan) – nach Nutzung wieder entfernen. */}
-                {/* Nur wenn der Spieler in BEIDEN Monaten offene Trainings hat. */}
-                {aprMaiTempEnabled && aprMaiHatBeideMonate(detail.spieler.id) && (
-                  <button className="btn btn-primary" onClick={() => openAprMaiRechnung(detail.spieler.id)}>
-                    📄 Apr+Mai zusammen
-                  </button>
-                )}
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
                   Schließen
                 </button>
@@ -4933,12 +4850,9 @@ function AbrechnungView({
           monthStr={lexofficeData.monthStr}
           shippingStart={lexofficeData.shippingStart}
           shippingEnd={lexofficeData.shippingEnd}
-          introOverride={lexofficeData.introOverride}
           onClose={() => setLexofficeData(null)}
           onSaved={onUpdate}
-          onInvoiced={() => lexofficeData.aprMaiTemp
-            ? markSpielerAusstehendAprMaiTemp(lexofficeData.spieler.id) // TEMP (Apr+Mai)
-            : markSpielerAusstehendNachRechnung(lexofficeData.spieler.id)}
+          onInvoiced={() => markSpielerAusstehendNachRechnung(lexofficeData.spieler.id)}
         />
       )}
 
