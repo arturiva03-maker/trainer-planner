@@ -4024,10 +4024,14 @@ function AbrechnungView({
       .map(x => {
         const dur = calculateDuration(x.t.uhrzeit_von, x.t.uhrzeit_bis)
         const hours = dur > 0 ? dur : 1
+        // Lexoffice erlaubt fuer die Menge max. 4 Nachkommastellen. Krumme
+        // Dauern (z.B. 1h20min = 1.33333… h) sonst -> "Validation failed".
+        // Ganze/halbe Stunden bleiben unveraendert (1.5 -> 1.5).
+        const qty = Number(hours.toFixed(4))
         return {
           name: `${x.tarif?.name || x.t.name || 'Tennistraining'} – ${formatDateGerman(x.t.datum)}`,
-          amount: Number((x.betrag / hours).toFixed(2)),
-          quantity: hours
+          amount: Number((x.betrag / qty).toFixed(2)),
+          quantity: qty
         }
       })
     const [yy, mm] = selectedMonth.split('-').map(Number)
