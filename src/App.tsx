@@ -4086,6 +4086,17 @@ function AbrechnungView({
       return aktiv || entferntPflicht
     })
 
+  // Hat der Spieler in BEIDEN Monaten (April UND Mai) offene Trainings? Nur dann
+  // ergibt die Sammelrechnung Sinn -> sonst Button gar nicht zeigen.
+  const aprMaiHatBeideMonate = (spielerId: string): boolean => {
+    const offene = aprMaiTrainingsForSpieler(spielerId).filter(t => {
+      const ps = getSpielerPaymentStatus(spielerId, t)
+      return !ps.bezahlt && !ps.barBezahlt
+    })
+    return offene.some(t => t.datum.substring(0, 7) === '2026-04') &&
+      offene.some(t => t.datum.substring(0, 7) === '2026-05')
+  }
+
   // Fasst April + Mai 2026 desselben Spielers in EINER Rechnung zusammen.
   const openAprMaiRechnung = (spielerId: string) => {
     const sp = spieler.find(s => s.id === spielerId)
@@ -4900,7 +4911,8 @@ function AbrechnungView({
                   </button>
                 )}
                 {/* TEMP (Apr+Mai-Sammelrechnung, nur Zlatan) – nach Nutzung wieder entfernen. */}
-                {aprMaiTempEnabled && (
+                {/* Nur wenn der Spieler in BEIDEN Monaten offene Trainings hat. */}
+                {aprMaiTempEnabled && aprMaiHatBeideMonate(detail.spieler.id) && (
                   <button className="btn btn-primary" onClick={() => openAprMaiRechnung(detail.spieler.id)}>
                     📄 Apr+Mai zusammen
                   </button>
