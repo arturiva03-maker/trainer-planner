@@ -204,7 +204,17 @@ async function handleCreateInvoice(req, res, apiKey) {
 
   const data = await r.json().catch(() => null)
   if (!r.ok) {
-    const detail = data?.message || data?.IssueList?.[0]?.i18nKey || `HTTP ${r.status}`
+    // Bei "Validation failed" liefert Lexoffice die echten Ursachen in einer
+    // Liste (lexware.io: details[], aelteres lexoffice: IssueList[]). Diese
+    // Feld-Details durchreichen, sonst steht nur "Validation failed" da.
+    const list = Array.isArray(data?.details) ? data.details
+      : Array.isArray(data?.IssueList) ? data.IssueList
+        : []
+    const issues = list
+      .map((d) => [d.field || d.source, d.message || d.violation || d.i18nKey || d.type]
+        .filter(Boolean).join(': '))
+      .filter(Boolean)
+    const detail = issues.length ? issues.join(' | ') : (data?.message || `HTTP ${r.status}`)
     return res.status(200).json({ ok: false, error: `Lexoffice: ${detail}`, raw: data })
   }
 
