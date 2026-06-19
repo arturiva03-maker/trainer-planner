@@ -3870,106 +3870,121 @@ tbody tr:last-child td {
 }
 
 
-/* ============================================================
-   AUTOMATIC DARK MODE — follows the device setting.
-   Pure CSS-variable swap (+ a few literal fixes). No markup/JS.
-   The legacy --gray-* ramp is INVERTED here as a safety net so any
-   surface still using var(--gray-*) flips correctly (no white boxes).
-   Must stay at END of file so it wins over the mobile @media block.
-   ============================================================ */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Brand — brightened for contrast on dark surfaces */
-    --primary: #818CF8;
-    --primary-hover: #A5B4FC;
-    --primary-light: #27306B;
-    --brand: #818CF8;
-    --brand-dark: #A5B4FC;
-
-    /* Semantic surfaces & text */
-    --bg: #0B1120;
-    --surface: #111827;
-    --surface-2: #1E293B;
-    --surface-3: #0F1A2E;
-    --surface-elevated: #1E293B;
-    --surface-active: #27306B;
-    --header-surface: linear-gradient(135deg, #1E293B 0%, #334155 100%);
-    --border: #2A3852;
-    --border-strong: #3A4A63;
-    --text: #E5EAF2;
-    --text-muted: #B4C0D0;
-    --text-subtle: #8595A8;
-    --overlay: rgba(0, 0, 0, 0.75);
-    --blur: blur(14px);
-    --glass-bg: rgba(17, 24, 39, 0.72);
-    --ring: 0 0 0 3px rgba(129, 140, 248, 0.40);
-
-    /* Shadows must darken, not lighten */
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6), 0 16px 48px rgba(0, 0, 0, 0.7);
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.45), 0 8px 16px -4px rgba(0, 0, 0, 0.55);
-    --shadow-xl: 0 24px 56px -12px rgba(0, 0, 0, 0.7);
-
-    /* Legacy neutral ramp — inverted (light grays -> dark surfaces, dark grays -> light text) */
-    --gray-50: #0F1A2E;
-    --gray-100: #1E293B;
-    --gray-200: #2A3852;
-    --gray-300: #3A4A63;
-    --gray-400: #64748B;
-    --gray-500: #94A3B8;
-    --gray-600: #B4C0D0;
-    --gray-700: #CBD5E1;
-    --gray-800: #E5EAF2;
-    --gray-900: #F1F5F9;
-    --sidebar-bg: #111827;
-    --sidebar-active: #27306B;
-
-    /* Status / pay — low-alpha tints + lighter text so chips stay legible */
-    --status-geplant-bg: #1E293B;
-    --status-geplant-text: #CBD5E1;
-    --status-durchgefuehrt-bg: rgba(34, 197, 94, 0.18);
-    --status-durchgefuehrt-text: #86EFAC;
-    --status-durchgefuehrt_halb-bg: rgba(34, 197, 94, 0.18);
-    --status-durchgefuehrt_halb-text: #86EFAC;
-    --status-abgesagt-bg: rgba(239, 68, 68, 0.18);
-    --status-abgesagt-text: #FCA5A5;
-    --status-bezahlt-bg: #27306B;
-    --status-bezahlt-text: #C7D2FE;
-    --success: #4ADE80;
-    --danger: #F87171;
-    --warning: #FBBF24;
-    --success-light: rgba(34, 197, 94, 0.18);
-    --danger-light: rgba(239, 68, 68, 0.18);
-    --warning-light: rgba(245, 158, 11, 0.18);
-    --pay-bar-bg: rgba(5, 150, 105, 0.20);
-    --pay-bar-text: #6EE7B7;
-    --pay-bezahlt-bg: rgba(37, 99, 235, 0.22);
-    --pay-bezahlt-text: #93C5FD;
-    --pay-ausstehend-bg: rgba(217, 119, 6, 0.20);
-    --pay-ausstehend-text: #FCD34D;
-    --pay-offen-bg: #1E293B;
-    --pay-offen-text: #CBD5E1;
-  }
-
-  /* --- Literal fixes that tokens can't reach --- */
-  body { color: var(--text); }
-  tbody tr:hover { background: rgba(129, 140, 248, 0.10); }
-  .btn-secondary,
-  .btn-secondary:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
-  /* 'Alle' active filter pill uses --gray-700 as a dark fill; the inverted ramp would flip it light -> pin a slate fill that keeps white text readable */
-  .pay-pill-alle.active { background: #475569; }
-  ::selection { background: rgba(129, 140, 248, 0.28); color: #E5EAF2; }
-  ::-webkit-scrollbar-thumb { background: rgba(159, 176, 195, 0.28); }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(159, 176, 195, 0.45); }
-
-  /* Auth screen keeps its (fixed light-gradient) identity instead of half-flipping */
-  .auth-form-container { background: #FFFFFF; }
-  .auth-info-content { color: #1E293B; }
-  .auth-box h2 { color: #1E293B; }
-  .auth-box label { color: #334155; }
-  .auth-box input { background: #F8FAFC; border-color: #E2E8F0; color: #1E293B; }
-  .auth-subtitle { color: #64748B; }
-  .auth-toggle { color: #475569; }
+/* Theme-Schalter (mobiler Header) */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-xs);
+  transition: background 0.15s var(--ease), transform 0.15s var(--ease);
 }
+.theme-toggle:hover { background: var(--surface-3); }
+.theme-toggle:active { transform: scale(0.92); }
+
+/* ============================================================
+   THEME — manueller Schalter + automatischer Fallback.
+   <html data-theme="dark"> wird per JS gesetzt: aus der gespeicherten
+   Wahl, oder bei 'System' aus prefers-color-scheme. Rein visuell.
+   ============================================================ */
+:root[data-theme="dark"] {
+  /* Brand — brightened for contrast on dark surfaces */
+  --primary: #818CF8;
+  --primary-hover: #A5B4FC;
+  --primary-light: #27306B;
+  --brand: #818CF8;
+  --brand-dark: #A5B4FC;
+
+  /* Semantic surfaces & text */
+  --bg: #0B1120;
+  --surface: #111827;
+  --surface-2: #1E293B;
+  --surface-3: #0F1A2E;
+  --surface-elevated: #1E293B;
+  --surface-active: #27306B;
+  --header-surface: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+  --border: #2A3852;
+  --border-strong: #3A4A63;
+  --text: #E5EAF2;
+  --text-muted: #B4C0D0;
+  --text-subtle: #8595A8;
+  --overlay: rgba(0, 0, 0, 0.75);
+  --blur: blur(14px);
+  --glass-bg: rgba(17, 24, 39, 0.72);
+  --ring: 0 0 0 3px rgba(129, 140, 248, 0.40);
+
+  /* Shadows must darken, not lighten */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6), 0 16px 48px rgba(0, 0, 0, 0.7);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.45), 0 8px 16px -4px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+
+  /* Legacy neutral ramp — inverted (light grays -> dark surfaces, dark grays -> light text) */
+  --gray-50: #0F1A2E;
+  --gray-100: #1E293B;
+  --gray-200: #2A3852;
+  --gray-300: #3A4A63;
+  --gray-400: #64748B;
+  --gray-500: #94A3B8;
+  --gray-600: #B4C0D0;
+  --gray-700: #CBD5E1;
+  --gray-800: #E5EAF2;
+  --gray-900: #F1F5F9;
+  --sidebar-bg: #111827;
+  --sidebar-active: #27306B;
+
+  /* Status / pay — low-alpha tints + lighter text */
+  --status-geplant-bg: #1E293B;
+  --status-geplant-text: #CBD5E1;
+  --status-durchgefuehrt-bg: rgba(34, 197, 94, 0.18);
+  --status-durchgefuehrt-text: #86EFAC;
+  --status-durchgefuehrt_halb-bg: rgba(34, 197, 94, 0.18);
+  --status-durchgefuehrt_halb-text: #86EFAC;
+  --status-abgesagt-bg: rgba(239, 68, 68, 0.18);
+  --status-abgesagt-text: #FCA5A5;
+  --status-bezahlt-bg: #27306B;
+  --status-bezahlt-text: #C7D2FE;
+  --success: #4ADE80;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --success-light: rgba(34, 197, 94, 0.18);
+  --danger-light: rgba(239, 68, 68, 0.18);
+  --warning-light: rgba(245, 158, 11, 0.18);
+  --pay-bar-bg: rgba(5, 150, 105, 0.20);
+  --pay-bar-text: #6EE7B7;
+  --pay-bezahlt-bg: rgba(37, 99, 235, 0.22);
+  --pay-bezahlt-text: #93C5FD;
+  --pay-ausstehend-bg: rgba(217, 119, 6, 0.20);
+  --pay-ausstehend-text: #FCD34D;
+  --pay-offen-bg: #1E293B;
+  --pay-offen-text: #CBD5E1;
+}
+
+/* Literal fixes that tokens can't reach */
+[data-theme="dark"] body { color: var(--text); }
+[data-theme="dark"] tbody tr:hover { background: rgba(129, 140, 248, 0.10); }
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .btn-secondary:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .pay-pill-alle.active { background: #475569; }
+[data-theme="dark"] ::selection { background: rgba(129, 140, 248, 0.28); color: #E5EAF2; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(159, 176, 195, 0.28); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(159, 176, 195, 0.45); }
+
+/* Auth screen keeps its (fixed light-gradient) identity instead of half-flipping */
+[data-theme="dark"] .auth-form-container { background: #FFFFFF; }
+[data-theme="dark"] .auth-info-content { color: #1E293B; }
+[data-theme="dark"] .auth-box h2 { color: #1E293B; }
+[data-theme="dark"] .auth-box label { color: #334155; }
+[data-theme="dark"] .auth-box input { background: #F8FAFC; border-color: #E2E8F0; color: #1E293B; }
+[data-theme="dark"] .auth-subtitle { color: #64748B; }
+[data-theme="dark"] .auth-toggle { color: #475569; }
