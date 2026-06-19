@@ -17,6 +17,9 @@ export interface Spieler {
   // Verknuepfung zum Lexoffice-Kontakt (Rechnungsempfaenger, i.d.R. das Elternteil)
   lexoffice_contact_id?: string | null
   lexoffice_contact_name?: string | null
+  // Label: in der Sommersaison faellt fuer diesen (erwachsenen) Spieler
+  // pro Trainingsstunde eine Platzgebuehr an.
+  platzgebuehr?: boolean
   created_at: string
 }
 
@@ -102,4 +105,4 @@ export interface MonthlyAdjustment {
   created_at?: string
 }
 
-export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'abrechnung-trainer'
+export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'platzgebuehr' | 'abrechnung-trainer'

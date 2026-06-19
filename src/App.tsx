@@ -546,6 +546,7 @@ function MainApp({ user }: { user: User }) {
     { id: 'kalender', label: 'Kalender', icon: '📅' },
     { id: 'verwaltung', label: 'Verwaltung', icon: '👥' },
     { id: 'abrechnung', label: 'Abrechnung', icon: '💰' },
+    { id: 'platzgebuehr', label: 'Platzgebühr', icon: '🎾' },
   ]
 
   const tabs: { id: Tab; label: string; icon: string }[] = [...baseTabs]
@@ -555,6 +556,7 @@ function MainApp({ user }: { user: User }) {
     { id: 'kalender', label: 'Kalender', icon: '📅' },
     { id: 'verwaltung', label: 'Verwalten', icon: '👥' },
     { id: 'abrechnung', label: 'Rechnung', icon: '💰' },
+    { id: 'platzgebuehr', label: 'Platz', icon: '🎾' },
   ]
 
   // Warte-Bildschirm für nicht freigeschaltete User
@@ -681,6 +683,13 @@ function MainApp({ user }: { user: User }) {
                 onNavigateToTraining={handleNavigateToTraining}
                 userId={user.id}
                 lexofficeEnabled={lexofficeEnabled}
+              />
+            )}
+            {activeTab === 'platzgebuehr' && (
+              <PlatzgebuehrView
+                trainings={trainings}
+                spieler={spieler}
+                onUpdate={loadAllData}
               />
             )}
             {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
@@ -3091,6 +3100,403 @@ function LexofficeRechnungModal({
           <button className="btn btn-secondary" onClick={onClose}>Schließen</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============ PLATZGEBÜHR (Sommersaison Mai–September) ============
+// Erwachsene Spieler mit dem Label `platzgebuehr` zahlen pro gegebener
+// Trainingsstunde eine Platzgebuehr. Halb durchgefuehrte Trainings zaehlen
+// als halbe Stunden. Berechnung pro gelabeltem Spieler pro Stunde.
+const PLATZGEBUEHR_PRO_STUNDE = 5
+const SOMMER_MONATE = [5, 6, 7, 8, 9] // Mai bis September
+const MONATSNAMEN: Record<number, string> = {
+  5: 'Mai', 6: 'Juni', 7: 'Juli', 8: 'August', 9: 'September'
+}
+
+function PlatzgebuehrView({
+  trainings,
+  spieler,
+  onUpdate
+}: {
+  trainings: Training[]
+  spieler: Spieler[]
+  onUpdate: () => void
+}) {
+  const currentYear = new Date().getFullYear()
+  const [jahr, setJahr] = useState<number>(currentYear)
+  const [selectedSpielerId, setSelectedSpielerId] = useState<string>('')
+  const [showVerwaltung, setShowVerwaltung] = useState(false)
+  const [verwaltungSuche, setVerwaltungSuche] = useState('')
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  // Auswahl der Jahre: alle Jahre mit Sommer-Trainings + aktuelles Jahr
+  const verfuegbareJahre = useMemo(() => {
+    const set = new Set<number>([currentYear])
+    trainings.forEach((t) => {
+      const [y, m] = t.datum.split('-').map(Number)
+      if (SOMMER_MONATE.includes(m)) set.add(y)
+    })
+    return Array.from(set).sort((a, b) => b - a)
+  }, [trainings, currentYear])
+
+  const platzSpielerIds = useMemo(
+    () => new Set(spieler.filter((s) => s.platzgebuehr).map((s) => s.id)),
+    [spieler]
+  )
+
+  // Eine Zeile pro gelabeltem Spieler pro Training in der Sommersaison.
+  type PlatzRow = {
+    training: Training
+    spieler: Spieler
+    monat: number
+    stunden: number
+    betrag: number
+  }
+  const rows = useMemo<PlatzRow[]>(() => {
+    const result: PlatzRow[] = []
+    trainings.forEach((t) => {
+      const [y, m] = t.datum.split('-').map(Number)
+      if (y !== jahr || !SOMMER_MONATE.includes(m)) return
+      if (t.status !== 'durchgefuehrt' && t.status !== 'durchgefuehrt_halb') return
+      const halbFaktor = t.status === 'durchgefuehrt_halb' ? 0.5 : 1
+      const dauer = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
+      const stunden = Math.max(dauer, 0) * halbFaktor
+      if (stunden <= 0) return
+      t.spieler_ids.forEach((sid) => {
+        if (!platzSpielerIds.has(sid)) return
+        const sp = spieler.find((s) => s.id === sid)
+        if (!sp) return
+        result.push({
+          training: t,
+          spieler: sp,
+          monat: m,
+          stunden,
+          betrag: stunden * PLATZGEBUEHR_PRO_STUNDE
+        })
+      })
+    })
+    // chronologisch sortieren
+    result.sort((a, b) => {
+      const d = a.training.datum.localeCompare(b.training.datum)
+      if (d !== 0) return d
+      return a.training.uhrzeit_von.localeCompare(b.training.uhrzeit_von)
+    })
+    return result
+  }, [trainings, jahr, platzSpielerIds, spieler])
+
+  // Summen pro Monat (immer alle 5 Sommermonate, auch mit 0)
+  const monatsSummen = useMemo(() => {
+    return SOMMER_MONATE.map((m) => {
+      const mRows = rows.filter((r) => r.monat === m)
+      return {
+        monat: m,
+        stunden: mRows.reduce((s, r) => s + r.stunden, 0),
+        betrag: mRows.reduce((s, r) => s + r.betrag, 0),
+        anzahl: mRows.length
+      }
+    })
+  }, [rows])
+
+  // Summen pro Spieler
+  const spielerSummen = useMemo(() => {
+    const map = new Map<string, { spieler: Spieler; stunden: number; betrag: number; anzahl: number }>()
+    rows.forEach((r) => {
+      const cur = map.get(r.spieler.id) || { spieler: r.spieler, stunden: 0, betrag: 0, anzahl: 0 }
+      cur.stunden += r.stunden
+      cur.betrag += r.betrag
+      cur.anzahl += 1
+      map.set(r.spieler.id, cur)
+    })
+    return Array.from(map.values()).sort((a, b) => b.betrag - a.betrag)
+  }, [rows])
+
+  const gesamtBetrag = rows.reduce((s, r) => s + r.betrag, 0)
+  const gesamtStunden = rows.reduce((s, r) => s + r.stunden, 0)
+
+  // Detailzeilen ggf. nach gewaehltem Spieler filtern
+  const detailRows = selectedSpielerId
+    ? rows.filter((r) => r.spieler.id === selectedSpielerId)
+    : rows
+
+  const fmtStd = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 2 })
+
+  const togglePlatzgebuehr = async (sp: Spieler) => {
+    setSavingId(sp.id)
+    const { error } = await supabase
+      .from('spieler')
+      .update({ platzgebuehr: !sp.platzgebuehr })
+      .eq('id', sp.id)
+    if (error) {
+      console.error('Platzgebuehr-Label speichern fehlgeschlagen:', error)
+      alert('Speichern fehlgeschlagen: ' + error.message)
+    }
+    setSavingId(null)
+    onUpdate()
+  }
+
+  const gefilterteVerwaltung = spieler
+    .filter((s) => s.name.toLowerCase().includes(verwaltungSuche.toLowerCase()))
+    .sort((a, b) => {
+      // Gelabelte zuerst, dann alphabetisch
+      if (!!a.platzgebuehr !== !!b.platzgebuehr) return a.platzgebuehr ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+
+  return (
+    <div>
+      <div className="view-header" style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0 }}>🎾 Platzgebühr</h2>
+        <p style={{ margin: '4px 0 0', color: 'var(--gray-600)', fontSize: 14 }}>
+          Sommersaison 1. Mai – 30. September · {PLATZGEBUEHR_PRO_STUNDE},00 € pro Trainingsstunde
+        </p>
+      </div>
+
+      {/* Stat-Kacheln */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Platzgebühr gesamt {jahr}</div>
+          <div className="stat-value" style={{ color: '#1E293B' }}>{gesamtBetrag.toFixed(2)} €</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Stunden gesamt</div>
+          <div className="stat-value" style={{ color: 'var(--primary)' }}>{fmtStd(gesamtStunden)}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Spieler mit Platzgebühr</div>
+          <div className="stat-value" style={{ color: 'var(--primary)' }}>{spielerSummen.length}</div>
+        </div>
+      </div>
+
+      {/* Jahr-Auswahl + Verwaltung-Button */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-header-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              className="form-control"
+              value={jahr}
+              onChange={(e) => { setJahr(Number(e.target.value)); setSelectedSpielerId('') }}
+              style={{ width: 'auto', minWidth: 120 }}
+            >
+              {verfuegbareJahre.map((y) => (
+                <option key={y} value={y}>Saison {y}</option>
+              ))}
+            </select>
+            {selectedSpielerId && (
+              <button className="btn btn-sm btn-secondary" onClick={() => setSelectedSpielerId('')}>
+                Filter aufheben ✕
+              </button>
+            )}
+            <button
+              className="btn btn-sm btn-secondary"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => setShowVerwaltung((v) => !v)}
+            >
+              {showVerwaltung ? 'Spieler-Labels ausblenden' : 'Spieler-Labels verwalten'}
+            </button>
+          </div>
+        </div>
+
+        {/* Verwaltung: wer zahlt Platzgebühr (schreibt direkt auf Supabase) */}
+        {showVerwaltung && (
+          <div style={{ padding: 16, borderTop: '1px solid var(--gray-200)' }}>
+            <p style={{ margin: '0 0 12px', color: 'var(--gray-600)', fontSize: 13 }}>
+              Markierte Spieler zahlen in der Sommersaison Platzgebühr. Änderungen werden
+              sofort gespeichert.
+            </p>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Spieler suchen..."
+              value={verwaltungSuche}
+              onChange={(e) => setVerwaltungSuche(e.target.value)}
+              style={{ marginBottom: 12, maxWidth: 280 }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
+              {gefilterteVerwaltung.map((sp) => (
+                <label
+                  key={sp.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                    borderRadius: 8, cursor: 'pointer',
+                    background: sp.platzgebuehr ? 'rgba(16,185,129,0.08)' : 'var(--gray-50)',
+                    opacity: savingId === sp.id ? 0.5 : 1
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!sp.platzgebuehr}
+                    disabled={savingId === sp.id}
+                    onChange={() => togglePlatzgebuehr(sp)}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <span style={{ fontWeight: sp.platzgebuehr ? 600 : 400 }}>{sp.name}</span>
+                  {sp.platzgebuehr && (
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                      Platzgebühr
+                    </span>
+                  )}
+                </label>
+              ))}
+              {gefilterteVerwaltung.length === 0 && (
+                <div className="empty-state">Kein Spieler gefunden</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {platzSpielerIds.size === 0 ? (
+        <div className="card" style={{ padding: 24 }}>
+          <div className="empty-state">
+            Noch kein Spieler für Platzgebühr markiert.<br />
+            Über „Spieler-Labels verwalten" die erwachsenen Spieler markieren.
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Monatsübersicht */}
+          <div className="card">
+            <div className="card-header"><h3 style={{ margin: 0 }}>Pro Monat</h3></div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Monat</th>
+                    <th style={{ textAlign: 'right' }}>Stunden</th>
+                    <th style={{ textAlign: 'right' }}>Einheiten</th>
+                    <th style={{ textAlign: 'right' }}>Platzgebühr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monatsSummen.map((m) => (
+                    <tr key={m.monat}>
+                      <td style={{ fontWeight: 500 }}>{MONATSNAMEN[m.monat]} {jahr}</td>
+                      <td style={{ textAlign: 'right' }}>{fmtStd(m.stunden)}</td>
+                      <td style={{ textAlign: 'right' }}>{m.anzahl}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{m.betrag.toFixed(2)} €</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td style={{ fontWeight: 700 }}>Gesamt</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtStd(gesamtStunden)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{rows.length}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{gesamtBetrag.toFixed(2)} €</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Spieler-Übersicht */}
+          <div className="card">
+            <div className="card-header"><h3 style={{ margin: 0 }}>Pro Spieler</h3></div>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Spieler</th>
+                    <th style={{ textAlign: 'right' }}>Stunden</th>
+                    <th style={{ textAlign: 'right' }}>Einheiten</th>
+                    <th style={{ textAlign: 'right' }}>Platzgebühr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {spielerSummen.map((s) => (
+                    <tr
+                      key={s.spieler.id}
+                      onClick={() => setSelectedSpielerId(selectedSpielerId === s.spieler.id ? '' : s.spieler.id)}
+                      style={{
+                        cursor: 'pointer',
+                        background: selectedSpielerId === s.spieler.id ? 'var(--gray-100)' : undefined
+                      }}
+                      title="Stunden dieses Spielers anzeigen"
+                    >
+                      <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{s.spieler.name}</td>
+                      <td style={{ textAlign: 'right' }}>{fmtStd(s.stunden)}</td>
+                      <td style={{ textAlign: 'right' }}>{s.anzahl}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{s.betrag.toFixed(2)} €</td>
+                    </tr>
+                  ))}
+                  {spielerSummen.length === 0 && (
+                    <tr><td colSpan={4} className="empty-state">Keine Platzgebühr-Stunden in dieser Saison</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Detailliste pro Stunde */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ margin: 0 }}>
+                Einzelne Stunden{selectedSpielerId ? ` · ${spieler.find((s) => s.id === selectedSpielerId)?.name}` : ''}
+              </h3>
+            </div>
+
+            {/* Desktop */}
+            <div className="table-container desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Uhrzeit</th>
+                    <th>Spieler</th>
+                    <th style={{ textAlign: 'right' }}>Stunden</th>
+                    <th style={{ textAlign: 'right' }}>Platzgebühr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detailRows.map((r, i) => (
+                    <tr key={r.training.id + r.spieler.id + i}>
+                      <td>{formatDateGerman(r.training.datum)}</td>
+                      <td>{formatTime(r.training.uhrzeit_von)}–{formatTime(r.training.uhrzeit_bis)}</td>
+                      <td style={{ color: 'var(--primary)' }}>
+                        {r.spieler.name}
+                        {r.training.status === 'durchgefuehrt_halb' && (
+                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--gray-500)' }}>(halb)</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{fmtStd(r.stunden)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.betrag.toFixed(2)} €</td>
+                    </tr>
+                  ))}
+                  {detailRows.length === 0 && (
+                    <tr><td colSpan={5} className="empty-state">Keine Stunden</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile */}
+            <div className="mobile-card-list">
+              {detailRows.map((r, i) => (
+                <div key={r.training.id + r.spieler.id + i} className="mobile-card">
+                  <div className="mobile-card-header">
+                    <div>
+                      <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{r.spieler.name}</div>
+                      <div className="mobile-card-subtitle">
+                        {formatDateGerman(r.training.datum)} · {formatTime(r.training.uhrzeit_von)}–{formatTime(r.training.uhrzeit_bis)}
+                        {r.training.status === 'durchgefuehrt_halb' && ' (halb)'}
+                      </div>
+                    </div>
+                    <span className="mobile-card-value" style={{ fontWeight: 600 }}>{r.betrag.toFixed(2)} €</span>
+                  </div>
+                  <div className="mobile-card-body">
+                    <div className="mobile-card-row">
+                      <span className="mobile-card-label">Stunden</span>
+                      <span className="mobile-card-value">{fmtStd(r.stunden)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {detailRows.length === 0 && (
+                <div className="empty-state">Keine Stunden</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
