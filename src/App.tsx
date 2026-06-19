@@ -463,34 +463,6 @@ function MainApp({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<Tab>('kalender')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Theme: 'system' (folgt Geraet, Standard), 'light' oder 'dark' – rein visuell via data-theme an <html>
-  const [theme, setTheme] = useState<'system' | 'light' | 'dark'>(() => {
-    const s = localStorage.getItem('cp-theme')
-    return s === 'light' || s === 'dark' ? s : 'system'
-  })
-  useEffect(() => {
-    const root = document.documentElement
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const apply = () => {
-      const dark = theme === 'dark' || (theme === 'system' && mq.matches)
-      root.setAttribute('data-theme', dark ? 'dark' : 'light')
-    }
-    apply()
-    if (theme === 'system') localStorage.removeItem('cp-theme')
-    else localStorage.setItem('cp-theme', theme)
-    if (theme === 'system') {
-      mq.addEventListener('change', apply)
-      return () => mq.removeEventListener('change', apply)
-    }
-  }, [theme])
-  const themeMeta = {
-    system: { icon: '🌓', label: 'System' },
-    light: { icon: '☀️', label: 'Hell' },
-    dark: { icon: '🌙', label: 'Dunkel' },
-  } as const
-  const cycleTheme = () =>
-    setTheme((t) => (t === 'system' ? 'light' : t === 'light' ? 'dark' : 'system'))
-
   // Navigation zum Kalender mit Training-Bearbeitung
   const [navigateToTraining, setNavigateToTraining] = useState<Training | null>(null)
 
@@ -620,14 +592,6 @@ function MainApp({ user }: { user: User }) {
           <h1 className="header-title">CourtPro</h1>
           <p className="header-subtitle">{profile?.name || 'Trainer'}</p>
         </div>
-        <button
-          className="theme-toggle"
-          onClick={cycleTheme}
-          title={`Design: ${themeMeta[theme].label}`}
-          aria-label={`Design umschalten – aktuell ${themeMeta[theme].label}`}
-        >
-          {themeMeta[theme].icon}
-        </button>
       </div>
 
       {/* Sidebar Overlay (Mobile) */}
@@ -657,13 +621,6 @@ function MainApp({ user }: { user: User }) {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button
-            className="btn btn-secondary btn-block"
-            onClick={cycleTheme}
-            style={{ marginBottom: 8 }}
-          >
-            {themeMeta[theme].icon} Design: {themeMeta[theme].label}
-          </button>
           <button className="btn btn-secondary btn-block" onClick={handleLogout}>
             Abmelden
           </button>
