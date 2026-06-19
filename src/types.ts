@@ -71,6 +71,9 @@ export interface Training {
   korrektur_grund?: string
   ist_pool?: boolean
   pool_pauschalpreis_pro_einheit?: number | null
+  // Einmalige Platzgebuehr nur fuer dieses Training: Liste der Spieler-IDs,
+  // die hier Platzgebuehr zahlen, auch ohne das globale `platzgebuehr`-Label.
+  platzgebuehr_spieler_ids?: string[] | null
   created_at: string
 }
 

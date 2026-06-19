@@ -6,3 +6,8 @@
 
 ALTER TABLE spieler
   ADD COLUMN IF NOT EXISTS platzgebuehr BOOLEAN NOT NULL DEFAULT false;
+
+-- Einmalige Platzgebuehr pro Training: Liste der Spieler-IDs, die nur fuer
+-- dieses eine Training Platzgebuehr zahlen (auch ohne globales Label).
+ALTER TABLE trainings
+  ADD COLUMN IF NOT EXISTS platzgebuehr_spieler_ids JSONB;

@@ -1502,6 +1502,10 @@ function TrainingModal({
     }
     return initial
   })
+  // Einmalige Platzgebuehr nur fuer dieses Training (Spieler ohne globales Label)
+  const [platzgebuehrSpieler, setPlatzgebuehrSpieler] = useState<string[]>(
+    training?.platzgebuehr_spieler_ids || []
+  )
   const [wiederholen, setWiederholen] = useState(false)
   // Zeitraum 1: heute bis vor Sommerferien Berlin 2026 (endet 08.07.2026)
   // Zeitraum 2: nach Sommerferien (ab 23.08.2026) bis vor Herbstferien (endet 18.10.2026)
@@ -1670,6 +1674,16 @@ function TrainingModal({
       } else if (training?.spieler_tarife) {
         // Wenn Training bereits individuelle Tarife hatte und jetzt deaktiviert wird: auf null setzen
         trainingData.spieler_tarife = null
+      }
+
+      // Einmalige Platzgebuehr: nur die noch ausgewaehlten Spieler behalten.
+      // Spalte muss in DB existieren (Migration 20260619_platzgebuehr.sql),
+      // daher nur senden wenn gesetzt oder vorher gesetzt war.
+      const platzgebuehrIds = platzgebuehrSpieler.filter((id) => selectedSpieler.includes(id))
+      if (platzgebuehrIds.length > 0) {
+        trainingData.platzgebuehr_spieler_ids = platzgebuehrIds
+      } else if (training?.platzgebuehr_spieler_ids && training.platzgebuehr_spieler_ids.length > 0) {
+        trainingData.platzgebuehr_spieler_ids = null
       }
 
       if (training) {
@@ -1946,6 +1960,63 @@ function TrainingModal({
               Ohne Angabe werden die Spielernamen angezeigt
             </small>
           </div>
+
+          {selectedSpieler.length > 0 && (
+            <div className="form-group">
+              <label>🎾 Platzgebühr (einmalig für dieses Training)</label>
+              <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block', marginBottom: 8 }}>
+                {PLATZGEBUEHR_PRO_STUNDE},00 € pro Stunde. Spieler mit Label zahlen in der Sommersaison
+                automatisch – hier nur für einzelne Spieler ohne Label, nur für dieses Training.
+              </small>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {selectedSpieler.map((sid) => {
+                  const sp = spieler.find((s) => s.id === sid)
+                  if (!sp) return null
+                  const dauer = Math.max(calculateDuration(uhrzeitVon, uhrzeitBis), 0) *
+                    (status === 'durchgefuehrt_halb' ? 0.5 : 1)
+                  const betrag = dauer * PLATZGEBUEHR_PRO_STUNDE
+                  if (sp.platzgebuehr) {
+                    return (
+                      <div key={sid} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+                        borderRadius: 8, background: 'rgba(16,185,129,0.08)'
+                      }}>
+                        <span style={{ fontWeight: 500 }}>{sp.name}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                          Label · automatisch {betrag > 0 ? `(${betrag.toFixed(2)} €)` : ''}
+                        </span>
+                      </div>
+                    )
+                  }
+                  const aktiv = platzgebuehrSpieler.includes(sid)
+                  return (
+                    <label key={sid} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
+                      borderRadius: 8, cursor: 'pointer',
+                      background: aktiv ? 'rgba(16,185,129,0.08)' : 'var(--gray-50)'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={aktiv}
+                        onChange={(e) => {
+                          setPlatzgebuehrSpieler((prev) =>
+                            e.target.checked ? [...prev, sid] : prev.filter((x) => x !== sid)
+                          )
+                        }}
+                        style={{ width: 18, height: 18 }}
+                      />
+                      <span style={{ fontWeight: aktiv ? 600 : 400 }}>{sp.name}</span>
+                      {aktiv && betrag > 0 && (
+                        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                          {betrag.toFixed(2)} €
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {poolEnabled && (
             <div className="form-group">
@@ -3111,7 +3182,8 @@ function LexofficeRechnungModal({
 const PLATZGEBUEHR_PRO_STUNDE = 5
 const SOMMER_MONATE = [5, 6, 7, 8, 9] // Mai bis September
 const MONATSNAMEN: Record<number, string> = {
-  5: 'Mai', 6: 'Juni', 7: 'Juli', 8: 'August', 9: 'September'
+  1: 'Januar', 2: 'Februar', 3: 'März', 4: 'April', 5: 'Mai', 6: 'Juni',
+  7: 'Juli', 8: 'August', 9: 'September', 10: 'Oktober', 11: 'November', 12: 'Dezember'
 }
 
 function PlatzgebuehrView({
@@ -3152,19 +3224,25 @@ function PlatzgebuehrView({
     monat: number
     stunden: number
     betrag: number
+    einmalig: boolean // einmalige Platzgebuehr (ohne globales Label)
   }
   const rows = useMemo<PlatzRow[]>(() => {
     const result: PlatzRow[] = []
     trainings.forEach((t) => {
       const [y, m] = t.datum.split('-').map(Number)
-      if (y !== jahr || !SOMMER_MONATE.includes(m)) return
+      if (y !== jahr) return
       if (t.status !== 'durchgefuehrt' && t.status !== 'durchgefuehrt_halb') return
       const halbFaktor = t.status === 'durchgefuehrt_halb' ? 0.5 : 1
       const dauer = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
       const stunden = Math.max(dauer, 0) * halbFaktor
       if (stunden <= 0) return
+      const einmaligIds = Array.isArray(t.platzgebuehr_spieler_ids) ? t.platzgebuehr_spieler_ids : []
       t.spieler_ids.forEach((sid) => {
-        if (!platzSpielerIds.has(sid)) return
+        // Gelabelte Spieler nur in der Sommersaison; einmalige Platzgebuehr
+        // gilt unabhaengig vom Monat (explizit am Training gesetzt).
+        const istLabelSommer = platzSpielerIds.has(sid) && SOMMER_MONATE.includes(m)
+        const istEinmalig = einmaligIds.includes(sid)
+        if (!istLabelSommer && !istEinmalig) return
         const sp = spieler.find((s) => s.id === sid)
         if (!sp) return
         result.push({
@@ -3172,7 +3250,8 @@ function PlatzgebuehrView({
           spieler: sp,
           monat: m,
           stunden,
-          betrag: stunden * PLATZGEBUEHR_PRO_STUNDE
+          betrag: stunden * PLATZGEBUEHR_PRO_STUNDE,
+          einmalig: !istLabelSommer && istEinmalig
         })
       })
     })
@@ -3185,9 +3264,12 @@ function PlatzgebuehrView({
     return result
   }, [trainings, jahr, platzSpielerIds, spieler])
 
-  // Summen pro Monat (immer alle 5 Sommermonate, auch mit 0)
+  // Summen pro Monat: immer alle 5 Sommermonate (auch mit 0) + zusaetzliche
+  // Monate, falls dort einmalige Platzgebuehren ausserhalb der Saison anfallen.
   const monatsSummen = useMemo(() => {
-    return SOMMER_MONATE.map((m) => {
+    const monate = Array.from(new Set([...SOMMER_MONATE, ...rows.map((r) => r.monat)]))
+      .sort((a, b) => a - b)
+    return monate.map((m) => {
       const mRows = rows.filter((r) => r.monat === m)
       return {
         monat: m,
@@ -3346,11 +3428,12 @@ function PlatzgebuehrView({
         )}
       </div>
 
-      {platzSpielerIds.size === 0 ? (
+      {platzSpielerIds.size === 0 && rows.length === 0 ? (
         <div className="card" style={{ padding: 24 }}>
           <div className="empty-state">
             Noch kein Spieler für Platzgebühr markiert.<br />
-            Über „Spieler-Labels verwalten" die erwachsenen Spieler markieren.
+            Über „Spieler-Labels verwalten" die erwachsenen Spieler markieren –
+            oder im Training eine einmalige Platzgebühr setzen.
           </div>
         </div>
       ) : (
@@ -3456,6 +3539,9 @@ function PlatzgebuehrView({
                         {r.training.status === 'durchgefuehrt_halb' && (
                           <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--gray-500)' }}>(halb)</span>
                         )}
+                        {r.einmalig && (
+                          <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--pay-ausstehend, #d97706)' }}>(einmalig)</span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'right' }}>{fmtStd(r.stunden)}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.betrag.toFixed(2)} €</td>
@@ -3478,6 +3564,7 @@ function PlatzgebuehrView({
                       <div className="mobile-card-subtitle">
                         {formatDateGerman(r.training.datum)} · {formatTime(r.training.uhrzeit_von)}–{formatTime(r.training.uhrzeit_bis)}
                         {r.training.status === 'durchgefuehrt_halb' && ' (halb)'}
+                        {r.einmalig && ' (einmalig)'}
                       </div>
                     </div>
                     <span className="mobile-card-value" style={{ fontWeight: 600 }}>{r.betrag.toFixed(2)} €</span>
