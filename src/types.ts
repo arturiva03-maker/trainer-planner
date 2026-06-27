@@ -74,6 +74,9 @@ export interface Training {
   // Einmalige Platzgebuehr nur fuer dieses Training: Liste der Spieler-IDs,
   // die hier Platzgebuehr zahlen, auch ohne das globale `platzgebuehr`-Label.
   platzgebuehr_spieler_ids?: string[] | null
+  // Ausnahme nur fuer dieses Training: Spieler-IDs, die zwar das globale
+  // `platzgebuehr`-Label haben, hier aber ausnahmsweise KEINE Platzgebuehr zahlen.
+  platzgebuehr_ausnahme_ids?: string[] | null
   created_at: string
 }
 

@@ -1506,6 +1506,11 @@ function TrainingModal({
   const [platzgebuehrSpieler, setPlatzgebuehrSpieler] = useState<string[]>(
     training?.platzgebuehr_spieler_ids || []
   )
+  // Ausnahme nur fuer dieses Training: gelabelte Spieler, die hier KEINE
+  // Platzgebuehr zahlen sollen.
+  const [platzgebuehrAusnahme, setPlatzgebuehrAusnahme] = useState<string[]>(
+    training?.platzgebuehr_ausnahme_ids || []
+  )
   const [wiederholen, setWiederholen] = useState(false)
   // Zeitraum 1: heute bis vor Sommerferien Berlin 2026 (endet 08.07.2026)
   // Zeitraum 2: nach Sommerferien (ab 23.08.2026) bis vor Herbstferien (endet 18.10.2026)
@@ -1684,6 +1689,15 @@ function TrainingModal({
         trainingData.platzgebuehr_spieler_ids = platzgebuehrIds
       } else if (training?.platzgebuehr_spieler_ids && training.platzgebuehr_spieler_ids.length > 0) {
         trainingData.platzgebuehr_spieler_ids = null
+      }
+
+      // Ausnahme: gelabelte Spieler, die hier ausnahmsweise keine Platzgebuehr
+      // zahlen. Spalte muss in DB existieren (Migration 20260627_platzgebuehr_ausnahme.sql).
+      const ausnahmeIds = platzgebuehrAusnahme.filter((id) => selectedSpieler.includes(id))
+      if (ausnahmeIds.length > 0) {
+        trainingData.platzgebuehr_ausnahme_ids = ausnahmeIds
+      } else if (training?.platzgebuehr_ausnahme_ids && training.platzgebuehr_ausnahme_ids.length > 0) {
+        trainingData.platzgebuehr_ausnahme_ids = null
       }
 
       if (training) {
@@ -1966,7 +1980,8 @@ function TrainingModal({
               <label>🎾 Platzgebühr (einmalig für dieses Training)</label>
               <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block', marginBottom: 8 }}>
                 {PLATZGEBUEHR_PRO_STUNDE},00 € pro Stunde. Spieler mit Label zahlen in der Sommersaison
-                automatisch – hier nur für einzelne Spieler ohne Label, nur für dieses Training.
+                automatisch – Haken hier entfernen, um die Platzgebühr ausnahmsweise nur für dieses
+                Training wegzunehmen. Spieler ohne Label können einzeln nur für dieses Training aktiviert werden.
               </small>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {selectedSpieler.map((sid) => {
@@ -1976,16 +1991,37 @@ function TrainingModal({
                     (status === 'durchgefuehrt_halb' ? 0.5 : 1)
                   const betrag = dauer * PLATZGEBUEHR_PRO_STUNDE
                   if (sp.platzgebuehr) {
+                    // Spieler mit globalem Label: zahlt in der Sommersaison
+                    // automatisch. Haekchen kann fuer dieses eine Training
+                    // entfernt werden (Ausnahme), dann faellt die Platzgebuehr weg.
+                    const ausgenommen = platzgebuehrAusnahme.includes(sid)
                     return (
-                      <div key={sid} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
-                        borderRadius: 8, background: 'rgba(16,185,129,0.08)'
+                      <label key={sid} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
+                        borderRadius: 8, cursor: 'pointer',
+                        background: ausgenommen ? 'var(--gray-50)' : 'rgba(16,185,129,0.08)'
                       }}>
-                        <span style={{ fontWeight: 500 }}>{sp.name}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
-                          Label · automatisch {betrag > 0 ? `(${betrag.toFixed(2)} €)` : ''}
-                        </span>
-                      </div>
+                        <input
+                          type="checkbox"
+                          checked={!ausgenommen}
+                          onChange={(e) => {
+                            setPlatzgebuehrAusnahme((prev) =>
+                              e.target.checked ? prev.filter((x) => x !== sid) : [...prev, sid]
+                            )
+                          }}
+                          style={{ width: 18, height: 18 }}
+                        />
+                        <span style={{ fontWeight: ausgenommen ? 400 : 500, textDecoration: ausgenommen ? 'line-through' : 'none' }}>{sp.name}</span>
+                        {ausgenommen ? (
+                          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--gray-500)', fontWeight: 600 }}>
+                            ausgenommen
+                          </span>
+                        ) : (
+                          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>
+                            Label · automatisch {betrag > 0 ? `(${betrag.toFixed(2)} €)` : ''}
+                          </span>
+                        )}
+                      </label>
                     )
                   }
                   const aktiv = platzgebuehrSpieler.includes(sid)
@@ -3237,10 +3273,12 @@ function PlatzgebuehrView({
       const stunden = Math.max(dauer, 0) * halbFaktor
       if (stunden <= 0) return
       const einmaligIds = Array.isArray(t.platzgebuehr_spieler_ids) ? t.platzgebuehr_spieler_ids : []
+      const ausnahmeIds = Array.isArray(t.platzgebuehr_ausnahme_ids) ? t.platzgebuehr_ausnahme_ids : []
       t.spieler_ids.forEach((sid) => {
         // Gelabelte Spieler nur in der Sommersaison; einmalige Platzgebuehr
         // gilt unabhaengig vom Monat (explizit am Training gesetzt).
-        const istLabelSommer = platzSpielerIds.has(sid) && SOMMER_MONATE.includes(m)
+        // Ausnahme: gelabelter Spieler, der fuer dieses Training befreit wurde.
+        const istLabelSommer = platzSpielerIds.has(sid) && SOMMER_MONATE.includes(m) && !ausnahmeIds.includes(sid)
         const istEinmalig = einmaligIds.includes(sid)
         if (!istLabelSommer && !istEinmalig) return
         const sp = spieler.find((s) => s.id === sid)
