@@ -2095,11 +2095,13 @@ function TrainingModal({
                   onChange={(e) => setTarifId(e.target.value)}
                 >
                   <option value="">-- Individuell --</option>
-                  {tarife.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.preis_pro_stunde} €/h)
-                    </option>
-                  ))}
+                  {tarife
+                    .filter((t) => !t.archiviert || t.id === tarifId)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.preis_pro_stunde} €/h){t.archiviert ? ' · archiviert' : ''}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className="form-group">
@@ -2242,11 +2244,13 @@ function TrainingModal({
                         }}
                       >
                         <option value="">-- Individuell --</option>
-                        {tarife.map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} ({t.preis_pro_stunde} €/h)
-                          </option>
-                        ))}
+                        {tarife
+                          .filter(t => !t.archiviert || t.id === entry.tarif_id)
+                          .map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.preis_pro_stunde} €/h){t.archiviert ? ' · archiviert' : ''}
+                            </option>
+                          ))}
                       </select>
                       {!entry.tarif_id && (
                         <input
@@ -2504,12 +2508,22 @@ function VerwaltungView({
   const [editingSpieler, setEditingSpieler] = useState<Spieler | null>(null)
   const [editingTarif, setEditingTarif] = useState<Tarif | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showArchivierteTarife, setShowArchivierteTarife] = useState(false)
 
   const filteredSpieler = useMemo(() => {
     if (!searchTerm) return spieler
     const term = searchTerm.toLowerCase()
     return spieler.filter((s) => s.name.toLowerCase().includes(term))
   }, [spieler, searchTerm])
+
+  const aktiveTarife = useMemo(() => tarife.filter((t) => !t.archiviert), [tarife])
+  const archivierteTarife = useMemo(() => tarife.filter((t) => t.archiviert), [tarife])
+
+  // Tarif direkt (ent-)archivieren ohne Modal.
+  const toggleTarifArchiviert = async (t: Tarif) => {
+    await supabase.from('tarife').update({ archiviert: !t.archiviert }).eq('id', t.id)
+    onUpdate()
+  }
 
   return (
     <div>
@@ -2524,7 +2538,7 @@ function VerwaltungView({
           className={`tab ${activeSubTab === 'tarife' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('tarife')}
         >
-          Tarife ({tarife.length})
+          Tarife ({aktiveTarife.length})
         </button>
       </div>
 
@@ -2632,7 +2646,7 @@ function VerwaltungView({
                 </tr>
               </thead>
               <tbody>
-                {tarife.map((t) => (
+                {aktiveTarife.map((t) => (
                   <tr key={t.id}>
                     <td>{t.name}</td>
                     <td>{t.preis_pro_stunde} €</td>
@@ -2653,7 +2667,7 @@ function VerwaltungView({
                     </td>
                   </tr>
                 ))}
-                {tarife.length === 0 && (
+                {aktiveTarife.length === 0 && (
                   <tr>
                     <td colSpan={5} className="empty-state">
                       Keine Tarife angelegt
@@ -2666,7 +2680,7 @@ function VerwaltungView({
 
           {/* Mobile Card List */}
           <div className="mobile-card-list">
-            {tarife.map((t) => (
+            {aktiveTarife.map((t) => (
               <div key={t.id} className="mobile-card">
                 <div className="mobile-card-header">
                   <div className="mobile-card-title">{t.name}</div>
@@ -2699,10 +2713,48 @@ function VerwaltungView({
                 </div>
               </div>
             ))}
-            {tarife.length === 0 && (
+            {aktiveTarife.length === 0 && (
               <div className="empty-state">Keine Tarife angelegt</div>
             )}
           </div>
+
+          {/* Archivierte Tarife */}
+          {archivierteTarife.length > 0 && (
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--gray-200)', paddingTop: 16 }}>
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowArchivierteTarife((v) => !v)}
+              >
+                {showArchivierteTarife ? '▾' : '▸'} Archivierte Tarife ({archivierteTarife.length})
+              </button>
+              {showArchivierteTarife && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <small style={{ color: 'var(--gray-500)', fontSize: 12 }}>
+                    Archivierte Tarife bleiben gespeichert – alte Trainings und Abrechnungen behalten
+                    ihren Preis. Sie erscheinen nur nicht mehr in der Auswahl bei neuen Trainings.
+                  </small>
+                  {archivierteTarife.map((t) => (
+                    <div key={t.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      borderRadius: 8, background: 'var(--gray-50)'
+                    }}>
+                      <span style={{ fontWeight: 500, color: 'var(--gray-600)' }}>{t.name}</span>
+                      <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>
+                        {t.preis_pro_stunde} €/h · {t.abrechnung === 'proTraining' ? 'Pro Training' : 'Monatlich'}
+                      </span>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ marginLeft: 'auto' }}
+                        onClick={() => toggleTarifArchiviert(t)}
+                      >
+                        Wieder aktivieren
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -2848,6 +2900,7 @@ function TarifModal({
   const [abrechnung, setAbrechnung] = useState<Tarif['abrechnung']>(tarif?.abrechnung || 'proTraining')
   const [beschreibung, setBeschreibung] = useState(tarif?.beschreibung || '')
   const [saving, setSaving] = useState(false)
+  const istArchiviert = !!tarif?.archiviert
 
   const handleSave = async () => {
     if (!name.trim() || !preis) {
@@ -2879,13 +2932,27 @@ function TarifModal({
     }
   }
 
-  const handleDelete = async () => {
+  // Soft-Delete: archivieren statt loeschen, damit alte Trainings/Abrechnungen,
+  // die diesen Tarif verwenden, weiterhin korrekt berechnet werden. Reversibel.
+  const handleArchivieren = async () => {
     if (!tarif) return
-    const confirmed = await showConfirm('Tarif löschen', 'Tarif wirklich löschen?')
-    if (!confirmed) return
-
-    await supabase.from('tarife').delete().eq('id', tarif.id)
-    onSave()
+    if (!istArchiviert) {
+      const confirmed = await showConfirm(
+        'Tarif archivieren',
+        'Tarif archivieren? Er verschwindet aus der Auswahl bei neuen Trainings. Alte Trainings und Abrechnungen bleiben unveraendert. Du kannst ihn jederzeit wieder aktivieren.'
+      )
+      if (!confirmed) return
+    }
+    setSaving(true)
+    try {
+      await supabase.from('tarife').update({ archiviert: !istArchiviert }).eq('id', tarif.id)
+      onSave()
+    } catch (err) {
+      console.error('Error archiving tarif:', err)
+      alert('Fehler beim Archivieren')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -2942,8 +3009,8 @@ function TarifModal({
         </div>
         <div className="modal-footer">
           {tarif && (
-            <button className="btn btn-danger" onClick={handleDelete}>
-              Löschen
+            <button className="btn btn-secondary" onClick={handleArchivieren} disabled={saving}>
+              {istArchiviert ? 'Wieder aktivieren' : 'Archivieren'}
             </button>
           )}
           <button className="btn btn-secondary" onClick={onClose}>

@@ -30,6 +30,10 @@ export interface Tarif {
   preis_pro_stunde: number
   abrechnung: 'proTraining' | 'monatlich'
   beschreibung?: string
+  // Archiviert (Soft-Delete): bleibt in der DB erhalten, damit alte Trainings
+  // weiterhin korrekt berechnet werden, verschwindet aber aus der Auswahl beim
+  // Anlegen neuer Trainings.
+  archiviert?: boolean
   created_at: string
 }
 
