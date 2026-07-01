@@ -7,6 +7,12 @@ export function formatDateGerman(dateStr: string): string {
   return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+// Ausgeschriebener Wochentag, z.B. "Mittwoch" – fuer detaillierte Beschreibungen.
+export function formatWeekdayGerman(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('de-DE', { weekday: 'long' })
+}
+
 export function formatTime(time: string): string {
   return time.substring(0, 5)
 }
