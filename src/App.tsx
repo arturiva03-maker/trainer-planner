@@ -3072,7 +3072,7 @@ function LexofficeRechnungModal({
     const [y, m] = monthStr.split('-').map(Number)
     return names[m - 1] ? `${names[m - 1]} ${y}` : monthStr
   })()
-  const introductionText = `Für das Tennistraining im ${monthLabel} stelle ich Ihnen vereinbarungsgemäß folgende Leistungen in Rechnung:`
+  const introductionText = `Für das Tennistraining von ${spieler.name} im ${monthLabel} stelle ich Ihnen vereinbarungsgemäß folgende Leistungen in Rechnung:`
   const [intro, setIntro] = useState(introductionText)
 
   const doSearch = async () => {
