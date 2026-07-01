@@ -3083,9 +3083,28 @@ function LexofficeRechnungModal({
     setResults(r.contacts || [])
   }
 
-  // Beim Oeffnen ohne verknuepften Kontakt automatisch nach Nachname suchen.
+  // Beim Oeffnen den verknuepften Empfaenger IMMER frisch aus der DB laden.
+  // Der uebergebene spieler-Snapshot kann je nach Reload-Timing veraltet sein –
+  // daher war der Empfaenger "mal vorausgewaehlt, mal nicht". Die DB ist die
+  // verlaessliche Quelle. Nur wenn wirklich keiner hinterlegt ist, automatisch
+  // nach dem Nachnamen suchen.
   useEffect(() => {
-    if (!contactId) doSearch()
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('spieler')
+        .select('lexoffice_contact_id, lexoffice_contact_name')
+        .eq('id', spieler.id)
+        .maybeSingle()
+      if (cancelled) return
+      if (data?.lexoffice_contact_id) {
+        setContactId(data.lexoffice_contact_id)
+        setContactName(data.lexoffice_contact_name ?? null)
+      } else if (!spieler.lexoffice_contact_id) {
+        doSearch()
+      }
+    })()
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
