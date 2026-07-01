@@ -4666,7 +4666,7 @@ function AbrechnungView({
         // Ganze/halbe Stunden bleiben unveraendert (1.5 -> 1.5).
         const qty = Number(hours.toFixed(4))
         return {
-          name: `${x.tarif?.name || x.t.name || 'Tennistraining'} – ${formatWeekdayGerman(x.t.datum)}, ${formatDateGerman(x.t.datum)}`,
+          name: `${x.tarif?.name || x.t.name || 'Tennistraining'} – ${formatWeekdayGerman(x.t.datum)}, ${formatDateGerman(x.t.datum)}, ${formatTime(x.t.uhrzeit_von)}–${formatTime(x.t.uhrzeit_bis)}`,
           amount: Number((x.betrag / qty).toFixed(2)),
           quantity: qty
         }
