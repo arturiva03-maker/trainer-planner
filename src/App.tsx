@@ -3091,12 +3091,20 @@ function LexofficeRechnungModal({
 
   const linkContact = async (c: LexofficeContact) => {
     setLinking(true)
-    const { error } = await supabase
+    // .select() zurueckholen: eine erfolgreiche Query, die aber 0 Zeilen aendert
+    // (z.B. RLS/Berechtigung in der geteilten DB), wuerde sonst faelschlich als
+    // gespeichert gelten – und der Empfaenger waere naechsten Monat wieder weg.
+    const { data, error } = await supabase
       .from('spieler')
       .update({ lexoffice_contact_id: c.id, lexoffice_contact_name: c.name })
       .eq('id', spieler.id)
+      .select('id')
     setLinking(false)
     if (error) { setSearchError('Speichern fehlgeschlagen: ' + error.message); return }
+    if (!data || data.length === 0) {
+      setSearchError('Rechnungsempfänger konnte nicht dauerhaft gespeichert werden (keine Berechtigung?).')
+      return
+    }
     setContactId(c.id); setContactName(c.name); setResults(null)
     onSaved()
   }
@@ -3136,6 +3144,9 @@ function LexofficeRechnungModal({
       else if (win) win.close()
       // Rechnung erstellt -> berechnete (offene) Trainings auf "ausstehend"
       try { await onInvoiced() } catch { /* nicht blockierend */ }
+      // Fertig: Modal schliessen und zurueck zur Abrechnung. Die neue Rechnung
+      // ist bereits im Lexoffice-Tab geoeffnet.
+      onClose()
     } else if (win) {
       win.close()
     }
