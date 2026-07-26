@@ -2087,23 +2087,36 @@ function TrainingModal({
           )}
 
           {!poolMode && (
-            <div className="form-row">
+            <>
               <div className="form-group">
                 <label>Tarif</label>
-                <select
-                  className="form-control"
-                  value={tarifId}
-                  onChange={(e) => setTarifId(e.target.value)}
-                >
-                  <option value="">-- Individuell --</option>
+                <div className="tarif-grid">
                   {tarife
                     .filter((t) => !t.archiviert || t.id === tarifId)
                     .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.preis_pro_stunde} €/h){t.archiviert ? ' · archiviert' : ''}
-                      </option>
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={`tarif-card ${tarifId === t.id ? 'selected' : ''}`}
+                        onClick={() => setTarifId(t.id)}
+                      >
+                        <span className="tarif-card-name">{t.name}</span>
+                        <span className="tarif-card-preis">{t.preis_pro_stunde} €/h</span>
+                        <span className="tarif-card-meta">
+                          {t.abrechnung === 'monatlich' ? 'monatlich' : 'pro Training'}
+                          {t.archiviert ? ' · archiviert' : ''}
+                        </span>
+                      </button>
                     ))}
-                </select>
+                  <button
+                    type="button"
+                    className={`tarif-card tarif-card-custom ${tarifId === '' ? 'selected' : ''}`}
+                    onClick={() => setTarifId('')}
+                  >
+                    <span className="tarif-card-name">Individuell</span>
+                    <span className="tarif-card-meta">Preis frei eingeben</span>
+                  </button>
+                </div>
               </div>
               <div className="form-group">
                 <label>Status</label>
@@ -2118,7 +2131,7 @@ function TrainingModal({
                   <option value="abgesagt">Abgesagt</option>
                 </select>
               </div>
-            </div>
+            </>
           )}
 
           {poolMode && (
