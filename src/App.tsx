@@ -1595,9 +1595,14 @@ function TrainingModal({
     setRemoveDialog(null)
   }
 
-  const handleSave = async () => {
+  // statusOverride erlaubt Schnellaktionen (z.B. "Durchgefuehrt"-Shortcut), die
+  // Status setzen und sofort speichern. Ueber den State ginge das nicht, weil
+  // setStatus erst nach dem Render greift und handleSave noch den alten Wert saehe.
+  const handleSave = async (statusOverride?: Training['status']) => {
+    const effektiverStatus = statusOverride ?? status
+
     // Bei abgesagten Trainings sind keine aktiven Spieler nötig
-    if (selectedSpieler.length === 0 && status !== 'abgesagt') {
+    if (selectedSpieler.length === 0 && effektiverStatus !== 'abgesagt') {
       alert('Bitte mindestens einen Spieler auswählen')
       return
     }
@@ -1665,7 +1670,7 @@ function TrainingModal({
         spieler_ids: selectedSpieler,
         entfernte_spieler: entfernteSpieler.length > 0 ? entfernteSpieler : null,
         tarif_id: poolMode ? null : (tarifId || null),
-        status,
+        status: effektiverStatus,
         notiz: notiz || null,
         name: trainingName || null,
         bar_bezahlt: barBezahlt,
@@ -1884,6 +1889,23 @@ function TrainingModal({
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
+          {/* Schnellaktion: haeufigster Fall beim Bearbeiten ist "hat stattgefunden".
+              Ein Klick setzt den Status und speichert direkt. */}
+          {training && (
+            status === 'durchgefuehrt' ? (
+              <div className="quick-done-hint">✓ Bereits als durchgeführt markiert</div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-block quick-done-btn"
+                onClick={() => handleSave('durchgefuehrt')}
+                disabled={saving}
+              >
+                {saving ? 'Speichere...' : '✓ Als durchgeführt markieren'}
+              </button>
+            )
+          )}
+
           <div className="form-group">
             <label>Datum</label>
             <input
@@ -2410,7 +2432,7 @@ function TrainingModal({
           <button className="btn btn-secondary" onClick={onClose}>
             Abbrechen
           </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <button className="btn btn-primary" onClick={() => handleSave()} disabled={saving}>
             {saving ? 'Speichere...' : 'Speichern'}
           </button>
         </div>
