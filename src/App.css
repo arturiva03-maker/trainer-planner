@@ -70,7 +70,9 @@
   --surface-3: #F7FAFA;
   --surface-elevated: #FFFFFF;
   --surface-active: #EEF2FF;
-  --header-surface: linear-gradient(135deg, #374151 0%, #6B7280 100%);
+  /* Modal-/Dialogkoepfe nutzen den Markenverlauf statt eines eigenen Graus,
+     damit Kopfzeilen ueberall dieselbe Farbe haben. */
+  --header-surface: var(--brand-gradient);
   --border: #E2E8F0;
   --border-strong: #CBD5E1;
   --text: #1E293B;
@@ -972,10 +974,21 @@ h2 { letter-spacing: -0.02em; }
 }
 
 .nav-item.active {
-  background: rgba(99, 102, 241, 0.08);
-  color: var(--brand-dark);
+  background: var(--brand-gradient);
+  color: #fff;
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--brand);
+  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, 0.6);
+}
+
+/* Der Shine-Effekt der Pille wuerde auf gefuellter Flaeche als Schleier wirken */
+.nav-item.active:hover {
+  background: var(--brand-gradient);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.nav-item.active::before {
+  display: none;
 }
 
 .nav-item:active {
@@ -1410,7 +1423,8 @@ tbody tr:last-child td {
   padding: 10px 10px;
   font-size: 14px;
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-left-width: 4px;
+  box-shadow: var(--shadow-sm);
 }
 
 .calendar-grid.day-view .training-block .training-title {
@@ -1427,9 +1441,8 @@ tbody tr:last-child td {
 
 .calendar-grid.day-view .training-block .training-tarif {
   font-size: 11px;
-  opacity: 0.85;
   margin-top: 4px;
-  background: rgba(255,255,255,0.2);
+  background: color-mix(in srgb, var(--tone) 22%, transparent);
   padding: 2px 8px;
   border-radius: 4px;
   display: inline-block;
@@ -1597,32 +1610,39 @@ tbody tr:last-child td {
   top: 2px;
   right: 4px;
   font-size: 11px;
-  color: #FBBF24;
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+  /* Bloecke sind jetzt hell – dunkleres Gold ohne Schatten bleibt lesbar */
+  color: #D97706;
   line-height: 1;
   pointer-events: none;
 }
 
+/* Kalenderbloecke: helle Flaeche mit farbcodierter Kante statt Vollflaechen-
+   Verlauf. Der Text steht dunkel auf hell und bleibt auch in schmalen
+   Wochenspalten lesbar. --tone/--tone-text kommen aus der Status-Klasse. */
 .training-block {
+  --tone: var(--brand);
+  --tone-text: var(--brand-dark);
   position: absolute;
   box-sizing: border-box;
-  background: var(--brand-gradient);
-  color: white;
-  border-radius: 10px;
-  padding: 6px 6px;
+  background: color-mix(in srgb, var(--tone) 14%, var(--surface));
+  color: var(--tone-text);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  border-left: 3px solid var(--tone);
+  padding: 5px 6px;
   font-size: 11px;
   cursor: pointer;
   overflow: hidden;
   z-index: 10;
-  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease);
-  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.3), 0 4px 8px -2px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  border: none;
+  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease), background 0.2s var(--ease);
+  box-shadow: var(--shadow-xs);
   animation: scaleIn 0.3s ease-out;
 }
 
 .training-block:hover {
   transform: scale(1.02) translateY(-1px);
-  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3), 0 8px 16px -4px rgba(99, 102, 241, 0.45);
+  background: color-mix(in srgb, var(--tone) 24%, var(--surface));
+  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--tone) 60%, transparent);
   z-index: 20;
 }
 
@@ -1643,55 +1663,43 @@ tbody tr:last-child td {
 }
 
 .training-block.status-geplant {
-  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  --tone: #D97706;
+  --tone-text: #92400E;
 }
 
-.training-block.status-geplant:hover {
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
-}
-
-.training-block.status-durchgefuehrt {
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
-}
-
-.training-block.status-durchgefuehrt:hover {
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-}
-
+.training-block.status-durchgefuehrt,
 .training-block.status-durchgefuehrt_halb {
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
-}
-
-.training-block.status-durchgefuehrt_halb:hover {
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
+  --tone: #16A34A;
+  --tone-text: #166534;
 }
 
 .training-block.status-abgesagt {
-  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-  opacity: 0.85;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  --tone: #DC2626;
+  --tone-text: #991B1B;
+  opacity: 0.75;
 }
 
 .training-block.status-abgesagt:hover {
   opacity: 1;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+}
+
+.training-block.status-abgesagt .training-title {
+  text-decoration: line-through;
 }
 
 .training-block .training-title {
-  font-weight: 600;
+  font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.2px;
+  letter-spacing: 0;
 }
 
 .training-block .training-time {
   font-size: 10px;
-  opacity: 0.9;
+  opacity: 0.75;
   margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Modal - Modernized */
@@ -2013,12 +2021,15 @@ tbody tr:last-child td {
   margin-bottom: 24px;
 }
 
+/* Kennzahl-Kacheln: --tone steuert Akzentleiste und Flaechentoenung.
+   Ohne tone-Klasse bleibt es die Markenfarbe. */
 .stat-card {
-  background: var(--surface);
+  --tone: var(--brand);
+  background: color-mix(in srgb, var(--tone) 7%, var(--surface));
   padding: 20px 24px;
   border-radius: 14px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  border: 1px solid color-mix(in srgb, var(--tone) 22%, var(--border));
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -2032,14 +2043,21 @@ tbody tr:last-child td {
   left: 0;
   width: 4px;
   height: 100%;
-  background: var(--brand-gradient);
+  background: var(--tone);
   border-radius: 4px 0 0 4px;
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  background: color-mix(in srgb, var(--tone) 12%, var(--surface));
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--tone) 45%, transparent);
 }
+
+.stat-card.tone-total { --tone: var(--brand); }
+.stat-card.tone-bar { --tone: var(--pay-bar); }
+.stat-card.tone-bezahlt { --tone: var(--pay-bezahlt); }
+.stat-card.tone-ausstehend { --tone: var(--pay-ausstehend); }
+.stat-card.tone-offen { --tone: var(--pay-offen); }
 
 .stat-card-clickable {
   cursor: pointer;
@@ -2050,17 +2068,9 @@ tbody tr:last-child td {
   transform: translateY(-1px) scale(0.99);
 }
 
-.stat-card.success::before {
-  background: linear-gradient(180deg, #6366F1 0%, #4F46E5 100%);
-}
-
-.stat-card.warning::before {
-  background: linear-gradient(180deg, #4F46E5 0%, #4F46E5 100%);
-}
-
-.stat-card.danger::before {
-  background: linear-gradient(180deg, #B54332 0%, #9A3828 100%);
-}
+.stat-card.success { --tone: var(--pay-bar); }
+.stat-card.warning { --tone: var(--pay-ausstehend); }
+.stat-card.danger { --tone: #B54332; }
 
 .stat-label {
   font-size: 13px;
@@ -2075,6 +2085,10 @@ tbody tr:last-child td {
   font-size: 28px;
   font-weight: 700;
   color: var(--text);
+  /* Gleiche Ziffernbreite, damit Euro-Betraege untereinander buendig stehen */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
 }
 
 /* Planung Grid */
@@ -2431,9 +2445,10 @@ tbody tr:last-child td {
 }
 
 .mobile-nav-item.active {
-  color: var(--brand-dark);
-  background: var(--surface-active);
+  color: #fff;
+  background: var(--brand-gradient);
   border-radius: 12px;
+  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, 0.6);
 }
 
 .mobile-nav-item:active {
@@ -2748,11 +2763,11 @@ tbody tr:last-child td {
     vertical-align: top;
   }
 
-  /* Training-Blocks im Kalender - Kompakt für Wochenansicht */
+  /* Training-Blocks im Kalender - Kompakt für Wochenansicht.
+     Flaeche und Textfarbe kommen aus der Basis-Regel (--tone). */
   .training-block {
-    background: var(--primary);
-    color: white;
-    border-radius: 3px;
+    border-radius: 4px;
+    border-left-width: 2px;
     padding: 2px 3px;
     font-size: 9px;
     line-height: 1.2;

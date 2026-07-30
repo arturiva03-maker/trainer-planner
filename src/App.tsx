@@ -4704,29 +4704,29 @@ function AbrechnungView({
   return (
     <div>
       <div className="stats-grid">
-        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('total')} title="Aufschlüsselung anzeigen">
+        <div className="stat-card stat-card-clickable tone-total" onClick={() => setStatBreakdown('total')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Gesamtumsatz</div>
           <div className="stat-value" style={{ color: '#1E293B' }}>{stats.total.toFixed(2)} €</div>
         </div>
-        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('bar')} title="Aufschlüsselung anzeigen">
+        <div className="stat-card stat-card-clickable tone-bar" onClick={() => setStatBreakdown('bar')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Bar bezahlt</div>
-          <div className="stat-value" style={{ color: 'var(--pay-bar)' }}>{stats.bar.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: 'var(--pay-bar-text)' }}>{stats.bar.toFixed(2)} €</div>
         </div>
-        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('bezahlt')} title="Aufschlüsselung anzeigen">
+        <div className="stat-card stat-card-clickable tone-bezahlt" onClick={() => setStatBreakdown('bezahlt')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Bezahlt (Überweisung)</div>
-          <div className="stat-value" style={{ color: 'var(--pay-bezahlt)' }}>
+          <div className="stat-value" style={{ color: 'var(--pay-bezahlt-text)' }}>
             {stats.bezahlt.toFixed(2)} €
           </div>
         </div>
-        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('ausstehend')} title="Aufschlüsselung anzeigen">
+        <div className="stat-card stat-card-clickable tone-ausstehend" onClick={() => setStatBreakdown('ausstehend')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Ausstehend</div>
-          <div className="stat-value" style={{ color: 'var(--pay-ausstehend)' }}>
+          <div className="stat-value" style={{ color: 'var(--pay-ausstehend-text)' }}>
             {stats.ausstehend.toFixed(2)} €
           </div>
         </div>
-        <div className="stat-card stat-card-clickable" onClick={() => setStatBreakdown('offen')} title="Aufschlüsselung anzeigen">
+        <div className="stat-card stat-card-clickable tone-offen" onClick={() => setStatBreakdown('offen')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Offen</div>
-          <div className="stat-value" style={{ color: 'var(--pay-offen)' }}>
+          <div className="stat-value" style={{ color: 'var(--pay-offen-text)' }}>
             {stats.offen.toFixed(2)} €
           </div>
         </div>
