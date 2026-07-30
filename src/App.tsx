@@ -1890,37 +1890,22 @@ function TrainingModal({
         </div>
         <div className="modal-body">
           {/* Schnellstatus: haeufigster Fall beim Bearbeiten ist "hat stattgefunden".
-              Ein Tipp setzt den Status und speichert direkt. "Abgesagt" fehlt hier
-              bewusst – daran haengt die Bezahl-Rueckfrage, das bleibt beim Dropdown. */}
+              Ein Tipp setzt den Status und speichert direkt. Die uebrigen Status
+              bleiben beim Dropdown – an "abgesagt" haengt die Bezahl-Rueckfrage. */}
           {training && (
             <div className="quick-status">
               <span className="quick-status-label">Schnellstatus</span>
-              <div className="quick-status-actions">
-                <button
-                  type="button"
-                  className={`quick-status-pill${status === 'durchgefuehrt' ? ' active' : ''}`}
-                  onClick={() => handleSave('durchgefuehrt')}
-                  disabled={saving || status === 'durchgefuehrt'}
-                >
-                  <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
-                    <path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Durchgeführt
-                </button>
-                <button
-                  type="button"
-                  className={`quick-status-pill${status === 'durchgefuehrt_halb' ? ' active' : ''}`}
-                  onClick={() => handleSave('durchgefuehrt_halb')}
-                  disabled={saving || status === 'durchgefuehrt_halb'}
-                  title="Halb durchgeführt, z.B. wegen Regen"
-                >
-                  <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
-                    <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
-                    <path d="M10 3a7 7 0 000 14z" fill="currentColor" />
-                  </svg>
-                  50 %
-                </button>
-              </div>
+              <button
+                type="button"
+                className={`quick-status-pill${status === 'durchgefuehrt' ? ' active' : ''}`}
+                onClick={() => handleSave('durchgefuehrt')}
+                disabled={saving || status === 'durchgefuehrt'}
+              >
+                <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
+                  <path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Durchgeführt
+              </button>
             </div>
           )}
 
