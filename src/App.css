@@ -1420,11 +1420,10 @@ tbody tr:last-child td {
 }
 
 .calendar-grid.day-view .training-block {
-  padding: 10px 10px;
+  padding: 10px 12px;
   font-size: 14px;
   border-radius: 10px;
-  border-left-width: 4px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: inset 4px 0 0 rgba(255, 255, 255, 0.45), var(--shadow-sm);
 }
 
 .calendar-grid.day-view .training-block .training-title {
@@ -1442,9 +1441,9 @@ tbody tr:last-child td {
 .calendar-grid.day-view .training-block .training-tarif {
   font-size: 11px;
   margin-top: 4px;
-  background: color-mix(in srgb, var(--tone) 22%, transparent);
+  background: rgba(255, 255, 255, 0.22);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 5px;
   display: inline-block;
 }
 
@@ -1610,39 +1609,41 @@ tbody tr:last-child td {
   top: 2px;
   right: 4px;
   font-size: 11px;
-  /* Bloecke sind jetzt hell – dunkleres Gold ohne Schatten bleibt lesbar */
-  color: #D97706;
+  /* Bloecke sind farbig gefuellt – weisser Marker mit leichtem Schatten */
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
   line-height: 1;
   pointer-events: none;
 }
 
-/* Kalenderbloecke: helle Flaeche mit farbcodierter Kante statt Vollflaechen-
-   Verlauf. Der Text steht dunkel auf hell und bleibt auch in schmalen
-   Wochenspalten lesbar. --tone/--tone-text kommen aus der Status-Klasse. */
+/* Kalenderbloecke: satte Vollflaeche mit weisser Schrift – die frueheren
+   hellen Tint-Bloecke waren im Wochenraster zu blass und kaum unterscheidbar.
+   --tone (hell) / --tone-dark (tief) kommen aus der Status-Klasse. */
 .training-block {
   --tone: var(--brand);
-  --tone-text: var(--brand-dark);
+  --tone-dark: var(--brand-dark);
   position: absolute;
   box-sizing: border-box;
-  background: color-mix(in srgb, var(--tone) 14%, var(--surface));
-  color: var(--tone-text);
+  background: linear-gradient(150deg, var(--tone) 0%, var(--tone-dark) 100%);
+  color: #fff;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
-  border-left: 3px solid var(--tone);
-  padding: 5px 6px;
+  border: none;
+  /* Heller Innenrand links: Kante bleibt sichtbar, ohne Rahmen um alles */
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.42), var(--shadow-xs);
+  padding: 5px 7px;
   font-size: 11px;
   cursor: pointer;
   overflow: hidden;
   z-index: 10;
-  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease), background 0.2s var(--ease);
-  box-shadow: var(--shadow-xs);
+  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease), filter 0.2s var(--ease);
   animation: scaleIn 0.3s ease-out;
 }
 
 .training-block:hover {
   transform: scale(1.02) translateY(-1px);
-  background: color-mix(in srgb, var(--tone) 24%, var(--surface));
-  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--tone) 60%, transparent);
+  filter: saturate(1.12) brightness(1.06);
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.55),
+    0 8px 18px -6px color-mix(in srgb, var(--tone-dark) 75%, transparent);
   z-index: 20;
 }
 
@@ -1654,7 +1655,8 @@ tbody tr:last-child td {
 .training-block.selected {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand), 0 4px 12px rgba(15, 23, 42, 0.2);
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.55),
+    0 0 0 2px var(--surface), 0 0 0 4px var(--brand), 0 4px 12px rgba(15, 23, 42, 0.2);
   z-index: 25;
 }
 
@@ -1664,19 +1666,19 @@ tbody tr:last-child td {
 
 .training-block.status-geplant {
   --tone: #D97706;
-  --tone-text: #92400E;
+  --tone-dark: #B45309;
 }
 
 .training-block.status-durchgefuehrt,
 .training-block.status-durchgefuehrt_halb {
   --tone: #16A34A;
-  --tone-text: #166534;
+  --tone-dark: #15803D;
 }
 
 .training-block.status-abgesagt {
   --tone: #DC2626;
-  --tone-text: #991B1B;
-  opacity: 0.75;
+  --tone-dark: #B91C1C;
+  opacity: 0.8;
 }
 
 .training-block.status-abgesagt:hover {
@@ -1697,7 +1699,7 @@ tbody tr:last-child td {
 
 .training-block .training-time {
   font-size: 10px;
-  opacity: 0.75;
+  opacity: 0.88;
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
 }
@@ -1771,78 +1773,78 @@ tbody tr:last-child td {
   padding: 24px;
 }
 
-/* Schnellstatus-Leiste oben im Bearbeiten-Dialog. Gruen wie ein durchgefuehrter
-   Kalenderblock; ist der Status bereits gesetzt, ist die Pille gefuellt. */
+/* Schnellstatus oben im Bearbeiten-Dialog: eine breite Aktionsflaeche statt
+   Kaestchen + Pille. Offen = gruener Button, gesetzt = ruhige Bestaetigung. */
 .quick-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 14px;
-  flex-wrap: wrap;
   margin-bottom: 22px;
-  padding: 12px 14px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-}
-
-.quick-status-label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-subtle);
 }
 
 .quick-status-pill {
   --tone: #16A34A;
-  display: inline-flex;
+  --tone-dark: #15803D;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 15px;
-  border-radius: 999px;
-  border: 1.5px solid color-mix(in srgb, var(--tone) 45%, transparent);
-  background: var(--surface);
-  color: var(--tone);
+  gap: 11px;
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, var(--tone) 0%, var(--tone-dark) 100%);
+  color: #fff;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 650;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.18s var(--ease), color 0.18s var(--ease),
-    border-color 0.18s var(--ease), transform 0.18s var(--ease-spring),
-    box-shadow 0.18s var(--ease);
+  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.24),
+    0 8px 18px -8px rgba(21, 128, 61, 0.55);
+  transition: transform 0.18s var(--ease-spring), box-shadow 0.18s var(--ease),
+    background 0.18s var(--ease), color 0.18s var(--ease);
 }
 
-.quick-status-pill svg {
+/* Icon sitzt in einem eigenen Kreis – gibt dem Button einen klaren Ankerpunkt */
+.quick-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .quick-status-pill:hover:not(:disabled) {
-  background: var(--tone);
-  border-color: var(--tone);
-  color: #fff;
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--tone) 70%, transparent);
+  box-shadow: 0 2px 4px rgba(21, 128, 61, 0.24),
+    0 12px 24px -8px rgba(21, 128, 61, 0.6);
 }
 
 .quick-status-pill:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: translateY(0) scale(0.985);
+  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.3);
 }
 
-/* Aktiver Status: gefuellt und nicht klickbar, aber nicht ausgegraut */
+/* Bereits durchgefuehrt: keine Button-Optik mehr, nur noch Bestaetigung */
 .quick-status-pill.active {
-  background: var(--tone);
-  border-color: var(--tone);
-  color: #fff;
+  background: color-mix(in srgb, var(--tone) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tone) 32%, transparent);
+  padding: 12px 15px;
+  color: var(--tone-dark);
   cursor: default;
-  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.18);
+  box-shadow: none;
+}
+
+.quick-status-pill.active .quick-status-icon {
+  background: var(--tone);
+  color: #fff;
 }
 
 .quick-status-pill:disabled:not(.active) {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .modal-footer {
@@ -2841,8 +2843,9 @@ tbody tr:last-child td {
      Flaeche und Textfarbe kommen aus der Basis-Regel (--tone). */
   .training-block {
     border-radius: 4px;
-    border-left-width: 2px;
-    padding: 2px 3px;
+    /* Schmalerer Innenrand – 3px waeren bei 9px-Bloecken zu dominant */
+    box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.45), var(--shadow-xs);
+    padding: 2px 4px;
     font-size: 9px;
     line-height: 1.2;
     overflow: hidden;
@@ -2853,7 +2856,7 @@ tbody tr:last-child td {
 
   .training-block .training-title {
     font-size: 9px;
-    font-weight: 500;
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
   }

@@ -1894,17 +1894,18 @@ function TrainingModal({
               bleiben beim Dropdown – an "abgesagt" haengt die Bezahl-Rueckfrage. */}
           {training && (
             <div className="quick-status">
-              <span className="quick-status-label">Schnellstatus</span>
               <button
                 type="button"
                 className={`quick-status-pill${status === 'durchgefuehrt' ? ' active' : ''}`}
                 onClick={() => handleSave('durchgefuehrt')}
                 disabled={saving || status === 'durchgefuehrt'}
               >
-                <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true">
-                  <path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Durchgeführt
+                <span className="quick-status-icon">
+                  <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+                    <path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                {status === 'durchgefuehrt' ? 'Als durchgeführt markiert' : 'Als durchgeführt markieren'}
               </button>
             </div>
           )}
