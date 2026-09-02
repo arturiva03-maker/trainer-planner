@@ -4019,3 +4019,58 @@ tbody tr:last-child td {
     font-size: 12px;
   }
 }
+
+/* ============ MONATSWECHSEL (Abrechnung) ============
+   Pfeil-Navigation statt Monats-Picker. Das Label ist gleichzeitig der
+   Sprung zurueck auf den aktuellen Monat (deaktiviert, wenn schon dort). */
+.month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.month-nav button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-subtle);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.month-nav button:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.month-nav button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.month-nav .month-nav-label {
+  width: auto;
+  min-width: 132px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.month-nav .month-nav-label:disabled {
+  cursor: default;
+  background: transparent;
+  color: var(--text);
+}

@@ -3359,6 +3359,35 @@ const MONATSNAMEN: Record<number, string> = {
   7: 'Juli', 8: 'August', 9: 'September', 10: 'Oktober', 11: 'November', 12: 'Dezember'
 }
 
+// ============ MONATSWECHSEL ============
+// Monat per Pfeil umschalten statt ueber den Monats-Picker auszuwaehlen.
+// Ein Klick auf das Label springt zurueck auf den aktuellen Monat.
+function shiftMonth(monthStr: string, delta: number): string {
+  const [y, m] = monthStr.split('-').map(Number)
+  return getMonthString(new Date(y, m - 1 + delta, 1))
+}
+
+function MonthNav({ value, onChange }: { value: string; onChange: (monat: string) => void }) {
+  const [y, m] = value.split('-').map(Number)
+  const label = MONATSNAMEN[m] ? `${MONATSNAMEN[m]} ${y}` : value
+  const istAktuellerMonat = value === getMonthString(new Date())
+  return (
+    <div className="month-nav">
+      <button type="button" aria-label="Vorheriger Monat" onClick={() => onChange(shiftMonth(value, -1))}>←</button>
+      <button
+        type="button"
+        className="month-nav-label"
+        onClick={() => onChange(getMonthString(new Date()))}
+        disabled={istAktuellerMonat}
+        title={istAktuellerMonat ? undefined : 'Zum aktuellen Monat'}
+      >
+        {label}
+      </button>
+      <button type="button" aria-label="Nächster Monat" onClick={() => onChange(shiftMonth(value, 1))}>→</button>
+    </div>
+  )
+}
+
 function PlatzgebuehrView({
   trainings,
   spieler,
@@ -4822,15 +4851,12 @@ function AbrechnungView({
         <div className="card-header">
           <div className="card-header-actions">
             <div className="filter-pills" style={{ flexWrap: 'wrap', gap: 8 }}>
-              <input
-                type="month"
-                className="form-control"
+              <MonthNav
                 value={selectedMonth}
-                onChange={(e) => {
-                  setSelectedMonth(e.target.value)
+                onChange={(monat) => {
+                  setSelectedMonth(monat)
                   setSelectedTag('')
                 }}
-                style={{ width: 'auto', minWidth: 140 }}
               />
               <div className="filter-pill-group">
                 {([
@@ -5752,13 +5778,7 @@ function AbrechnungTrainerView({
       <div className="card">
         <div className="card-header">
           <h3>Trainer-Abrechnung</h3>
-          <input
-            type="month"
-            className="form-control"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            style={{ width: 'auto' }}
-          />
+          <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
         </div>
 
         {/* Desktop Table */}
