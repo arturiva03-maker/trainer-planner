@@ -3368,24 +3368,140 @@ function shiftMonth(monthStr: string, delta: number): string {
 }
 
 function MonthNav({ value, onChange }: { value: string; onChange: (monat: string) => void }) {
+  const [pickerOffen, setPickerOffen] = useState(false)
+  const [pickerJahr, setPickerJahr] = useState(() => Number(value.split('-')[0]))
+  const wrapRef = useRef<HTMLDivElement>(null)
+
   const [y, m] = value.split('-').map(Number)
   const label = MONATSNAMEN[m] ? `${MONATSNAMEN[m]} ${y}` : value
-  const istAktuellerMonat = value === getMonthString(new Date())
+  const aktuellerMonat = getMonthString(new Date())
+
+  // Picker startet immer im Jahr des gerade gewaehlten Monats.
+  useEffect(() => {
+    if (pickerOffen) setPickerJahr(Number(value.split('-')[0]))
+  }, [pickerOffen, value])
+
+  // Klick daneben oder Escape schliesst den Picker wieder.
+  useEffect(() => {
+    if (!pickerOffen) return
+    const handleClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setPickerOffen(false)
+    }
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOffen(false) }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [pickerOffen])
+
   return (
-    <div className="month-nav">
-      <button type="button" aria-label="Vorheriger Monat" onClick={() => onChange(shiftMonth(value, -1))}>←</button>
-      <button
-        type="button"
-        className="month-nav-label"
-        onClick={() => onChange(getMonthString(new Date()))}
-        disabled={istAktuellerMonat}
-        title={istAktuellerMonat ? undefined : 'Zum aktuellen Monat'}
-      >
-        {label}
-      </button>
-      <button type="button" aria-label="Nächster Monat" onClick={() => onChange(shiftMonth(value, 1))}>→</button>
+    <div className="month-nav-wrap" ref={wrapRef}>
+      <div className="month-nav">
+        <button type="button" aria-label="Vorheriger Monat" onClick={() => onChange(shiftMonth(value, -1))}>←</button>
+        <button
+          type="button"
+          className="month-nav-label"
+          onClick={() => setPickerOffen((offen) => !offen)}
+          aria-expanded={pickerOffen}
+          title="Monat direkt wählen"
+        >
+          {label}
+        </button>
+        <button type="button" aria-label="Nächster Monat" onClick={() => onChange(shiftMonth(value, 1))}>→</button>
+      </div>
+
+      {pickerOffen && (
+        <div className="month-picker">
+          <div className="month-picker-jahr">
+            <button type="button" aria-label="Vorheriges Jahr" onClick={() => setPickerJahr((j) => j - 1)}>←</button>
+            <span>{pickerJahr}</span>
+            <button type="button" aria-label="Nächstes Jahr" onClick={() => setPickerJahr((j) => j + 1)}>→</button>
+          </div>
+          <div className="month-picker-grid">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((mm) => {
+              const monatStr = `${pickerJahr}-${String(mm).padStart(2, '0')}`
+              const klassen = ['month-picker-cell']
+              if (monatStr === value) klassen.push('active')
+              else if (monatStr === aktuellerMonat) klassen.push('heute')
+              return (
+                <button
+                  key={mm}
+                  type="button"
+                  className={klassen.join(' ')}
+                  onClick={() => { onChange(monatStr); setPickerOffen(false) }}
+                >
+                  {MONATSNAMEN[mm].substring(0, 3)}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            className="month-picker-heute"
+            onClick={() => { onChange(aktuellerMonat); setPickerOffen(false) }}
+          >
+            Aktueller Monat
+          </button>
+        </div>
+      )}
     </div>
   )
+}
+
+// Monat zusaetzlich per Wischen (Handy) und Pfeiltasten (Desktop) wechseln,
+// damit man nicht jedes Mal den kleinen Pfeil treffen muss.
+function useMonatWechselGesten(value: string, onChange: (monat: string) => void) {
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  const touchEnd = useRef<{ x: number; y: number } | null>(null)
+  const minSwipeDistance = 60
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Nicht waehrend einer Texteingabe und nicht ueber offenen Dialogen.
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+      if (document.querySelector('.modal-overlay')) return
+      // Bei offenem Monatsraster gehoeren die Pfeiltasten dorthin.
+      if (document.querySelector('.month-picker')) return
+      onChange(shiftMonth(value, e.key === 'ArrowRight' ? 1 : -1))
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [value, onChange])
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchEnd.current = null
+    touchStart.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY }
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    touchEnd.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY }
+  }
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current
+    const ende = touchEnd.current
+    touchStart.current = null
+    touchEnd.current = null
+    if (!start || !ende) return
+    const dx = start.x - ende.x
+    const dy = start.y - ende.y
+    // Nur eindeutig waagerechte Wischer zaehlen, sonst stoert es das Scrollen.
+    if (Math.abs(dx) < minSwipeDistance || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    // Quer scrollbare Bereiche (breite Tabellen) behalten ihren eigenen Wisch.
+    let el = e.target as HTMLElement | null
+    while (el && el !== e.currentTarget) {
+      if (el.scrollWidth > el.clientWidth + 4) return
+      el = el.parentElement
+    }
+    onChange(shiftMonth(value, dx > 0 ? 1 : -1))
+  }
+
+  return { onTouchStart, onTouchMove, onTouchEnd }
 }
 
 function PlatzgebuehrView({
@@ -3825,6 +3941,13 @@ function AbrechnungView({
   const [selectedSpielerDetail, setSelectedSpielerDetail] = useState<string | null>(null)
   // Welche Statistik-Kachel ist zur Aufschluesselung geoeffnet (null = keine)
   const [statBreakdown, setStatBreakdown] = useState<'total' | 'bar' | 'bezahlt' | 'ausstehend' | 'offen' | null>(null)
+
+  // Monatswechsel per Wischen/Pfeiltasten. Tag-Filter dabei zuruecksetzen,
+  // weil er sich immer auf einen Tag des alten Monats bezieht.
+  const monatGesten = useMonatWechselGesten(selectedMonth, (monat) => {
+    setSelectedMonth(monat)
+    setSelectedTag('')
+  })
 
   // Monat + Status-Filter merken, damit der Tab beim Zurueckkommen den letzten
   // Stand zeigt statt auf aktuellen Monat / "Alle" zurueckzuspringen.
@@ -4757,7 +4880,7 @@ function AbrechnungView({
   }
 
   return (
-    <div>
+    <div {...monatGesten}>
       <div className="stats-grid">
         <div className="stat-card stat-card-clickable tone-total" onClick={() => setStatBreakdown('total')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Gesamtumsatz</div>
@@ -5728,6 +5851,7 @@ function AbrechnungTrainerView({
   userId: string
 }) {
   const [selectedMonth, setSelectedMonth] = useState(getMonthString(new Date()))
+  const monatGesten = useMonatWechselGesten(selectedMonth, setSelectedMonth)
 
   const trainerSummary = useMemo(() => {
     const monthTrainings = trainings.filter((t) => {
@@ -5763,7 +5887,7 @@ function AbrechnungTrainerView({
   }, [trainerSummary])
 
   return (
-    <div>
+    <div {...monatGesten}>
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Gesamtstunden</div>
