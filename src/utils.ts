@@ -125,3 +125,29 @@ export function calculateSpielerPreisForTraining(
 }
 
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+// Hallensaisons Winter 2026/27 (BSV). An 24.12. und 31.12. ist die Halle gesperrt.
+export const SAISONS = {
+  feldhalle: { name: '4-Feld-Halle', von: '2026-09-19', bis: '2027-04-25' },
+  traglufthalle: { name: 'Traglufthalle', von: '2026-09-26', bis: '2027-03-29' }
+} as const
+
+export type SaisonKey = keyof typeof SAISONS
+
+const SAISON_SPERRTAGE = ['2026-12-24', '2026-12-31']
+
+// Woechentliche Termine am Wochentag von startDatum, frühestens ab Saisonbeginn.
+export function getSaisonTermine(startDatum: string, saison: SaisonKey): string[] {
+  const { von, bis } = SAISONS[saison]
+  const current = new Date(startDatum)
+  while (formatDate(current) < von) {
+    current.setUTCDate(current.getUTCDate() + 7)
+  }
+  const termine: string[] = []
+  while (formatDate(current) <= bis) {
+    const d = formatDate(current)
+    if (!SAISON_SPERRTAGE.includes(d)) termine.push(d)
+    current.setUTCDate(current.getUTCDate() + 7)
+  }
+  return termine
+}

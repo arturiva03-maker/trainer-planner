@@ -54,8 +54,11 @@ import {
   getMonthString,
   calculateDuration,
   calculateSpielerPreisForTraining,
-  WOCHENTAGE
+  WOCHENTAGE,
+  SAISONS,
+  getSaisonTermine
 } from './utils'
+import type { SaisonKey } from './utils'
 
 // ============ SCROLL PRESERVATION ============
 // Einfacher globaler Mechanismus um Scroll-Position bei State-Updates zu erhalten
@@ -1513,11 +1516,7 @@ function TrainingModal({
     training?.platzgebuehr_ausnahme_ids || []
   )
   const [wiederholen, setWiederholen] = useState(false)
-  // Zeitraum 1: heute bis vor Sommerferien Berlin 2026 (endet 08.07.2026)
-  // Zeitraum 2: nach Sommerferien (ab 23.08.2026) bis vor Herbstferien (endet 18.10.2026)
-  const [wiederholenZeitraum1Bis, setWiederholenZeitraum1Bis] = useState('2026-07-12')
-  const [wiederholenZeitraum2Von, setWiederholenZeitraum2Von] = useState('2026-08-24')
-  const [wiederholenZeitraum2Bis, setWiederholenZeitraum2Bis] = useState('2026-09-30')
+  const [wiederholenSaison, setWiederholenSaison] = useState<SaisonKey>('feldhalle')
   const [serienAktion, setSerienAktion] = useState<'einzeln' | 'nachfolgende'>('einzeln')
   const [saving, setSaving] = useState(false)
   const [spielerSuche, setSpielerSuche] = useState('')
@@ -1747,41 +1746,20 @@ function TrainingModal({
             }
           }
         }
-      } else if (wiederholen && (wiederholenZeitraum1Bis || wiederholenZeitraum2Bis)) {
-        // Create series of trainings across two periods (before and after Sommerferien)
+      } else if (wiederholen) {
         const serieId = crypto.randomUUID()
-        const trainingsToCreate: typeof trainingData[] = []
-
-        const addWeeklyDates = (startDate: Date, endDateStr: string) => {
-          const endDate = new Date(endDateStr)
-          let current = new Date(startDate)
-          while (current <= endDate) {
-            trainingsToCreate.push({
-              ...trainingData,
-              datum: formatDate(current),
-              serie_id: serieId
-            })
-            current.setDate(current.getDate() + 7)
-          }
+        const trainingsToCreate = getSaisonTermine(datum, wiederholenSaison).map(d => ({
+          ...trainingData,
+          datum: d,
+          serie_id: serieId
+        }))
+        if (trainingsToCreate.length === 0) {
+          alert('Das Datum liegt nach dem Ende der Saison.')
+          return
         }
 
-        // Zeitraum 1: vom Training-Datum bis vor Sommerferien
-        if (wiederholenZeitraum1Bis) {
-          addWeeklyDates(new Date(datum), wiederholenZeitraum1Bis)
-        }
-
-        // Zeitraum 2: nach Sommerferien bis vor Herbstferien
-        if (wiederholenZeitraum2Von && wiederholenZeitraum2Bis) {
-          // Ersten Termin ab Zeitraum2Von finden, der auf den gleichen Wochentag fällt
-          const startDayOfWeek = new Date(datum).getDay()
-          let zeitraum2Start = new Date(wiederholenZeitraum2Von)
-          while (zeitraum2Start.getDay() !== startDayOfWeek) {
-            zeitraum2Start.setDate(zeitraum2Start.getDate() + 1)
-          }
-          addWeeklyDates(zeitraum2Start, wiederholenZeitraum2Bis)
-        }
-
-        await supabase.from('trainings').insert(trainingsToCreate)
+        const { error: insertError } = await supabase.from('trainings').insert(trainingsToCreate)
+        if (insertError) throw insertError
       } else {
         await supabase.from('trainings').insert(trainingData)
       }
@@ -2381,46 +2359,21 @@ function TrainingModal({
               {wiederholen && (
                 <>
                   <div className="form-group">
-                    <label style={{ fontWeight: 600, marginBottom: 4 }}>
-                      Zeitraum 1 – bis vor Sommerferien
-                    </label>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#666' }}>von {datum}</span>
-                      <span style={{ color: '#666' }}>bis</span>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={wiederholenZeitraum1Bis}
-                        onChange={(e) => setWiederholenZeitraum1Bis(e.target.value)}
-                        min={datum}
-                        style={{ flex: 1 }}
-                      />
-                    </div>
-                    <small style={{ color: '#888' }}>Sommerferien Berlin 2026: 09.07. – 22.08.</small>
-                  </div>
-
-                  <div className="form-group">
-                    <label style={{ fontWeight: 600, marginBottom: 4 }}>
-                      Zeitraum 2 – nach Sommerferien bis vor Herbstferien
-                    </label>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={wiederholenZeitraum2Von}
-                        onChange={(e) => setWiederholenZeitraum2Von(e.target.value)}
-                        style={{ flex: 1 }}
-                      />
-                      <span style={{ color: '#666' }}>bis</span>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={wiederholenZeitraum2Bis}
-                        onChange={(e) => setWiederholenZeitraum2Bis(e.target.value)}
-                        style={{ flex: 1 }}
-                      />
-                    </div>
-                    <small style={{ color: '#888' }}>Herbstferien Berlin 2026: 19.10. – 31.10.</small>
+                    <label style={{ fontWeight: 600, marginBottom: 4 }}>Zeitraum</label>
+                    {(Object.keys(SAISONS) as SaisonKey[]).map(key => (
+                      <label key={key} className="checkbox-group">
+                        <input
+                          type="radio"
+                          name="wiederholen-saison"
+                          checked={wiederholenSaison === key}
+                          onChange={() => setWiederholenSaison(key)}
+                        />
+                        {SAISONS[key].name}: {formatDateGerman(SAISONS[key].von)} – {formatDateGerman(SAISONS[key].bis)}
+                      </label>
+                    ))}
+                    <small style={{ color: '#888' }}>
+                      {getSaisonTermine(datum, wiederholenSaison).length} Termine, ohne 24.12. und 31.12.
+                    </small>
                   </div>
                 </>
               )}
