@@ -126,10 +126,11 @@ export function calculateSpielerPreisForTraining(
 
 export const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-// Hallensaisons Winter 2026/27 (BSV). An 24.12. und 31.12. ist die Halle gesperrt.
+// Hallensaisons Winter 2026/27. An 24.12. und 31.12. ist gesperrt.
 export const SAISONS = {
   feldhalle: { name: '4-Feld-Halle', von: '2026-09-19', bis: '2027-04-25' },
-  traglufthalle: { name: 'Traglufthalle', von: '2026-09-26', bis: '2027-03-29' }
+  traglufthalle: { name: 'Traglufthalle', von: '2026-09-26', bis: '2027-03-29' },
+  preussenpark: { name: 'Preußenpark', von: '2026-09-21', bis: '2027-03-29' }
 } as const
 
 export type SaisonKey = keyof typeof SAISONS
