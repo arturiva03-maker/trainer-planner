@@ -693,6 +693,7 @@ function MainApp({ user }: { user: User }) {
               <PlatzgebuehrView
                 trainings={trainings}
                 spieler={spieler}
+                tarife={tarife}
                 onUpdate={loadAllData}
               />
             )}
@@ -1549,6 +1550,15 @@ function TrainingModal({
 
   // Abrechnungsart ermitteln
   const selectedTarif = tarife.find(t => t.id === tarifId)
+
+  // Spieler, fuer die wegen eines Hallen-/Wintertarifs keine Platzgebuehr gilt.
+  // Individueller Spieler-Tarif schlaegt den Trainingstarif.
+  const ohnePlatzgebuehrIds = useMemo(() => new Set(
+    selectedSpieler.filter((sid) => {
+      const override = individuelleTarife ? spielerTarifeMap[sid] : undefined
+      return istTarifOhnePlatzgebuehr(tarife, override?.tarif_id || tarifId)
+    })
+  ), [selectedSpieler, spielerTarifeMap, individuelleTarife, tarifId, tarife])
   const abrechnungsart = selectedTarif?.abrechnung || 'proTraining'
 
   // Prüft ob Bezahl-Abfrage nötig ist (nur bei proTraining mit Spielern)
@@ -1689,7 +1699,8 @@ function TrainingModal({
       // Einmalige Platzgebuehr: nur die noch ausgewaehlten Spieler behalten.
       // Spalte muss in DB existieren (Migration 20260619_platzgebuehr.sql),
       // daher nur senden wenn gesetzt oder vorher gesetzt war.
-      const platzgebuehrIds = platzgebuehrSpieler.filter((id) => selectedSpieler.includes(id))
+      const platzgebuehrIds = platzgebuehrSpieler
+        .filter((id) => selectedSpieler.includes(id) && !ohnePlatzgebuehrIds.has(id))
       if (platzgebuehrIds.length > 0) {
         trainingData.platzgebuehr_spieler_ids = platzgebuehrIds
       } else if (training?.platzgebuehr_spieler_ids && training.platzgebuehr_spieler_ids.length > 0) {
@@ -1698,7 +1709,8 @@ function TrainingModal({
 
       // Ausnahme: gelabelte Spieler, die hier ausnahmsweise keine Platzgebuehr
       // zahlen. Spalte muss in DB existieren (Migration 20260627_platzgebuehr_ausnahme.sql).
-      const ausnahmeIds = platzgebuehrAusnahme.filter((id) => selectedSpieler.includes(id))
+      const ausnahmeIds = platzgebuehrAusnahme
+        .filter((id) => selectedSpieler.includes(id) && !ohnePlatzgebuehrIds.has(id))
       if (ausnahmeIds.length > 0) {
         trainingData.platzgebuehr_ausnahme_ids = ausnahmeIds
       } else if (training?.platzgebuehr_ausnahme_ids && training.platzgebuehr_ausnahme_ids.length > 0) {
@@ -1984,6 +1996,13 @@ function TrainingModal({
           {selectedSpieler.length > 0 && (
             <div className="form-group">
               <label>🎾 Platzgebühr (einmalig für dieses Training)</label>
+              {ohnePlatzgebuehrIds.size === selectedSpieler.length ? (
+                <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block' }}>
+                  Hallen-/Wintertarif gewählt – die Platzmiete steckt im Trainingspreis.
+                  Für dieses Training fällt keine Platzgebühr an.
+                </small>
+              ) : (
+              <>
               <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block', marginBottom: 8 }}>
                 {PLATZGEBUEHR_PRO_STUNDE},00 € pro Stunde. Spieler mit Label zahlen in der Sommersaison
                 automatisch – Haken hier entfernen, um die Platzgebühr ausnahmsweise nur für dieses
@@ -1993,6 +2012,8 @@ function TrainingModal({
                 {selectedSpieler.map((sid) => {
                   const sp = spieler.find((s) => s.id === sid)
                   if (!sp) return null
+                  // Hallen-/Wintertarif: keine Platzgebuehr, Zeile entfaellt.
+                  if (ohnePlatzgebuehrIds.has(sid)) return null
                   const dauer = Math.max(calculateDuration(uhrzeitVon, uhrzeitBis), 0) *
                     (status === 'durchgefuehrt_halb' ? 0.5 : 1)
                   const betrag = dauer * PLATZGEBUEHR_PRO_STUNDE
@@ -2057,6 +2078,8 @@ function TrainingModal({
                   )
                 })}
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -2688,7 +2711,14 @@ function VerwaltungView({
               <tbody>
                 {aktiveTarife.map((t) => (
                   <tr key={t.id}>
-                    <td>{t.name}</td>
+                    <td>
+                      {t.name}
+                      {t.ohne_platzgebuehr && (
+                        <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--gray-500)' }}>
+                          · ohne Platzgebühr
+                        </span>
+                      )}
+                    </td>
                     <td>{t.preis_pro_stunde} €</td>
                     <td>
                       {t.abrechnung === 'proTraining' ? 'Pro Training' : 'Monatlich'}
@@ -2968,6 +2998,7 @@ function TarifModal({
   const [preis, setPreis] = useState(tarif?.preis_pro_stunde?.toString() || '')
   const [abrechnung, setAbrechnung] = useState<Tarif['abrechnung']>(tarif?.abrechnung || 'proTraining')
   const [beschreibung, setBeschreibung] = useState(tarif?.beschreibung || '')
+  const [ohnePlatzgebuehr, setOhnePlatzgebuehr] = useState(!!tarif?.ohne_platzgebuehr)
   const [saving, setSaving] = useState(false)
   const istArchiviert = !!tarif?.archiviert
 
@@ -2984,7 +3015,8 @@ function TarifModal({
         name: name.trim(),
         preis_pro_stunde: parseFloat(preis),
         abrechnung,
-        beschreibung: beschreibung || null
+        beschreibung: beschreibung || null,
+        ohne_platzgebuehr: ohnePlatzgebuehr
       }
 
       if (tarif) {
@@ -3064,6 +3096,21 @@ function TarifModal({
               <option value="proTraining">Pro Training</option>
               <option value="monatlich">Monatlich</option>
             </select>
+          </div>
+          <div className="form-group">
+            <label className="checkbox-group">
+              <input
+                type="checkbox"
+                checked={ohnePlatzgebuehr}
+                onChange={(e) => setOhnePlatzgebuehr(e.target.checked)}
+              />
+              Keine Platzgebühr (Hallen-/Wintertarif)
+            </label>
+            <small style={{ color: 'var(--gray-500)', fontSize: 12 }}>
+              Die Platzmiete steckt im Trainingspreis. Für Trainings mit diesem Tarif fällt
+              keine Platzgebühr an – auch nicht für Spieler mit Platzgebühr-Label und auch
+              nicht in den Sommermonaten.
+            </small>
           </div>
           <div className="form-group">
             <label>Beschreibung</label>
@@ -3383,6 +3430,23 @@ function LexofficeRechnungModal({
 // als halbe Stunden. Berechnung pro gelabeltem Spieler pro Stunde.
 const PLATZGEBUEHR_PRO_STUNDE = 5
 const SOMMER_MONATE = [5, 6, 7, 8, 9] // Mai bis September
+
+// Hallen-/Wintertarife (`ohne_platzgebuehr`) schalten die Platzgebuehr ab: die
+// Platzmiete steckt dort schon im Trainingspreis. Der individuelle Spieler-Tarif
+// im Gruppentraining schlaegt dabei den Trainingstarif.
+function istTarifOhnePlatzgebuehr(tarife: Tarif[], tarifId?: string | null): boolean {
+  if (!tarifId) return false
+  return !!tarife.find((t) => t.id === tarifId)?.ohne_platzgebuehr
+}
+
+function spielerOhnePlatzgebuehr(
+  tarife: Tarif[],
+  training: Pick<Training, 'tarif_id' | 'spieler_tarife'>,
+  spielerId: string
+): boolean {
+  const override = training.spieler_tarife?.[spielerId]
+  return istTarifOhnePlatzgebuehr(tarife, override?.tarif_id || training.tarif_id)
+}
 const MONATSNAMEN: Record<number, string> = {
   1: 'Januar', 2: 'Februar', 3: 'März', 4: 'April', 5: 'Mai', 6: 'Juni',
   7: 'Juli', 8: 'August', 9: 'September', 10: 'Oktober', 11: 'November', 12: 'Dezember'
@@ -3536,10 +3600,12 @@ function useMonatWechselGesten(value: string, onChange: (monat: string) => void)
 function PlatzgebuehrView({
   trainings,
   spieler,
+  tarife,
   onUpdate
 }: {
   trainings: Training[]
   spieler: Spieler[]
+  tarife: Tarif[]
   onUpdate: () => void
 }) {
   const currentYear = new Date().getFullYear()
@@ -3586,6 +3652,11 @@ function PlatzgebuehrView({
       const einmaligIds = Array.isArray(t.platzgebuehr_spieler_ids) ? t.platzgebuehr_spieler_ids : []
       const ausnahmeIds = Array.isArray(t.platzgebuehr_ausnahme_ids) ? t.platzgebuehr_ausnahme_ids : []
       t.spieler_ids.forEach((sid) => {
+        // Hallen-/Wintertarif: Platzmiete ist im Preis enthalten, es faellt gar
+        // keine Platzgebuehr an - weder ueber das Label noch einmalig. Steht vor
+        // allem anderen, weil die Hallensaison (21.09.-29.03.) in die
+        // Sommermonate hineinragt.
+        if (spielerOhnePlatzgebuehr(tarife, t, sid)) return
         // Gelabelte Spieler nur in der Sommersaison; einmalige Platzgebuehr
         // gilt unabhaengig vom Monat (explizit am Training gesetzt).
         // Ausnahme: gelabelter Spieler, der fuer dieses Training befreit wurde.
@@ -3611,7 +3682,7 @@ function PlatzgebuehrView({
       return a.training.uhrzeit_von.localeCompare(b.training.uhrzeit_von)
     })
     return result
-  }, [trainings, jahr, platzSpielerIds, spieler])
+  }, [trainings, jahr, platzSpielerIds, spieler, tarife])
 
   // Summen pro Monat: immer alle 5 Sommermonate (auch mit 0) + zusaetzliche
   // Monate, falls dort einmalige Platzgebuehren ausserhalb der Saison anfallen.

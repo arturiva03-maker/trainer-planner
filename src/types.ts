@@ -38,6 +38,10 @@ export interface Tarif {
   // weiterhin korrekt berechnet werden, verschwindet aber aus der Auswahl beim
   // Anlegen neuer Trainings.
   archiviert?: boolean
+  // Hallen-/Wintertarif: die Platzmiete steckt im Preis, es faellt keine
+  // zusaetzliche Platzgebuehr an — weder ueber das Spieler-Label noch als
+  // einmalige Platzgebuehr am Training.
+  ohne_platzgebuehr?: boolean
   created_at: string
 }
 
