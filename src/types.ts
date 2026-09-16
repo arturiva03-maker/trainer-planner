@@ -20,6 +20,10 @@ export interface Spieler {
   // Label: in der Sommersaison faellt fuer diesen (erwachsenen) Spieler
   // pro Trainingsstunde eine Platzgebuehr an.
   platzgebuehr?: boolean
+  // Archiviert (Soft-Delete): bleibt in der DB erhalten, damit alte Trainings
+  // und Abrechnungen den Spieler weiterhin korrekt anzeigen, verschwindet aber
+  // aus der Spielerliste und aus der Auswahl bei neuen Trainings.
+  archiviert?: boolean
   created_at: string
 }
 

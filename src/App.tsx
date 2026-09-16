@@ -1938,6 +1938,7 @@ function TrainingModal({
             />
             <div className="multi-select">
               {spieler
+                .filter(s => !s.archiviert || selectedSpieler.includes(s.id))
                 .filter(s => s.name.toLowerCase().includes(spielerSuche.toLowerCase()))
                 .map((s) => (
                 <div
@@ -1950,7 +1951,7 @@ function TrainingModal({
                     checked={selectedSpieler.includes(s.id)}
                     readOnly
                   />
-                  <span>{s.name}</span>
+                  <span>{s.name}{s.archiviert ? ' · archiviert' : ''}</span>
                 </div>
               ))}
               {spieler.length === 0 && (
@@ -1958,7 +1959,7 @@ function TrainingModal({
                   Noch keine Spieler angelegt
                 </div>
               )}
-              {spieler.length > 0 && spieler.filter(s => s.name.toLowerCase().includes(spielerSuche.toLowerCase())).length === 0 && (
+              {spieler.length > 0 && spieler.filter(s => (!s.archiviert || selectedSpieler.includes(s.id)) && s.name.toLowerCase().includes(spielerSuche.toLowerCase())).length === 0 && (
                 <div style={{ padding: 12, color: 'var(--gray-500)' }}>
                   Kein Spieler gefunden
                 </div>
@@ -2502,15 +2503,25 @@ function VerwaltungView({
   const [editingTarif, setEditingTarif] = useState<Tarif | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showArchivierteTarife, setShowArchivierteTarife] = useState(false)
+  const [showArchivierteSpieler, setShowArchivierteSpieler] = useState(false)
+
+  const aktiveSpieler = useMemo(() => spieler.filter((s) => !s.archiviert), [spieler])
+  const archivierteSpieler = useMemo(() => spieler.filter((s) => s.archiviert), [spieler])
 
   const filteredSpieler = useMemo(() => {
-    if (!searchTerm) return spieler
+    if (!searchTerm) return aktiveSpieler
     const term = searchTerm.toLowerCase()
-    return spieler.filter((s) => s.name.toLowerCase().includes(term))
-  }, [spieler, searchTerm])
+    return aktiveSpieler.filter((s) => s.name.toLowerCase().includes(term))
+  }, [aktiveSpieler, searchTerm])
 
   const aktiveTarife = useMemo(() => tarife.filter((t) => !t.archiviert), [tarife])
   const archivierteTarife = useMemo(() => tarife.filter((t) => t.archiviert), [tarife])
+
+  // Spieler direkt (ent-)archivieren ohne Modal.
+  const toggleSpielerArchiviert = async (s: Spieler) => {
+    await supabase.from('spieler').update({ archiviert: !s.archiviert }).eq('id', s.id)
+    onUpdate()
+  }
 
   // Tarif direkt (ent-)archivieren ohne Modal.
   const toggleTarifArchiviert = async (t: Tarif) => {
@@ -2525,7 +2536,7 @@ function VerwaltungView({
           className={`tab ${activeSubTab === 'spieler' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('spieler')}
         >
-          Spieler ({spieler.length})
+          Spieler ({aktiveSpieler.length})
         </button>
         <button
           className={`tab ${activeSubTab === 'tarife' ? 'active' : ''}`}
@@ -2614,6 +2625,42 @@ function VerwaltungView({
               <div className="empty-state">Keine Spieler gefunden</div>
             )}
           </div>
+
+          {/* Archivierte Spieler */}
+          {archivierteSpieler.length > 0 && (
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--gray-200)', paddingTop: 16 }}>
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowArchivierteSpieler((v) => !v)}
+              >
+                {showArchivierteSpieler ? '▾' : '▸'} Archivierte Spieler ({archivierteSpieler.length})
+              </button>
+              {showArchivierteSpieler && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <small style={{ color: 'var(--gray-500)', fontSize: 12 }}>
+                    Archivierte Spieler bleiben gespeichert – alte Trainings, Abrechnungen und
+                    Platzgebühren bleiben unverändert. Sie erscheinen nur nicht mehr in der
+                    Spielerliste und nicht mehr in der Auswahl bei neuen Trainings.
+                  </small>
+                  {archivierteSpieler.map((s) => (
+                    <div key={s.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      borderRadius: 8, background: 'var(--gray-50)'
+                    }}>
+                      <span style={{ fontWeight: 500, color: 'var(--gray-600)' }}>{s.name}</span>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ marginLeft: 'auto' }}
+                        onClick={() => toggleSpielerArchiviert(s)}
+                      >
+                        Wieder aktivieren
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -2802,6 +2849,7 @@ function SpielerModal({
 }) {
   const [name, setName] = useState(spieler?.name || '')
   const [saving, setSaving] = useState(false)
+  const istArchiviert = !!spieler?.archiviert
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -2838,6 +2886,29 @@ function SpielerModal({
     onSave()
   }
 
+  // Archivieren statt loeschen: der Spieler bleibt in alten Trainings und
+  // Abrechnungen erhalten, verschwindet aber aus Liste und Auswahl.
+  const handleArchivieren = async () => {
+    if (!spieler) return
+    if (!istArchiviert) {
+      const confirmed = await showConfirm(
+        'Spieler archivieren',
+        'Spieler archivieren? Er verschwindet aus der Spielerliste und aus der Auswahl bei neuen Trainings. Alte Trainings und Abrechnungen bleiben unveraendert. Du kannst ihn jederzeit wieder aktivieren.'
+      )
+      if (!confirmed) return
+    }
+    setSaving(true)
+    try {
+      await supabase.from('spieler').update({ archiviert: !istArchiviert }).eq('id', spieler.id)
+      onSave()
+    } catch (err) {
+      console.error('Error archiving spieler:', err)
+      alert('Fehler beim Archivieren')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -2862,6 +2933,11 @@ function SpielerModal({
           {spieler && (
             <button className="btn btn-danger" onClick={handleDelete}>
               Löschen
+            </button>
+          )}
+          {spieler && (
+            <button className="btn btn-secondary" onClick={handleArchivieren} disabled={saving}>
+              {istArchiviert ? 'Wieder aktivieren' : 'Archivieren'}
             </button>
           )}
           <button className="btn btn-secondary" onClick={onClose}>
