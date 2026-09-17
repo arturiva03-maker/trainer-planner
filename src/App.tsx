@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { searchLexofficeContacts, createLexofficeInvoice } from './lexoffice'
+import { getKalenderAboLink } from './kalender'
 import type { LexofficeContact, LexofficeLineItem } from './lexoffice'
 import type { User, Session } from '@supabase/supabase-js'
 import type {
@@ -2519,7 +2520,7 @@ function VerwaltungView({
   onUpdate: () => void
   userId: string
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'spieler' | 'tarife'>('spieler')
+  const [activeSubTab, setActiveSubTab] = useState<'spieler' | 'tarife' | 'kalender'>('spieler')
   const [showSpielerModal, setShowSpielerModal] = useState(false)
   const [showTarifModal, setShowTarifModal] = useState(false)
   const [editingSpieler, setEditingSpieler] = useState<Spieler | null>(null)
@@ -2566,6 +2567,12 @@ function VerwaltungView({
           onClick={() => setActiveSubTab('tarife')}
         >
           Tarife ({aktiveTarife.length})
+        </button>
+        <button
+          className={`tab ${activeSubTab === 'kalender' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('kalender')}
+        >
+          Kalender-Abo
         </button>
       </div>
 
@@ -2828,6 +2835,8 @@ function VerwaltungView({
         </div>
       )}
 
+      {activeSubTab === 'kalender' && <KalenderAboView />}
+
       {/* Spieler Modal */}
       {showSpielerModal && (
         <SpielerModal
@@ -2860,6 +2869,94 @@ function VerwaltungView({
             onUpdate()
           }}
         />
+      )}
+    </div>
+  )
+}
+
+// ============ KALENDER-ABO ============
+// Zeigt den persoenlichen ICS-Link, mit dem sich die Trainings in Google
+// Kalender, Apple Kalender oder Outlook abonnieren lassen. Der Link ist
+// signiert und gilt nur fuer den eingeloggten Trainer.
+function KalenderAboView() {
+  const [url, setUrl] = useState<string | null>(null)
+  const [fehler, setFehler] = useState<string | null>(null)
+  const [laedt, setLaedt] = useState(true)
+  const [kopiert, setKopiert] = useState(false)
+
+  useEffect(() => {
+    let aktiv = true
+    getKalenderAboLink()
+      .then((r) => {
+        if (!aktiv) return
+        if (r.ok && r.url) setUrl(r.url)
+        else setFehler(r.error || 'Der Link konnte nicht erzeugt werden.')
+      })
+      .catch(() => { if (aktiv) setFehler('Der Server war nicht erreichbar.') })
+      .finally(() => { if (aktiv) setLaedt(false) })
+    return () => { aktiv = false }
+  }, [])
+
+  const kopieren = async () => {
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+      setKopiert(true)
+      setTimeout(() => setKopiert(false), 2000)
+    } catch {
+      // Clipboard-API scheitert z.B. ohne HTTPS – dann muss man den Link
+      // im Feld markieren und selbst kopieren.
+      setFehler('Kopieren hat nicht geklappt, bitte den Link im Feld markieren.')
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h3>Trainings im Kalender abonnieren</h3>
+      </div>
+
+      {laedt && <p>Link wird geladen...</p>}
+
+      {fehler && !url && <p style={{ color: 'var(--danger)' }}>{fehler}</p>}
+
+      {url && (
+        <>
+          <p>
+            Dieser Link liefert deine Trainings als Kalender-Abo. Trag ihn einmal in
+            Google Kalender ein, danach aktualisiert er sich von selbst.
+          </p>
+
+          <div style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
+            <input
+              type="text"
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem' }}
+            />
+            <button className="btn btn-primary" onClick={kopieren}>
+              {kopiert ? 'Kopiert' : 'Kopieren'}
+            </button>
+          </div>
+
+          <p>
+            <strong>In Google Kalender:</strong> links unten bei „Weitere Kalender" auf
+            das Plus, dann „Per URL", Link einfügen, „Kalender hinzufügen".
+            In Apple Kalender: Datei, Neues Kalenderabonnement.
+          </p>
+          <p>
+            Zwei Dinge dazu. Der Kalender ist <strong>nur lesend</strong> — Änderungen
+            machst du weiter hier in der App, im Kalender selbst lässt sich nichts
+            umbuchen. Und Google entscheidet selbst, wann es den Link neu abruft: das
+            dauert oft einige Stunden. Was du gerade eben eingetragen hast, steht also
+            nicht sofort drin.
+          </p>
+          <p>
+            Behandle den Link wie ein Passwort. Wer ihn hat, kann deinen Trainingsplan
+            lesen, ohne sich einzuloggen.
+          </p>
+        </>
       )}
     </div>
   )
