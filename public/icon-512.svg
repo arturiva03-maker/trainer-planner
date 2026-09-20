@@ -1,21 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#1e3a5f"/>
-  <!-- Racket head -->
-  <ellipse cx="210" cy="180" rx="120" ry="133" stroke="#ec4899" stroke-width="14" fill="none"/>
-  <!-- Racket strings horizontal -->
-  <line x1="100" y1="135" x2="320" y2="135" stroke="#ec4899" stroke-width="6" opacity="0.5"/>
-  <line x1="92" y1="180" x2="328" y2="180" stroke="#ec4899" stroke-width="6" opacity="0.5"/>
-  <line x1="100" y1="225" x2="320" y2="225" stroke="#ec4899" stroke-width="6" opacity="0.5"/>
-  <!-- Racket strings vertical -->
-  <line x1="155" y1="55" x2="155" y2="305" stroke="#ec4899" stroke-width="6" opacity="0.5"/>
-  <line x1="210" y1="47" x2="210" y2="313" stroke="#ec4899" stroke-width="6" opacity="0.5"/>
-  <line x1="265" y1="55" x2="265" y2="305" stroke="#ec4899" stroke-width="6" opacity="0.5"/>
-  <!-- Racket handle -->
-  <rect x="178" y="310" width="64" height="150" rx="10" fill="#ec4899"/>
-  <rect x="178" y="342" width="64" height="20" fill="#db2777"/>
-  <rect x="178" y="385" width="64" height="20" fill="#db2777"/>
-  <!-- Tennis ball -->
-  <circle cx="385" cy="120" r="75" fill="#a3e635"/>
-  <path d="M330 75 Q385 120 330 165" stroke="white" stroke-width="10" fill="none"/>
-  <path d="M440 75 Q385 120 440 165" stroke="white" stroke-width="10" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <rect width="64" height="64" fill="#123e2c"/>
+  <path d="M43 17H19v30h24" fill="none" stroke="#ffffff" stroke-width="4"/>
+  <path d="M19 32h24M31 17v30" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+  <circle cx="44" cy="32" r="5" fill="#d1f04a"/>
 </svg>

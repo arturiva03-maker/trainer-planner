@@ -82,9 +82,9 @@ const preserveScroll = () => {
 // Tennis Logo Icon Component - minimalistisches CourtPro-Zeichen
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <ellipse cx="25" cy="23" rx="16" ry="19" stroke="var(--brand)" strokeWidth="4" />
-    <path d="M25 42v17" stroke="var(--brand)" strokeWidth="6" strokeLinecap="round" />
-    <circle cx="49" cy="15" r="9" fill="var(--accent)" />
+    <path d="M45 14H15v36h30" stroke="var(--brand)" strokeWidth="6" />
+    <path d="M15 32h30M30 14v36" stroke="var(--brand)" strokeWidth="2" />
+    <circle cx="47" cy="32" r="7" fill="var(--accent)" />
   </svg>
 )
 
@@ -1192,7 +1192,7 @@ function KalenderView({
       <div className="calendar-container">
         <div className="calendar-header">
           <div className="calendar-nav">
-            <button onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
+            <button aria-label={isDayView ? 'Vorheriger Tag' : 'Vorherige Woche'} onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
             <div className="calendar-nav-center">
               <h3>
                 {isDayView
@@ -1200,25 +1200,21 @@ function KalenderView({
                   : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
                 }
               </h3>
-              <button
-                className={`btn btn-sm ${formatDate(currentDate) === formatDate(new Date()) ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={goToToday}
-                style={{ marginTop: 4 }}
-              >
-                Heute
-              </button>
             </div>
-            <button onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
+            <button aria-label={isDayView ? 'Nächster Tag' : 'Nächste Woche'} onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
           <div className="view-toggle">
+            <button className="btn calendar-today" onClick={goToToday}>Heute</button>
             <button
               className={`btn ${viewMode === 'week' ? 'btn-primary' : ''}`}
+              aria-pressed={viewMode === 'week'}
               onClick={() => setViewMode('week')}
             >
               Woche
             </button>
             <button
               className={`btn ${viewMode === 'day' ? 'btn-primary' : ''}`}
+              aria-pressed={viewMode === 'day'}
               onClick={() => setViewMode('day')}
             >
               Tag
@@ -2589,9 +2585,9 @@ function VerwaltungView({
       </div>
 
       {activeSubTab === 'spieler' && (
-        <div className="card">
+        <div className="card player-directory">
           <div className="card-header">
-            <h3>Spieler-Verwaltung</h3>
+            <h3>Spieler</h3>
             <button className="btn btn-primary" onClick={() => setShowSpielerModal(true)}>
               + Neuer Spieler
             </button>
@@ -2601,6 +2597,7 @@ function VerwaltungView({
             <input
               type="text"
               placeholder="Suche nach Name..."
+              aria-label="Spieler nach Namen suchen"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -2644,24 +2641,22 @@ function VerwaltungView({
           </div>
 
           {/* Mobile Card List */}
-          <div className="mobile-card-list">
+          <div className="mobile-card-list player-list">
             {filteredSpieler.map((s) => (
-              <div key={s.id} className="mobile-card">
-                <div className="mobile-card-header">
-                  <div className="mobile-card-title">{s.name}</div>
-                </div>
-                <div className="mobile-card-actions">
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => {
-                      setEditingSpieler(s)
-                      setShowSpielerModal(true)
-                    }}
-                  >
-                    Bearbeiten
-                  </button>
-                </div>
-              </div>
+              <button
+                key={s.id}
+                type="button"
+                className="player-row"
+                aria-label={`${s.name} bearbeiten`}
+                onClick={() => {
+                  setEditingSpieler(s)
+                  setShowSpielerModal(true)
+                }}
+              >
+                <span className="player-initial" aria-hidden="true">{s.name.charAt(0).toLocaleUpperCase('de-DE')}</span>
+                <span className="player-name">{s.name}</span>
+                <span className="player-open" aria-hidden="true">↗</span>
+              </button>
             ))}
             {filteredSpieler.length === 0 && (
               <div className="empty-state">Keine Spieler gefunden</div>
