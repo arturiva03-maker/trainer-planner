@@ -3241,13 +3241,27 @@ function TarifModal({
 
 // ============ ABRECHNUNG VIEW ============
 // ============ LEXOFFICE RECHNUNG MODAL ============
+type LexofficePreviewStatus = 'offen' | 'ausstehend' | 'bezahlt' | 'bar' | 'enthalten'
+
+interface LexofficePreviewItem {
+  id: string
+  trainingIds: string[]
+  lineItem: LexofficeLineItem | null
+  displayName: string
+  displayAmount: number | null
+  displayQuantity: number
+  displayUnitAmount: number | null
+  status: LexofficePreviewStatus
+  statusLabel: string
+}
+
 // Verknuepft den Spieler mit einem Lexoffice-Kontakt (Rechnungsempfaenger,
 // i.d.R. das Elternteil) und legt eine Rechnung mit den uebergebenen Positionen
 // an. Versand passiert danach in Lexoffice selbst (die API kann nicht mailen) –
 // wir oeffnen den Permalink.
 function LexofficeRechnungModal({
   spieler,
-  lineItems,
+  previewItems,
   monthStr,
   shippingStart,
   shippingEnd,
@@ -3256,13 +3270,13 @@ function LexofficeRechnungModal({
   onInvoiced
 }: {
   spieler: Spieler
-  lineItems: LexofficeLineItem[]
+  previewItems: LexofficePreviewItem[]
   monthStr: string
   shippingStart: string
   shippingEnd: string
   onClose: () => void
   onSaved: () => void
-  onInvoiced: () => void | Promise<void>
+  onInvoiced: (trainingIds: string[]) => void | Promise<void>
 }) {
   const [contactId, setContactId] = useState<string | null>(spieler.lexoffice_contact_id ?? null)
   const [contactName, setContactName] = useState<string | null>(spieler.lexoffice_contact_name ?? null)
@@ -3275,8 +3289,27 @@ function LexofficeRechnungModal({
   const [finalize, setFinalize] = useState(false)
   const [creating, setCreating] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; permalink?: string; error?: string } | null>(null)
+  const selectableIds = useMemo(
+    () => previewItems.filter(item => item.lineItem && item.status === 'offen').map(item => item.id),
+    [previewItems]
+  )
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(selectableIds))
+  const selectedItems = previewItems.filter(item => selectedIds.has(item.id) && item.lineItem)
+  const lineItems = selectedItems.map(item => item.lineItem as LexofficeLineItem)
+  const selectedTrainingIds = Array.from(new Set(selectedItems.flatMap(item => item.trainingIds)))
 
   const total = lineItems.reduce((s, li) => s + li.amount * (li.quantity ?? 1), 0)
+
+  const togglePosition = (id: string) => {
+    setSelectedIds(previous => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id))
 
   // "2026-05" -> "Mai 2026" fuer den Einleitungstext
   const monthLabel = (() => {
@@ -3373,8 +3406,8 @@ function LexofficeRechnungModal({
     if (r.ok) {
       if (r.permalink && win) win.location.href = r.permalink
       else if (win) win.close()
-      // Rechnung erstellt -> berechnete (offene) Trainings auf "ausstehend"
-      try { await onInvoiced() } catch { /* nicht blockierend */ }
+      // Nur die wirklich berechneten Trainings auf "ausstehend" setzen.
+      try { await onInvoiced(selectedTrainingIds) } catch { /* nicht blockierend */ }
       // Fertig: Modal schliessen und zurueck zur Abrechnung. Die neue Rechnung
       // ist bereits im Lexoffice-Tab geoeffnet.
       onClose()
@@ -3385,7 +3418,7 @@ function LexofficeRechnungModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+      <div className="modal lexoffice-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Lexoffice-Rechnung – {spieler.name}</h3>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -3455,31 +3488,68 @@ function LexofficeRechnungModal({
             />
           </div>
 
-          {/* Positionen */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontWeight: 600, fontSize: 14 }}>Positionen ({lineItems.length})</label>
-            {lineItems.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--gray-600)', marginTop: 6 }}>
-                Keine offenen Trainings in diesem Monat – nichts zu berechnen.
+          {/* Rechnungsvorschau mit Auswahl pro Stunde */}
+          <section className="lexoffice-preview" aria-labelledby="lexoffice-preview-heading">
+            <div className="lexoffice-preview-header">
+              <div>
+                <h4 id="lexoffice-preview-heading">Stunden auswählen</h4>
+                <p>Nur ausgewählte offene Stunden kommen in die Rechnung.</p>
               </div>
+              {selectableIds.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary lexoffice-select-all"
+                  onClick={() => setSelectedIds(allSelected ? new Set() : new Set(selectableIds))}
+                >
+                  {allSelected ? 'Alle abwählen' : 'Alle auswählen'}
+                </button>
+              )}
+            </div>
+
+            {previewItems.length === 0 ? (
+              <div className="lexoffice-preview-empty">Keine Trainings in diesem Monat.</div>
             ) : (
-              <div style={{ marginTop: 6, fontSize: 13 }}>
-                {lineItems.map((li, i) => {
-                  const qty = li.quantity ?? 1
+              <div className="lexoffice-preview-list">
+                {previewItems.map(item => {
+                  const li = item.lineItem
+                  const selectable = !!li && item.status === 'offen'
+                  const checked = selectable && selectedIds.has(item.id)
                   return (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--gray-100)' }}>
-                      <span>{li.name} <span style={{ color: 'var(--gray-600)' }}>({qty} × {li.amount.toFixed(2)} €)</span></span>
-                      <span>{(li.amount * qty).toFixed(2)} €</span>
-                    </div>
+                    <label
+                      key={item.id}
+                      className={`lexoffice-preview-item${checked ? ' selected' : ''}${!selectable ? ' disabled' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!selectable || creating}
+                        onChange={() => togglePosition(item.id)}
+                      />
+                      <span className="lexoffice-preview-copy">
+                        <span className="lexoffice-preview-name">{item.displayName}</span>
+                        {item.displayUnitAmount !== null && (
+                          <span className="lexoffice-preview-calculation">
+                            {item.displayQuantity} × {item.displayUnitAmount.toFixed(2)} €
+                          </span>
+                        )}
+                      </span>
+                      <span className={`status-badge ${item.status === 'bar' ? 'bar' : item.status}`}>
+                        {item.statusLabel}
+                      </span>
+                      <strong className="lexoffice-preview-amount">
+                        {item.displayAmount !== null ? `${item.displayAmount.toFixed(2)} €` : '—'}
+                      </strong>
+                    </label>
                   )
                 })}
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, fontWeight: 700 }}>
-                  <span>Gesamt (brutto)</span>
-                  <span>{total.toFixed(2)} €</span>
-                </div>
               </div>
             )}
-          </div>
+
+            <div className="lexoffice-preview-total" aria-live="polite">
+              <span>{selectedItems.length} von {selectableIds.length} offenen Positionen</span>
+              <span>Gesamt (brutto) <strong>{total.toFixed(2)} €</strong></span>
+            </div>
+          </section>
 
           {/* Steuer + Modus */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -3509,7 +3579,7 @@ function LexofficeRechnungModal({
         <div className="modal-footer">
           <button
             className="btn btn-primary"
-            disabled={!contactId || lineItems.length === 0 || creating}
+            disabled={!contactId || selectedItems.length === 0 || creating}
             onClick={create}
           >
             {creating ? 'Wird angelegt…' : (finalize ? 'Rechnung anlegen' : 'Entwurf in Lexoffice anlegen')}
@@ -4162,7 +4232,7 @@ function AbrechnungView({
   // Lexoffice-Rechnung: Daten fuer das Rechnungs-Modal (null = geschlossen)
   const [lexofficeData, setLexofficeData] = useState<null | {
     spieler: Spieler
-    lineItems: LexofficeLineItem[]
+    previewItems: LexofficePreviewItem[]
     monthStr: string
     shippingStart: string
     shippingEnd: string
@@ -4988,15 +5058,13 @@ function AbrechnungView({
     onUpdate()
   }
 
-  // Nach Erstellen einer Lexoffice-Rechnung: die berechneten (offenen) Trainings
-  // des Spielers automatisch auf "ausstehend" setzen (Rechnung raus, Zahlung
-  // erwartet). Bereits bezahlte/bar bleiben unangetastet.
-  const markSpielerAusstehendNachRechnung = async (spielerId: string) => {
-    const spielerData = spielerSummary.find(s => s.spieler.id === spielerId)
-    if (!spielerData) return
-    const betroffene = spielerData.trainings.filter(t => {
+  // Nach Erstellen einer Lexoffice-Rechnung nur die ausgewaehlten Stunden auf
+  // "ausstehend" setzen. Abgewaehlte offene Stunden bleiben offen.
+  const markSpielerAusstehendNachRechnung = async (spielerId: string, trainingIds: string[]) => {
+    const ids = new Set(trainingIds)
+    const betroffene = monthTrainings.filter(t => ids.has(t.id)).filter(t => {
       const ps = getSpielerPaymentStatus(spielerId, t)
-      return !ps.bezahlt && !ps.barBezahlt
+      return !ps.bezahlt && !ps.barBezahlt && !ps.ausstehend
     })
     if (betroffene.length === 0) { onUpdate(); return }
     const rows = betroffene.map(training => ({
@@ -5010,53 +5078,103 @@ function AbrechnungView({
     const { error } = await supabase
       .from('spieler_training_payments')
       .upsert(rows, { onConflict: 'training_id,spieler_id' })
-    if (error) console.error('Auto-Ausstehend nach Rechnung fehlgeschlagen:', error)
+    if (error) {
+      console.error('Auto-Ausstehend nach Rechnung fehlgeschlagen:', error)
+      alert('Die Rechnung wurde erstellt, aber die Stunden konnten nicht auf „Ausstehend“ gesetzt werden:\n' + error.message)
+      return
+    }
+
+    setSpielerPayments(previous => {
+      const next = [...previous]
+      for (const training of betroffene) {
+        const index = next.findIndex(p => p.training_id === training.id && p.spieler_id === spielerId)
+        if (index >= 0) {
+          next[index] = { ...next[index], bezahlt: false, bar_bezahlt: false, ausstehend: true }
+        } else {
+          next.push({
+            id: `temp-${training.id}-${spielerId}`,
+            user_id: userId,
+            training_id: training.id,
+            spieler_id: spielerId,
+            bezahlt: false,
+            bar_bezahlt: false,
+            ausstehend: true,
+            created_at: new Date().toISOString()
+          })
+        }
+      }
+      return next
+    })
     onUpdate()
   }
 
-  // Baut aus den Trainings eines Spielers die offenen Rechnungspositionen.
-  // Beruecksichtigt monatliche Tarife (nur erstes Training pro Tarif PRO MONAT),
-  // Korrekturen und Stunden (Menge = Dauer, Preis pro Stunde). Funktioniert auch
-  // ueber mehrere Monate hinweg (Schluessel enthaelt den Monat).
-  const buildLexofficeLines = (sp: Spieler, trainingsList: Training[]): LexofficeLineItem[] => {
+  // Baut die Vorschau fuer alle Stunden. Nur offene, noch nicht berechnete
+  // Positionen sind auswaehlbar. Monatstarife werden weiterhin einmal pro Tarif
+  // und Monat berechnet; beim Auswaehlen wird die ganze offene Serie markiert.
+  const buildLexofficePreview = (sp: Spieler, trainingsList: Training[]): LexofficePreviewItem[] => {
     const sorted = [...trainingsList].sort((a, b) => a.datum.localeCompare(b.datum))
     const monatlichErstes = new Map<string, string>()
+    const monatlichOffeneIds = new Map<string, string[]>()
     sorted.forEach(t => {
       const calc = calculateSpielerPreisForTraining(t, sp.id, tarife)
       if (calc.abrechnungsart === 'monatlich') {
         const key = `${calc.tarifId || t.id}|${t.datum.substring(0, 7)}`
         if (!monatlichErstes.has(key)) monatlichErstes.set(key, t.id)
+        const ps = getSpielerPaymentStatus(sp.id, t)
+        if (!ps.bezahlt && !ps.barBezahlt && !ps.ausstehend) {
+          monatlichOffeneIds.set(key, [...(monatlichOffeneIds.get(key) || []), t.id])
+        }
       }
     })
     return sorted
       .map(t => {
         const calc = calculateSpielerPreisForTraining(t, sp.id, tarife)
+        const monatlichKey = `${calc.tarifId || t.id}|${t.datum.substring(0, 7)}`
         let basis = 0
         if (calc.abrechnungsart === 'monatlich') {
-          const key = `${calc.tarifId || t.id}|${t.datum.substring(0, 7)}`
-          if (monatlichErstes.get(key) === t.id) basis = calc.spielerPreis
+          if (monatlichErstes.get(monatlichKey) === t.id) basis = calc.spielerPreis
         } else {
           basis = calc.spielerPreis
         }
         const betrag = basis + (t.korrektur_betrag || 0)
         const tarif = calc.tarifId ? tarife.find(ta => ta.id === calc.tarifId) : undefined
-        return { t, betrag, tarif }
-      })
-      .filter(x => {
-        const ps = getSpielerPaymentStatus(sp.id, x.t)
-        return !ps.bezahlt && !ps.barBezahlt && x.betrag > 0
-      })
-      .map(x => {
-        const dur = calculateDuration(x.t.uhrzeit_von, x.t.uhrzeit_bis)
+        const ps = getSpielerPaymentStatus(sp.id, t)
+        let status: LexofficePreviewStatus = 'offen'
+        let statusLabel = 'Offen'
+        if (ps.barBezahlt) { status = 'bar'; statusLabel = 'Bar bezahlt' }
+        else if (ps.bezahlt) { status = 'bezahlt'; statusLabel = 'Bezahlt' }
+        else if (ps.ausstehend) { status = 'ausstehend'; statusLabel = 'Ausstehend' }
+        else if (betrag <= 0 && calc.abrechnungsart === 'monatlich') {
+          status = 'enthalten'; statusLabel = 'Im Monatstarif enthalten'
+        }
+
+        const dur = calculateDuration(t.uhrzeit_von, t.uhrzeit_bis)
         const hours = dur > 0 ? dur : 1
         // Lexoffice erlaubt fuer die Menge max. 4 Nachkommastellen. Krumme
         // Dauern (z.B. 1h20min = 1.33333… h) sonst -> "Validation failed".
         // Ganze/halbe Stunden bleiben unveraendert (1.5 -> 1.5).
         const qty = Number(hours.toFixed(4))
-        return {
-          name: `${x.tarif?.name || x.t.name || 'Tennistraining'} – ${formatWeekdayGerman(x.t.datum)}, ${formatDateGerman(x.t.datum)}, ${formatTime(x.t.uhrzeit_von)}–${formatTime(x.t.uhrzeit_bis)}`,
-          amount: Number((x.betrag / qty).toFixed(2)),
+        const displayName = `${tarif?.name || t.name || 'Tennistraining'} – ${formatWeekdayGerman(t.datum)}, ${formatDateGerman(t.datum)}, ${formatTime(t.uhrzeit_von)}–${formatTime(t.uhrzeit_bis)}`
+        const displayAmount = betrag > 0 ? betrag : null
+        const displayUnitAmount = displayAmount !== null ? Number((displayAmount / qty).toFixed(2)) : null
+        const lineItem = status === 'offen' && betrag > 0 ? {
+          name: displayName,
+          amount: displayUnitAmount as number,
           quantity: qty
+        } : null
+
+        return {
+          id: t.id,
+          trainingIds: calc.abrechnungsart === 'monatlich' && monatlichErstes.get(monatlichKey) === t.id
+            ? (monatlichOffeneIds.get(monatlichKey) || [t.id])
+            : [t.id],
+          lineItem,
+          displayName,
+          displayAmount,
+          displayQuantity: qty,
+          displayUnitAmount,
+          status,
+          statusLabel
         }
       })
   }
@@ -5064,12 +5182,12 @@ function AbrechnungView({
   // Baut die offenen Rechnungspositionen eines Spielers (Monat) und oeffnet das
   // Lexoffice-Modal.
   const openLexofficeRechnung = (item: { spieler: Spieler; trainings: Training[] }) => {
-    const lines = buildLexofficeLines(item.spieler, item.trainings)
+    const previewItems = buildLexofficePreview(item.spieler, item.trainings)
     const [yy, mm] = selectedMonth.split('-').map(Number)
     const lastDay = String(new Date(yy, mm, 0).getDate()).padStart(2, '0')
     setLexofficeData({
       spieler: item.spieler,
-      lineItems: lines,
+      previewItems,
       monthStr: selectedMonth,
       shippingStart: `${selectedMonth}-01`,
       shippingEnd: `${selectedMonth}-${lastDay}`
@@ -5860,13 +5978,13 @@ function AbrechnungView({
       {lexofficeData && (
         <LexofficeRechnungModal
           spieler={lexofficeData.spieler}
-          lineItems={lexofficeData.lineItems}
+          previewItems={lexofficeData.previewItems}
           monthStr={lexofficeData.monthStr}
           shippingStart={lexofficeData.shippingStart}
           shippingEnd={lexofficeData.shippingEnd}
           onClose={() => setLexofficeData(null)}
           onSaved={onUpdate}
-          onInvoiced={() => markSpielerAusstehendNachRechnung(lexofficeData.spieler.id)}
+          onInvoiced={(trainingIds) => markSpielerAusstehendNachRechnung(lexofficeData.spieler.id, trainingIds)}
         />
       )}
 

@@ -1773,6 +1773,141 @@ tbody tr:last-child td {
   padding: 24px;
 }
 
+/* Lexoffice-Rechnungsvorschau */
+.lexoffice-modal {
+  max-width: 760px;
+}
+
+.lexoffice-preview {
+  margin-bottom: 18px;
+}
+
+.lexoffice-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.lexoffice-preview-header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.lexoffice-preview-header p {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.lexoffice-select-all {
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.lexoffice-preview-list {
+  display: grid;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.lexoffice-preview-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto minmax(74px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.lexoffice-preview-item:hover:not(.disabled),
+.lexoffice-preview-item:focus-within:not(.disabled) {
+  border-color: var(--primary);
+}
+
+.lexoffice-preview-item.selected {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.lexoffice-preview-item.disabled {
+  cursor: default;
+  background: var(--gray-50);
+}
+
+.lexoffice-preview-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.lexoffice-preview-copy {
+  min-width: 0;
+}
+
+.lexoffice-preview-name,
+.lexoffice-preview-calculation {
+  display: block;
+}
+
+.lexoffice-preview-name {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.lexoffice-preview-calculation {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--gray-600);
+}
+
+.lexoffice-preview-amount {
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lexoffice-preview-empty {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--gray-600);
+  text-align: center;
+  font-size: 13px;
+}
+
+.lexoffice-preview-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.lexoffice-preview-total span:last-child {
+  color: var(--text);
+}
+
+.status-badge.enthalten {
+  background: var(--gray-200);
+  color: var(--gray-600);
+}
+
 /* Schnellstatus oben im Bearbeiten-Dialog: eine breite Aktionsflaeche statt
    Kaestchen + Pille. Offen = gruener Button, gesetzt = ruhige Bestaetigung. */
 .quick-status {
@@ -3161,6 +3296,29 @@ tbody tr:last-child td {
 
   .modal-footer .btn {
     width: 100%;
+  }
+
+  .lexoffice-preview-header,
+  .lexoffice-preview-total {
+    flex-direction: column;
+  }
+
+  .lexoffice-select-all {
+    width: 100%;
+  }
+
+  .lexoffice-preview-item {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+  }
+
+  .lexoffice-preview-item .status-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .lexoffice-preview-amount {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 
   /* Tabs horizontal scrollbar */
