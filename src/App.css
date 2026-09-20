@@ -20,8 +20,8 @@
   --status-durchgefuehrt_halb-text: #166534;
   --status-abgesagt-bg: #FECACA;
   --status-abgesagt-text: #991B1B;
-  --status-bezahlt-bg: #EEF2FF;
-  --status-bezahlt-text: #4F46E5;
+  --status-bezahlt-bg: #DBEAFE;
+  --status-bezahlt-text: #1E40AF;
   /* Grautöne (neutral) */
   --gray-50: #F8FAFC;
   --gray-100: #F1F5F9;
@@ -45,13 +45,13 @@
   /* Bezahlstatus – EINE feste Farbe je Status, app-weit einheitlich.
      Bar = Grün (Bargeld), Bezahlt = Blau (Überweisung),
      Ausstehend = Amber (Rechnung raus), Offen = Grau (noch nichts). */
-  --pay-bar: #059669;
+  --pay-bar: #047857;
   --pay-bar-bg: #D1FAE5;
   --pay-bar-text: #065F46;
   --pay-bezahlt: #2563EB;
   --pay-bezahlt-bg: #DBEAFE;
   --pay-bezahlt-text: #1E40AF;
-  --pay-ausstehend: #D97706;
+  --pay-ausstehend: #92400E;
   --pay-ausstehend-bg: #FEF3C7;
   --pay-ausstehend-text: #92400E;
   --pay-offen: #64748B;
@@ -130,7 +130,7 @@ html { scrollbar-width: thin; scrollbar-color: rgba(100, 116, 139, 0.4) transpar
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.32); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.5); }
-::selection { background: rgba(99, 102, 241, 0.18); color: var(--text); }
+::selection { background: rgba(15, 112, 68, 0.18); color: var(--text); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: none; box-shadow: var(--ring); border-radius: inherit; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
 
@@ -146,7 +146,7 @@ h2 { letter-spacing: -0.02em; }
 .auth-container {
   min-height: 100vh;
   display: flex;
-  background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 50%, #C7D2FE 100%);
+  background: linear-gradient(135deg, var(--surface-active) 0%, var(--surface-active) 50%, var(--border) 100%);
   position: relative;
   overflow: hidden;
 }
@@ -203,7 +203,7 @@ h2 { letter-spacing: -0.02em; }
 
 .auth-logo-icon {
   font-size: 48px;
-  filter: drop-shadow(0 2px 4px rgba(99,102,241,0.2));
+  filter: drop-shadow(0 2px 4px rgba(15, 112, 68,0.2));
 }
 
 .auth-logo h1 {
@@ -234,11 +234,11 @@ h2 { letter-spacing: -0.02em; }
   padding: 20px;
   border-radius: 12px;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(99,102,241,0.2);
+  border: 1px solid rgba(15, 112, 68,0.2);
   transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
   cursor: pointer;
   position: relative;
-  box-shadow: 0 2px 8px rgba(99,102,241,0.1);
+  box-shadow: 0 2px 8px rgba(15, 112, 68,0.1);
 }
 
 .auth-feature:hover {
@@ -338,7 +338,7 @@ h2 { letter-spacing: -0.02em; }
   outline: none;
   border-color: var(--primary);
   background: var(--surface);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 4px rgba(15, 112, 68, 0.1);
 }
 
 .auth-box .btn-block {
@@ -557,10 +557,10 @@ h2 { letter-spacing: -0.02em; }
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    box-shadow: 0 0 0 0 rgba(15, 112, 68, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+    box-shadow: 0 0 0 10px rgba(15, 112, 68, 0);
   }
 }
 
@@ -792,18 +792,18 @@ h2 { letter-spacing: -0.02em; }
 .btn-primary {
   background: var(--brand-gradient);
   color: white;
-  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.2), 0 2px 8px -1px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: 0 1px 2px rgba(10, 86, 52, 0.2), 0 2px 8px -1px rgba(15, 112, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25), 0 8px 20px -2px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(10, 86, 52, 0.25), 0 8px 20px -2px rgba(15, 112, 68, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
   filter: brightness(1.05);
 }
 
 .btn-primary:active {
   transform: scale(0.95) translateY(0);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(15, 112, 68, 0.3);
 }
 
 .btn-secondary {
@@ -820,15 +820,15 @@ h2 { letter-spacing: -0.02em; }
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
   color: white;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 14px rgba(15, 112, 68, 0.35);
 }
 
 .btn-success:hover {
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 6px 20px rgba(15, 112, 68, 0.45);
   transform: translateY(-2px);
-  background: linear-gradient(135deg, #818CF8 0%, #6366F1 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand) 100%);
 }
 
 .btn-danger {
@@ -844,13 +844,13 @@ h2 { letter-spacing: -0.02em; }
 }
 
 .btn-warning {
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
   color: white;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 14px rgba(15, 112, 68, 0.35);
 }
 
 .btn-warning:hover {
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 6px 20px rgba(15, 112, 68, 0.45);
   transform: translateY(-2px);
 }
 
@@ -960,7 +960,7 @@ h2 { letter-spacing: -0.02em; }
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.05), transparent);
+  background: linear-gradient(90deg, transparent, rgba(15, 112, 68,0.05), transparent);
   transition: left 0.5s ease;
 }
 
@@ -978,7 +978,7 @@ h2 { letter-spacing: -0.02em; }
   background: var(--brand-gradient);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, 0.6);
+  box-shadow: 0 4px 12px -4px rgba(15, 112, 68, 0.6);
 }
 
 /* Der Shine-Effekt der Pille wuerde auf gefuellter Flaeche als Schleier wirken */
@@ -1251,7 +1251,7 @@ tr {
 }
 
 tbody tr:hover {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(15, 112, 68, 0.05);
 }
 
 tbody tr:last-child td {
@@ -1380,19 +1380,19 @@ tbody tr:last-child td {
 }
 
 .view-toggle .btn.btn-primary {
-  background: #6366F1;
+  background: var(--brand);
   color: white;
   border-color: var(--brand);
 }
 
 .view-toggle .btn.btn-success {
-  background: #6366F1;
+  background: var(--brand);
   border-color: var(--brand);
   color: white;
 }
 
 .view-toggle .btn.btn-success:hover {
-  background: #4F46E5;
+  background: var(--brand-dark);
   border-color: var(--brand-dark);
 }
 
@@ -1526,12 +1526,12 @@ tbody tr:last-child td {
 }
 
 .calendar-day-cell:hover {
-  background: rgba(99, 102, 241, 0.04);
+  background: rgba(15, 112, 68, 0.04);
 }
 
 .calendar-day-cell.drag-over {
-  background: rgba(99, 102, 241, 0.18);
-  outline: 2px dashed #6366F1;
+  background: rgba(15, 112, 68, 0.18);
+  outline: 2px dashed var(--brand);
   outline-offset: -2px;
 }
 
@@ -1599,7 +1599,7 @@ tbody tr:last-child td {
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 6px;
-  background: #E0E7FF;
+  background: var(--surface-active);
   color: #1E40AF;
   font-size: 11px;
   font-weight: 600;
@@ -1909,79 +1909,6 @@ tbody tr:last-child td {
   color: var(--gray-600);
 }
 
-/* Schnellstatus oben im Bearbeiten-Dialog: eine breite Aktionsflaeche statt
-   Kaestchen + Pille. Offen = gruener Button, gesetzt = ruhige Bestaetigung. */
-.quick-status {
-  margin-bottom: 22px;
-}
-
-/* Breite richtet sich nach dem Text, kein Vollbreiten-Balken */
-.quick-status-pill {
-  --tone: #16A34A;
-  --tone-dark: #15803D;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 16px 9px 10px;
-  border-radius: 999px;
-  border: none;
-  background: linear-gradient(135deg, var(--tone) 0%, var(--tone-dark) 100%);
-  color: #fff;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.24),
-    0 8px 18px -8px rgba(21, 128, 61, 0.55);
-  transition: transform 0.18s var(--ease-spring), box-shadow 0.18s var(--ease),
-    background 0.18s var(--ease), color 0.18s var(--ease);
-}
-
-/* Icon sitzt in einem eigenen Kreis – gibt dem Button einen klaren Ankerpunkt */
-.quick-status-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.quick-status-pill:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(21, 128, 61, 0.24),
-    0 12px 24px -8px rgba(21, 128, 61, 0.6);
-}
-
-.quick-status-pill:active:not(:disabled) {
-  transform: translateY(0) scale(0.985);
-  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.3);
-}
-
-/* Bereits durchgefuehrt: keine Button-Optik mehr, nur noch Bestaetigung */
-.quick-status-pill.active {
-  background: color-mix(in srgb, var(--tone) 12%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--tone) 32%, transparent);
-  padding: 8px 15px 8px 9px;
-  color: var(--tone-dark);
-  cursor: default;
-  box-shadow: none;
-}
-
-.quick-status-pill.active .quick-status-icon {
-  background: var(--tone);
-  color: #fff;
-}
-
-.quick-status-pill:disabled:not(.active) {
-  opacity: 0.55;
-  cursor: not-allowed;
-  box-shadow: none;
-}
 
 .modal-footer {
   padding: 20px 24px 24px;
@@ -2169,9 +2096,9 @@ tbody tr:last-child td {
 
 .tab.active {
   color: white;
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 12px rgba(15, 112, 68, 0.35);
   transform: translateY(-1px);
 }
 
@@ -2445,7 +2372,7 @@ tbody tr:last-child td {
   outline: none;
   border-color: var(--brand);
   background: var(--surface);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 4px rgba(15, 112, 68, 0.1);
 }
 
 .search-box::before {
@@ -2519,7 +2446,7 @@ tbody tr:last-child td {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2563,7 +2490,7 @@ tbody tr:last-child td {
 }
 
 .toast.success {
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
 }
 
 .toast.error {
@@ -2571,7 +2498,7 @@ tbody tr:last-child td {
 }
 
 .toast.warning {
-  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
 }
 
 /* Pulse animation for notifications/badges */
@@ -2660,7 +2587,7 @@ tbody tr:last-child td {
   color: #fff;
   background: var(--brand-gradient);
   border-radius: 12px;
-  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, 0.6);
+  box-shadow: 0 4px 12px -4px rgba(15, 112, 68, 0.6);
 }
 
 .mobile-nav-item:active {
@@ -2827,7 +2754,7 @@ tbody tr:last-child td {
   }
 
   .calendar-nav-center .btn-sm.btn-primary {
-    background: #6366F1;
+    background: var(--brand);
     color: white;
     border-color: var(--brand);
   }
@@ -2863,13 +2790,13 @@ tbody tr:last-child td {
   }
 
   .view-toggle .btn.btn-primary {
-    background: #6366F1;
+    background: var(--brand);
     color: white;
     border-color: var(--brand);
   }
 
   .view-toggle .btn.btn-success {
-    background: #6366F1;
+    background: var(--brand);
     border-color: var(--brand);
     color: white;
     flex: 0 0 auto;
@@ -3512,7 +3439,7 @@ tbody tr:last-child td {
 /* ============ PUBLIC FORMULAR STYLES ============ */
 .public-form-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #374151 0%, #6B7280 50%, #6366F1 100%);
+  background: linear-gradient(135deg, #374151 0%, #6B7280 50%, var(--brand) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4111,7 +4038,7 @@ tbody tr:last-child td {
 }
 
 .badge-warning {
-  background: #4F46E5;
+  background: var(--brand-dark);
   color: white;
 }
 
@@ -4126,7 +4053,7 @@ tbody tr:last-child td {
 }
 
 .badge-info {
-  background: #6366F1;
+  background: var(--brand);
   color: white;
 }
 

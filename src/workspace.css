@@ -1,4 +1,37 @@
 /* Workspace layout: the schedule and directory share one continuous surface. */
+/* Shared dialog and semantic status colors. */
+.modal-close { color: var(--text-muted); background: var(--surface-2); min-width: 44px; min-height: 44px; }
+.modal-close:hover { color: var(--text); background: var(--border); transform: none; }
+.btn-warning, .btn-warning:hover, .toast.warning, .badge-warning { background: var(--warning-light); color: var(--warning); border-color: var(--warning); }
+.badge-info { background: var(--pay-bezahlt-bg); color: var(--pay-bezahlt-text); }
+.training-editor { display: flex; flex-direction: column; max-width: 620px; max-height: 90dvh; overflow: hidden; }
+.training-editor .modal-header { flex: 0 0 auto; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.training-editor .modal-body { overflow-y: auto; min-height: 0; padding: 20px; }
+.training-editor .modal-footer { flex: 0 0 auto; margin: 0; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface); gap: 8px; }
+.training-editor .modal-footer .btn { min-height: 44px; }
+.training-editor .modal-footer .btn-danger { background: transparent; color: var(--danger); border-color: var(--border); margin-right: auto; }
+.training-when { color: var(--text-muted); font-size: 14px; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.training-overview h4 { font-size: 16px; margin-bottom: 10px; }
+.training-overview h4 span { color: var(--text-subtle); font-weight: 400; }
+.training-participants { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.training-participants > span { padding: 6px 10px; background: var(--surface-2); color: var(--text); border-radius: 5px; font-size: 14px; }
+.training-actions { display: grid; gap: 14px; margin-bottom: 20px; }
+.training-cash { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; cursor: pointer; }
+.training-cash.is-paid { background: var(--pay-bar-bg); border-color: var(--pay-bar); color: var(--pay-bar-text); }
+.training-cash input { width: 22px; height: 22px; accent-color: var(--pay-bar-text); flex: 0 0 auto; }
+.training-cash small { display: block; font-size: 12px; margin-top: 2px; color: var(--text-muted); }
+.training-status { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.training-status select { min-height: 44px; }
+.training-section { border-top: 1px solid var(--border); }
+.training-section summary { padding: 16px 0; min-height: 48px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text); }
+.training-section summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.training-editor .multi-select-item { min-height: 44px; margin: 0; font-weight: 400; cursor: pointer; }
+.training-editor .multi-select-item input { accent-color: var(--brand); }
+@media (max-width: 480px) {
+  .training-editor .modal-body { padding: 16px; }
+  .training-editor .modal-footer { padding: 12px; flex-direction: row; flex-wrap: wrap; }
+  .training-editor .modal-footer .btn { flex: 1; padding: 10px 8px; font-size: 13px; }
+}
 :root { --bg: #f6f7f4; --sidebar-width: 208px; }
 .main-content { min-width: 0; padding: 28px 32px; }
 .sidebar { background: #f6f7f4; border-color: var(--border); --brand: #123e2c; }

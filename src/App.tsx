@@ -1882,33 +1882,38 @@ function TrainingModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal training-editor" role="dialog" aria-labelledby="training-editor-title" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{training ? 'Training bearbeiten' : 'Neues Training'}</h3>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h3 id="training-editor-title">{training ? 'Training bearbeiten' : 'Neues Training'}</h3>
+          <button className="modal-close" aria-label="Training schließen" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          {/* Schnellstatus: haeufigster Fall beim Bearbeiten ist "hat stattgefunden".
-              Ein Tipp setzt den Status und speichert direkt. Die uebrigen Status
-              bleiben beim Dropdown – an "abgesagt" haengt die Bezahl-Rueckfrage. */}
-          {training && (
-            <div className="quick-status">
-              <button
-                type="button"
-                className={`quick-status-pill${status === 'durchgefuehrt' ? ' active' : ''}`}
-                onClick={() => handleSave('durchgefuehrt')}
-                disabled={saving || status === 'durchgefuehrt'}
-              >
-                <span className="quick-status-icon">
-                  <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-                    <path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                {status === 'durchgefuehrt' ? 'Als durchgeführt markiert' : 'Als durchgeführt markieren'}
-              </button>
+          <div className="training-overview">
+            <p className="training-when">{formatDateGerman(datum)} · {formatTime(uhrzeitVon)}–{formatTime(uhrzeitBis)}</p>
+            <h4>Teilnehmer <span>({selectedSpieler.length})</span></h4>
+            <div className="training-participants">
+              {selectedSpieler.map(id => (
+                <span key={id}>{spieler.find(s => s.id === id)?.name || 'Unbekannter Spieler'}</span>
+              ))}
+              {selectedSpieler.length === 0 && <p>Noch keine Spieler ausgewählt.</p>}
             </div>
-          )}
-
+          </div>
+          <div className="training-actions">
+            <label className={`training-cash${barBezahlt ? ' is-paid' : ''}`}>
+              <input type="checkbox" checked={barBezahlt} onChange={e => setBarBezahlt(e.target.checked)} />
+              <span><strong>Bar bezahlt</strong><small>Für das gesamte Training · mit Speichern übernehmen</small></span>
+            </label>
+            <label className="training-status">Trainingsstatus
+              <select className="form-control" value={status} onChange={e => handleStatusChange(e.target.value as Training['status'])}>
+                <option value="geplant">Geplant</option>
+                <option value="durchgefuehrt">Durchgeführt</option>
+                <option value="durchgefuehrt_halb">Durchgeführt – 50%</option>
+                <option value="abgesagt">Abgesagt</option>
+              </select>
+            </label>
+          </div>
+          <details className="training-section" open={training ? undefined : true}>
+            <summary>Datum und Uhrzeit ändern</summary>
           <div className="form-group">
             <label>Datum</label>
             <input
@@ -1947,6 +1952,9 @@ function TrainingModal({
             </div>
           </div>
 
+          </details>
+          <details className="training-section" open={training ? undefined : true}>
+            <summary>Teilnehmer ändern</summary>
           <div className="form-group">
             <label>Spieler auswählen</label>
             <input
@@ -1961,19 +1969,20 @@ function TrainingModal({
               {spieler
                 .filter(s => !s.archiviert || selectedSpieler.includes(s.id))
                 .filter(s => s.name.toLowerCase().includes(spielerSuche.toLowerCase()))
+                .sort((a, b) => Number(selectedSpieler.includes(b.id)) - Number(selectedSpieler.includes(a.id)))
                 .map((s) => (
-                <div
+                <label
                   key={s.id}
                   className={`multi-select-item ${selectedSpieler.includes(s.id) ? 'selected' : ''}`}
-                  onClick={() => toggleSpieler(s.id)}
                 >
                   <input
                     type="checkbox"
                     checked={selectedSpieler.includes(s.id)}
-                    readOnly
+                    onChange={() => toggleSpieler(s.id)}
+                    aria-label={s.name}
                   />
                   <span>{s.name}{s.archiviert ? ' · archiviert' : ''}</span>
-                </div>
+                </label>
               ))}
               {spieler.length === 0 && (
                 <div style={{ padding: 12, color: 'var(--gray-500)' }}>
@@ -1988,6 +1997,9 @@ function TrainingModal({
             </div>
           </div>
 
+          </details>
+          <details className="training-section" open={training ? undefined : true}>
+            <summary>Tarif, Platzgebühr und weitere Angaben</summary>
           <div className="form-group">
             <label>Trainingsname (optional)</label>
             <input
@@ -2155,37 +2167,9 @@ function TrainingModal({
                   </button>
                 </div>
               </div>
-              <div className="form-group">
-                <label>Status</label>
-                <select
-                  className="form-control"
-                  value={status}
-                  onChange={(e) => handleStatusChange(e.target.value as Training['status'])}
-                >
-                  <option value="geplant">Geplant</option>
-                  <option value="durchgefuehrt">Durchgeführt</option>
-                  <option value="durchgefuehrt_halb">Durchgeführt – 50% (z.B. Regen)</option>
-                  <option value="abgesagt">Abgesagt</option>
-                </select>
-              </div>
             </>
           )}
 
-          {poolMode && (
-            <div className="form-group">
-              <label>Status</label>
-              <select
-                className="form-control"
-                value={status}
-                onChange={(e) => handleStatusChange(e.target.value as Training['status'])}
-              >
-                <option value="geplant">Geplant</option>
-                <option value="durchgefuehrt">Durchgeführt</option>
-                <option value="durchgefuehrt_halb">Durchgeführt – 50% (z.B. Regen)</option>
-                <option value="abgesagt">Abgesagt</option>
-              </select>
-            </div>
-          )}
 
           {!poolMode && !tarifId && !individuelleTarife && (
             <div className="form-group">
@@ -2336,16 +2320,7 @@ function TrainingModal({
             />
           </div>
 
-          <div className="form-group">
-            <label className="checkbox-group">
-              <input
-                type="checkbox"
-                checked={barBezahlt}
-                onChange={(e) => setBarBezahlt(e.target.checked)}
-              />
-              Bar bezahlt
-            </label>
-          </div>
+          </details>
 
           {/* Serienoptionen beim Bearbeiten */}
           {training && istSerie && (
