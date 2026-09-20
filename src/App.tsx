@@ -79,27 +79,35 @@ const preserveScroll = () => {
   })
 }
 
-// Tennis Logo Icon Component - Blau racket with ball
+// Tennis Logo Icon Component - minimalistisches CourtPro-Zeichen
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Racket head */}
-    <ellipse cx="26" cy="22" rx="18" ry="20" stroke="#6366F1" strokeWidth="3" fill="none"/>
-    {/* Racket strings horizontal */}
-    <line x1="10" y1="16" x2="42" y2="16" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="9" y1="22" x2="43" y2="22" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="10" y1="28" x2="42" y2="28" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
-    {/* Racket strings vertical */}
-    <line x1="18" y1="4" x2="18" y2="40" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="26" y1="2" x2="26" y2="42" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
-    <line x1="34" y1="4" x2="34" y2="40" stroke="#6366F1" strokeWidth="1.5" opacity="0.6"/>
-    {/* Racket handle */}
-    <rect x="22" y="40" width="8" height="20" rx="2" fill="#6366F1"/>
-    <rect x="22" y="44" width="8" height="3" fill="#4F46E5"/>
-    <rect x="22" y="50" width="8" height="3" fill="#4F46E5"/>
-    {/* Tennis ball */}
-    <circle cx="50" cy="14" r="10" fill="#a3e635"/>
-    <path d="M43 8 Q50 14 43 20" stroke="white" strokeWidth="2" fill="none"/>
-    <path d="M57 8 Q50 14 57 20" stroke="white" strokeWidth="2" fill="none"/>
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <ellipse cx="25" cy="23" rx="16" ry="19" stroke="var(--brand)" strokeWidth="4" />
+    <path d="M25 42v17" stroke="var(--brand)" strokeWidth="6" strokeLinecap="round" />
+    <circle cx="49" cy="15" r="9" fill="var(--accent)" />
+  </svg>
+)
+
+type AppIconName = 'calendar' | 'users' | 'invoice' | 'court' | 'coach'
+
+const AppIcon = ({ name, size = 20 }: { name: AppIconName; size?: number }) => (
+  <svg
+    className="app-icon"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {name === 'calendar' && <><path d="M6 2v4M18 2v4M3 9h18"/><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 13h3v3H8z"/></>}
+    {name === 'users' && <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>}
+    {name === 'invoice' && <><path d="M6 2h10l4 4v16l-3-2-3 2-3-2-3 2-2-1V2z"/><path d="M14 2v5h5M9 11h6M9 15h6"/></>}
+    {name === 'court' && <><path d="M4 3h16v18H4zM4 12h16M12 3v18"/><circle cx="12" cy="12" r="3"/></>}
+    {name === 'coach' && <><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M18 8v6M15 11h6"/></>}
   </svg>
 )
 
@@ -547,21 +555,21 @@ function MainApp({ user }: { user: User }) {
   const poolEnabled = isPoolAllowed(user.email)
   const lexofficeEnabled = isLexofficeAllowed(user.email)
 
-  const baseTabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'kalender', label: 'Kalender', icon: '📅' },
-    { id: 'verwaltung', label: 'Verwaltung', icon: '👥' },
-    { id: 'abrechnung', label: 'Abrechnung', icon: '💰' },
-    { id: 'platzgebuehr', label: 'Platzgebühr', icon: '🎾' },
+  const baseTabs: { id: Tab; label: string; icon: AppIconName }[] = [
+    { id: 'kalender', label: 'Kalender', icon: 'calendar' },
+    { id: 'verwaltung', label: 'Verwaltung', icon: 'users' },
+    { id: 'abrechnung', label: 'Abrechnung', icon: 'invoice' },
+    { id: 'platzgebuehr', label: 'Platzgebühr', icon: 'court' },
   ]
 
-  const tabs: { id: Tab; label: string; icon: string }[] = [...baseTabs]
-  if (trainer.length > 0) tabs.push({ id: 'abrechnung-trainer', label: 'Abr. Trainer', icon: '👨‍🏫' })
+  const tabs: { id: Tab; label: string; icon: AppIconName }[] = [...baseTabs]
+  if (trainer.length > 0) tabs.push({ id: 'abrechnung-trainer', label: 'Abr. Trainer', icon: 'coach' })
 
-  const mobileNavTabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'kalender', label: 'Kalender', icon: '📅' },
-    { id: 'verwaltung', label: 'Verwalten', icon: '👥' },
-    { id: 'abrechnung', label: 'Rechnung', icon: '💰' },
-    { id: 'platzgebuehr', label: 'Platz', icon: '🎾' },
+  const mobileNavTabs: { id: Tab; label: string; icon: AppIconName }[] = [
+    { id: 'kalender', label: 'Kalender', icon: 'calendar' },
+    { id: 'verwaltung', label: 'Verwalten', icon: 'users' },
+    { id: 'abrechnung', label: 'Rechnung', icon: 'invoice' },
+    { id: 'platzgebuehr', label: 'Platz', icon: 'court' },
   ]
 
   // Warte-Bildschirm für nicht freigeschaltete User
@@ -614,13 +622,15 @@ function MainApp({ user }: { user: User }) {
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
               onClick={() => {
                 setActiveTab(tab.id)
                 setSidebarOpen(false)
               }}
             >
-              <span>{tab.icon}</span>
+              <span className="nav-icon"><AppIcon name={tab.icon} /></span>
               <span>{tab.label}</span>
             </button>
           ))}
@@ -638,10 +648,12 @@ function MainApp({ user }: { user: User }) {
           {mobileNavTabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               className={`mobile-nav-item ${activeTab === tab.id ? 'active' : ''}`}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
               onClick={() => setActiveTab(tab.id)}
             >
-              <span className="nav-icon">{tab.icon}</span>
+              <span className="nav-icon"><AppIcon name={tab.icon} size={22} /></span>
               <span>{tab.label}</span>
             </button>
           ))}
@@ -5445,10 +5457,11 @@ function AbrechnungView({
                         <button
                           className="btn btn-sm"
                           onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
-                          style={{ background: '#6366F1', color: 'white', borderColor: '#6366F1' }}
+                          style={{ background: 'var(--brand)', color: 'white', borderColor: 'var(--brand)' }}
                           title="Lexoffice-Rechnung erstellen"
+                          aria-label="Lexoffice-Rechnung erstellen"
                         >
-                          📄
+                          <AppIcon name="invoice" size={16} />
                         </button>
                       )}
                       <button
@@ -5544,10 +5557,11 @@ function AbrechnungView({
                   <button
                     className="btn btn-sm"
                     onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
-                    style={{ background: '#6366F1', color: 'white', borderColor: '#6366F1' }}
+                    style={{ background: 'var(--brand)', color: 'white', borderColor: 'var(--brand)' }}
                     title="Lexoffice-Rechnung erstellen"
+                    aria-label="Lexoffice-Rechnung erstellen"
                   >
-                    📄
+                    <AppIcon name="invoice" size={16} />
                   </button>
                 )}
                 <button
