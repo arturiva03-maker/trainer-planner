@@ -1,9 +1,9 @@
 :root {
   /* Clubhaus-Palette: ruhig, sportlich und bewusst ohne Verlauf */
-  --primary: #176B45;
-  --primary-hover: #115437;
-  --primary-light: #EAF5EE;
-  --accent: #C7E34B;
+  --primary: #0F7044;
+  --primary-hover: #0A5634;
+  --primary-light: #DCEFE3;
+  --accent: #D1F04A;
   /* Kraeftigere Status-Farben mit besserer Abgrenzung */
   --success: #166534;
   --success-light: #BBF7D0;
@@ -35,7 +35,7 @@
   --gray-900: #0F172A;
   /* Sidebar (Hell) */
   --sidebar-bg: #FCFDF9;
-  --sidebar-active: #EAF5EE;
+  --sidebar-active: #DCEFE3;
   --sidebar-width: 248px;
   --header-height: 60px;
   --radius: 10px;
@@ -60,29 +60,29 @@
   /* Marken-Verlauf – EINE Quelle für alle Indigo-Flächen (Header, Bottom-Nav,
      aktive Tabs, Primär-Buttons). Vorher hatten Kopf-/Fußzeile abweichende
      Grau/Blau-Verläufe, dadurch wirkte das Handy farblich anders. */
-  --brand: #176B45;
-  --brand-dark: #115437;
+  --brand: #0F7044;
+  --brand-dark: #0A5634;
   --brand-gradient: var(--brand);
 
   /* === Premium theming tokens (semantic; drive light + auto dark) === */
-  --bg: #F5F6F1;
+  --bg: #EEF1EC;
   --surface: #FFFFFF;
-  --surface-2: #EFF2EC;
-  --surface-3: #F8F9F5;
+  --surface-2: #E8EDE7;
+  --surface-3: #F4F6F2;
   --surface-elevated: #FFFFFF;
-  --surface-active: #EAF5EE;
+  --surface-active: #DCEFE3;
   /* Modal-/Dialogkoepfe nutzen den Markenverlauf statt eines eigenen Graus,
      damit Kopfzeilen ueberall dieselbe Farbe haben. */
   --header-surface: var(--brand-gradient);
-  --border: #DDE4DC;
-  --border-strong: #C3CEC3;
-  --text: #17231C;
-  --text-muted: #405247;
-  --text-subtle: #68786E;
+  --border: #CCD6CD;
+  --border-strong: #AEBEB1;
+  --text: #102219;
+  --text-muted: #304A3A;
+  --text-subtle: #576B5E;
   --overlay: rgba(15, 23, 42, 0.45);
   --blur: blur(8px);
   --glass-bg: rgba(252, 253, 249, 0.94);
-  --ring: 0 0 0 3px rgba(23, 107, 69, 0.24);
+  --ring: 0 0 0 3px rgba(15, 112, 68, 0.28);
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.04), 0 8px 16px -4px rgba(15, 23, 42, 0.08);
@@ -4444,21 +4444,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar {
-  background: var(--sidebar-bg);
+  --brand: #FFFFFF;
+  --accent: #D1F04A;
+  background: #123E2C;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  border-right-color: #123E2C;
 }
 
 .sidebar-header {
   min-height: 76px;
   padding: 18px 20px;
   gap: 10px;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
 .sidebar-header h2 {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.035em;
+  color: #FFFFFF;
 }
 
 .sidebar-nav {
@@ -4470,7 +4475,7 @@ h1, h2, h3, h4, h5, h6 {
   gap: 13px;
   padding: 11px 13px;
   margin-bottom: 3px;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.72);
   border-radius: 8px;
   overflow: visible;
   transition: background-color 160ms var(--ease), color 160ms var(--ease);
@@ -4481,15 +4486,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .nav-item:hover {
-  background: var(--surface-2);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
   transform: none;
 }
 
 .nav-item.active,
 .nav-item.active:hover {
-  background: var(--surface-active);
-  color: var(--brand-dark);
+  background: rgba(209, 240, 74, 0.14);
+  color: #F1FFC0;
   box-shadow: none;
   transform: none;
 }
@@ -4502,7 +4507,7 @@ h1, h2, h3, h4, h5, h6 {
   bottom: 10px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--brand);
+  background: var(--accent);
 }
 
 .nav-item .nav-icon {
@@ -4518,6 +4523,17 @@ h1, h2, h3, h4, h5, h6 {
 
 .sidebar-footer {
   padding: 16px;
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-footer .btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.sidebar-footer .btn:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .main-content {
@@ -4669,8 +4685,8 @@ tbody tr:hover {
 
 .training-block {
   --tone: var(--brand);
-  --block-bg: #EAF5EE;
-  --block-text: #174B34;
+  --block-bg: #D9EEE1;
+  --block-text: #103F2A;
   --block-border: var(--brand);
   background: var(--block-bg);
   color: var(--block-text);
@@ -4690,22 +4706,22 @@ tbody tr:hover {
 }
 
 .training-block.status-geplant {
-  --block-bg: #FFF7E7;
-  --block-text: #6D4610;
-  --block-border: #D68A18;
+  --block-bg: #FCECCB;
+  --block-text: #603B06;
+  --block-border: #C87808;
 }
 
 .training-block.status-durchgefuehrt,
 .training-block.status-durchgefuehrt_halb {
-  --block-bg: #EAF5EE;
-  --block-text: #174B34;
-  --block-border: #2B825B;
+  --block-bg: #D9EEE1;
+  --block-text: #103F2A;
+  --block-border: #197A4B;
 }
 
 .training-block.status-abgesagt {
-  --block-bg: #FCF0EE;
-  --block-text: #7A302A;
-  --block-border: #B94A41;
+  --block-bg: #F6DEDA;
+  --block-text: #6E2520;
+  --block-border: #B43C32;
 }
 
 .training-block.selected,
@@ -4826,7 +4842,9 @@ tbody tr:hover {
     min-height: 68px;
     padding: 12px 16px;
     gap: 11px;
-    background: rgba(252, 253, 249, 0.96);
+    --brand: #FFFFFF;
+    --accent: #D1F04A;
+    background: #123E2C;
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
   }
@@ -4834,10 +4852,12 @@ tbody tr:hover {
   .mobile-header .header-title {
     font-size: 20px;
     font-weight: 700;
+    color: #FFFFFF;
   }
 
   .mobile-header .header-subtitle {
     margin-top: 1px;
+    color: rgba(255, 255, 255, 0.68);
   }
 
   .calendar-header {
@@ -4921,7 +4941,7 @@ tbody tr:hover {
 
   .mobile-nav-item.active {
     color: var(--brand-dark);
-    background: var(--surface-active);
+    background: #DCEFE3;
     box-shadow: none;
   }
 
