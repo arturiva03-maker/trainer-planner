@@ -603,7 +603,6 @@ function MainApp({ user }: { user: User }) {
         <TennisLogo size={36} />
         <div className="header-content">
           <h1 className="header-title">CourtPro</h1>
-          <p className="header-subtitle">{profile?.name || 'Trainer'}</p>
         </div>
       </div>
 
