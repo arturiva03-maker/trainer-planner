@@ -1200,11 +1200,11 @@ function KalenderView({
                   : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
                 }
               </h3>
+              <button className="btn calendar-today" onClick={goToToday}>Heute</button>
             </div>
             <button aria-label={isDayView ? 'Nächster Tag' : 'Nächste Woche'} onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
           <div className="view-toggle">
-            <button className="btn calendar-today" onClick={goToToday}>Heute</button>
             <button
               className={`btn ${viewMode === 'week' ? 'btn-primary' : ''}`}
               aria-pressed={viewMode === 'week'}

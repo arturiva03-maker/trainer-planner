@@ -52,6 +52,7 @@
 .calendar-nav-center { flex-direction: row; gap: 16px; min-width: 0; }
 .calendar-nav h3 { font-size: 24px; font-weight: 650; letter-spacing: -.045em; }
 .calendar-nav button { width: 44px; height: 44px; border: 0; background: transparent; }
+.calendar-nav .calendar-today { width: auto; min-width: 0; padding: 8px 12px; color: var(--brand); font-size: 13px; font-weight: 600; }
 .view-toggle { gap: 2px; width: auto; }
 .view-toggle .btn { min-height: 44px; border: 0; border-radius: 5px; padding: 10px 14px; background: transparent; }
 .view-toggle .btn.btn-primary { background: #e1e7df; color: #123e2c; }
@@ -95,9 +96,10 @@
   .main-content { padding: 12px 16px calc(84px + env(safe-area-inset-bottom)); }
   .calendar-header { flex-direction: row; padding: 0 0 12px; gap: 8px; }
   .calendar-nav { width: 100%; justify-content: flex-start; gap: 0; }
-  .calendar-nav-center { flex: 1; justify-content: space-between; gap: 4px; }
+  .calendar-nav-center { flex: 1; justify-content: center; gap: 8px; }
   .calendar-nav h3 { font-size: 20px; text-align: left; }
   .calendar-nav button { width: 36px; min-width: 36px; }
+  .calendar-nav .calendar-today { width: auto; min-width: 0; padding-inline: 8px; }
   .view-toggle { width: 100%; gap: 2px; }
   .view-toggle .btn { flex: 0 0 auto; min-height: 44px; padding: 8px 16px; border: 0; }
   .view-toggle .btn.btn-primary { background: #e1e7df; color: #123e2c; }
