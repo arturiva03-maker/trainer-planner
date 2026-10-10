@@ -58,11 +58,16 @@
 .view-toggle .btn.btn-primary { background: #e1e7df; color: #123e2c; }
 .view-toggle .btn.btn-success { margin-left: 12px; background: #123e2c; color: white; }
 .calendar-scroll-container { padding: 0; }
-.calendar-grid { border: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+.calendar-grid { --calendar-hour-height: 60px; border: 1px solid var(--border); border-radius: 0; box-shadow: none; }
+.calendar-grid.day-view { --calendar-hour-height: 50px; }
+/* Keep rows aligned with the training positions in both calendar views. */
+.calendar-grid .calendar-time-cell, .calendar-grid .calendar-day-cell,
+.calendar-grid.day-view .calendar-time-cell, .calendar-grid.day-view .calendar-day-cell { height: var(--calendar-hour-height); min-height: var(--calendar-hour-height); }
+.calendar-grid .calendar-day-cell { padding: 0; }
 .calendar-time-cell { font-variant-numeric: tabular-nums; font-weight: 500; }
 .calendar-header-cell { background: white; }
 .calendar-grid.day-view .training-block { border-radius: 3px; margin: 0; padding: 6px 10px; }
-.training-block { border-radius: 3px; border-top: 0; border-right: 0; border-bottom: 0; }
+.training-block { border-radius: 3px; border-top: 0; border-right: 0; border-bottom: 2px solid var(--surface); background-clip: padding-box; }
 .calendar-grid.day-view .training-block .training-title { margin: 0; font-size: 15px; line-height: 1.25; }
 .calendar-grid.day-view .training-block .training-time { font-size: 12px; margin-top: 2px; opacity: 1; }
 .calendar-grid.day-view .training-block .training-tarif { padding: 0; margin-top: 2px; background: none; font-size: 11px; }
