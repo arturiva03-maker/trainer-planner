@@ -1,3 +1,4 @@
+import { TrainingDayList } from './TrainingDayList'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { searchLexofficeContacts, createLexofficeInvoice } from './lexoffice'
@@ -748,8 +749,8 @@ function KalenderView({
   onDateChange: (date: Date) => void
   poolEnabled: boolean
 }) {
-  const [viewMode, setViewMode] = useState<'week' | 'day'>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week'
+  const [viewMode, setViewMode] = useState<'week' | 'day' | 'list'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'list' : 'week'
   )
   const [editingTraining, setEditingTraining] = useState<Training | null>(null)
   const [selectedTrainingIds, setSelectedTrainingIds] = useState<Set<string>>(new Set())
@@ -793,9 +794,9 @@ function KalenderView({
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
-        setViewMode('day')
+        setViewMode(previous => previous === 'list' ? previous : 'day')
       } else {
-        setViewMode('week')
+        setViewMode(previous => previous === 'list' ? previous : 'week')
       }
     }
 
@@ -1142,6 +1143,7 @@ function KalenderView({
   }
 
   const isDayView = viewMode === 'day'
+  const isSingleDay = viewMode !== 'week'
   const cellHeight = isDayView ? 50 : 60
   const [showAddTraining, setShowAddTraining] = useState(false)
   const [addTrainingPreset, setAddTrainingPreset] = useState<{ date: string, von: string, bis: string } | null>(null)
@@ -1191,19 +1193,23 @@ function KalenderView({
       <div className="calendar-container">
         <div className="calendar-header">
           <div className="calendar-nav">
-            <button aria-label={isDayView ? 'Vorheriger Tag' : 'Vorherige Woche'} onClick={() => isDayView ? navigateDay(-1) : navigateWeek(-1)}>←</button>
+            <button aria-label={isSingleDay ? 'Vorheriger Tag' : 'Vorherige Woche'} onClick={() => isSingleDay ? navigateDay(-1) : navigateWeek(-1)}>←</button>
             <div className="calendar-nav-center">
               <h3>
-                {isDayView
+                {isSingleDay
                   ? currentDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' })
                   : `${weekDates[0].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} - ${weekDates[6].toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}`
                 }
               </h3>
               <button className="btn calendar-today" onClick={goToToday}>Heute</button>
             </div>
-            <button aria-label={isDayView ? 'Nächster Tag' : 'Nächste Woche'} onClick={() => isDayView ? navigateDay(1) : navigateWeek(1)}>→</button>
+            <button aria-label={isSingleDay ? 'Nächster Tag' : 'Nächste Woche'} onClick={() => isSingleDay ? navigateDay(1) : navigateWeek(1)}>→</button>
           </div>
           <div className="view-toggle">
+            <button className={`btn ${viewMode === 'list' ? 'btn-primary' : ''}`}
+              aria-pressed={viewMode === 'list'} onClick={() => { setViewMode('list'); setSelectedTrainingIds(new Set()) }}>
+              Tagesliste
+            </button>
             <button
               className={`btn ${viewMode === 'week' ? 'btn-primary' : ''}`}
               aria-pressed={viewMode === 'week'}
@@ -1225,7 +1231,7 @@ function KalenderView({
         </div>
 
         {/* Aktionsleiste bei Mehrfachauswahl */}
-        {selectedTrainingIds.size > 0 && (
+        {viewMode !== 'list' && selectedTrainingIds.size > 0 && (
           <div className="selection-action-bar">
             <span>{selectedTrainingIds.size} Training{selectedTrainingIds.size > 1 ? 's' : ''} ausgewählt</span>
             <div className="selection-actions">
@@ -1245,6 +1251,11 @@ function KalenderView({
           </div>
         )}
 
+        {viewMode === 'list' ? (
+          <TrainingDayList key={`${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`}
+            trainings={trainings} spieler={spieler} date={currentDate} userId={userId}
+            onEdit={setEditingTraining} onUpdate={onUpdate} />
+        ) : (
         <div
           className="calendar-scroll-container"
           onTouchStart={onTouchStart}
@@ -1335,6 +1346,7 @@ function KalenderView({
             ))}
           </div>
         </div>
+        )}
       </div>
 
       {/* Training Info Tooltip (Hover Desktop / Long-Press Mobile) */}

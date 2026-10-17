@@ -125,3 +125,34 @@
   .player-list { margin: 0; }
   .mobile-nav-item.active { background: transparent; color: #123e2c; border-radius: 0; box-shadow: inset 0 -2px #123e2c; }
 }
+
+
+.training-day-list { color: var(--text); }
+.day-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.day-list-toolbar p, .day-list-feedback { font-size: 14px; color: var(--text-muted); }
+.training-day-list .btn { min-height: 48px; white-space: normal; }
+.training-day-list :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.day-list-select-all { margin-top: 8px; }
+.day-list-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.day-list-feedback:not(:empty) { padding: 8px 0; }
+.day-list-error { color: var(--danger); padding: 12px 0; }
+.day-list-empty { padding: 40px 0; color: var(--text-muted); }
+.day-list-rows { list-style: none; margin: 0; padding: 0; }
+.day-list-row { display: flex; align-items: center; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.day-list-row.is-selected { background: var(--surface-active); }
+.day-list-detail { flex: 1; min-width: 0; }
+.day-list-time { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; margin: 0 0 6px; }
+.day-list-detail h4 { font-size: 17px; line-height: 1.4; overflow-wrap: anywhere; margin: 0 0 8px; }
+.day-list-names { font-size: 14px; overflow-wrap: anywhere; color: var(--text-muted); margin: 0 0 8px; }
+.day-list-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.day-list-checkbox { display: flex; align-items: center; justify-content: center; flex: 0 0 48px; min-height: 48px; cursor: pointer; }
+.day-list-checkbox input { width: 22px; height: 22px; accent-color: var(--brand); }
+.day-list-bulk { position: sticky; bottom: calc(80px + env(safe-area-inset-bottom)); padding: 12px 0; background: var(--bg); border-top: 1px solid var(--border); }
+.day-list-bulk .btn { width: 100%; }
+@media (max-width: 768px) {
+  .day-list-row { flex-wrap: wrap; gap: 8px; padding: 16px 0; }
+  .day-list-actions { width: 100%; justify-content: flex-start; }
+  .day-list-actions .btn { flex: 1; }
+  .day-list-toolbar p { max-width: 180px; }
+  .calendar-header .view-toggle .btn { padding-inline: 12px; }
+}
