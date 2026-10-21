@@ -7,6 +7,14 @@ const statusLabels: Record<Training['status'], string> = {
   durchgefuehrt_halb: 'Durchgeführt · 50 %', abgesagt: 'Abgesagt'
 }
 
+const toMinutes = (time: string) => {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+const formatGap = (gap: number) =>
+  gap >= 60 ? `${Math.floor(gap / 60)} h${gap % 60 ? ` ${gap % 60} min` : ''}` : `${gap} min`
+
 export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUpdate }: {
   trainings: Training[]
   spieler: Spieler[]
@@ -28,7 +36,7 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const refresh = () => setNow(new Date())
-    const timer = window.setInterval(refresh, 1000)
+    const timer = window.setInterval(refresh, 30000)
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
     return () => {
@@ -40,6 +48,13 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
   const eligible = rows.filter(t => t.status === 'geplant' &&
     new Date(`${t.datum}T${t.uhrzeit_bis}`).getTime() <= now.getTime())
   const selectedIds = eligible.filter(t => selected.has(t.id)).map(t => t.id)
+  const doneCount = rows.filter(t => t.status === 'durchgefuehrt' || t.status === 'durchgefuehrt_halb').length
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
 
   async function save(ids: string[], undo = false) {
     if (locked.current || ids.length === 0) return
@@ -75,54 +90,75 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
 
   return <section className="training-day-list" aria-label="Trainings des Tages" aria-busy={busy}>
     <div className="day-list-toolbar">
-      <p>{rows.length} Trainings · {eligible.length} zum Abschließen</p>
-      <button className="btn" disabled={busy || eligible.length === 0} aria-pressed={selecting}
+      <p>
+        {rows.length === 0 ? 'Kein Training' : `${rows.length} ${rows.length === 1 ? 'Training' : 'Trainings'}`}
+        {doneCount > 0 && ` · ${doneCount} erledigt`}
+        {eligible.length > 0 && ` · ${eligible.length} offen`}
+      </p>
+      {eligible.length > 1 && <button className="day-list-link" disabled={busy} aria-pressed={selecting}
         onClick={() => { setSelecting(!selecting); setSelected(new Set()) }}>
-        {selecting ? 'Auswahl beenden' : 'Auswählen'}
-      </button>
+        {selecting ? 'Fertig' : 'Mehrere abschließen'}
+      </button>}
     </div>
-    {selecting && <button className="btn day-list-select-all" disabled={busy}
-      onClick={() => setSelected(new Set(eligible.map(t => t.id)))}>Alle vergangenen auswählen</button>}
-    <div className="day-list-feedback" role="status">
-      {busy ? 'Wird gespeichert …' : message}
-      {undoIds.length > 0 && <button className="btn" disabled={busy}
+    {selecting && <button className="day-list-link" disabled={busy}
+      onClick={() => setSelected(new Set(eligible.map(t => t.id)))}>Alle offenen auswählen</button>}
+    {(busy || message) && <div className="day-list-feedback" role="status">
+      <span>{busy ? 'Wird gespeichert …' : message}</span>
+      {undoIds.length > 0 && <button className="day-list-link" disabled={busy}
         onClick={() => void save(undoIds, true)}>Rückgängig</button>}
-    </div>
+    </div>}
     {error && <p className="day-list-error" role="alert">{error}</p>}
     {rows.length === 0 && <p className="day-list-empty">Keine Trainings an diesem Tag.</p>}
     <ul className="day-list-rows">
-      {rows.map(t => {
+      {rows.map((t, index) => {
         const canComplete = eligible.some(item => item.id === t.id)
+        const isSelected = selected.has(t.id)
         const names = t.spieler_ids.map(id => spieler.find(s => s.id === id)?.name || 'Unbekannter Spieler').join(', ')
-        return <li key={t.id} className={`day-list-row${selected.has(t.id) ? ' is-selected' : ''}`}>
-          {selecting && <label className="day-list-checkbox">
-            <input type="checkbox" disabled={busy || !canComplete} checked={selected.has(t.id)}
-              aria-label={`${t.uhrzeit_von.slice(0, 5)} ${t.name || names} auswählen`}
-              onChange={e => { const checked = e.target.checked; setSelected(prev => {
-                const next = new Set(prev)
-                if (checked) next.add(t.id); else next.delete(t.id)
-                return next
-              }) }} />
-          </label>}
-          <div className="day-list-detail">
-            <p className="day-list-time">{t.uhrzeit_von.slice(0, 5)}–{t.uhrzeit_bis.slice(0, 5)}</p>
-            <h4>{t.name || names || 'Training ohne Teilnehmer'}</h4>
-            {t.name && names && <p className="day-list-names">{names}</p>}
-            <span className={`status-badge ${t.status}`}>{statusLabels[t.status]}</span>
-          </div>
-          <div className="day-list-actions">
-            {!selecting && canComplete && <button className="btn btn-primary" disabled={busy}
-              aria-label={`${t.uhrzeit_von.slice(0, 5)} ${t.name || names} als durchgeführt markieren`}
-              onClick={() => void save([t.id])}>Durchgeführt</button>}
-            <button className="btn" disabled={busy} onClick={() => onEdit(t)}
-              aria-label={`${t.uhrzeit_von.slice(0, 5)} ${t.name || names} bearbeiten`}>Bearbeiten</button>
+        const title = t.name || names || 'Training ohne Teilnehmer'
+        const duration = toMinutes(t.uhrzeit_bis) - toMinutes(t.uhrzeit_von)
+        const previous = rows[index - 1]
+        const gap = previous ? toMinutes(t.uhrzeit_von) - toMinutes(previous.uhrzeit_bis) : 0
+        const running = t.status === 'geplant' &&
+          now.getTime() >= new Date(`${t.datum}T${t.uhrzeit_von}`).getTime() &&
+          now.getTime() < new Date(`${t.datum}T${t.uhrzeit_bis}`).getTime()
+        const label = `${t.uhrzeit_von.slice(0, 5)} ${title}`
+        const statusText = running ? 'läuft gerade' : t.status !== 'geplant' ? statusLabels[t.status] : ''
+        return <li key={t.id} className={`day-list-row status-${t.status}${isSelected ? ' is-selected' : ''}${running ? ' is-running' : ''}`}>
+          {gap >= 30 && <p className="day-list-gap">{formatGap(gap)} frei</p>}
+          <div className="day-list-item">
+            <button className="day-list-main" disabled={busy || (selecting && !canComplete)}
+              aria-pressed={selecting ? isSelected : undefined}
+              aria-label={selecting ? `${label} auswählen` : `${label} bearbeiten`}
+              onClick={() => selecting ? toggle(t.id) : onEdit(t)}>
+              <span className="day-list-time">
+                <strong>{t.uhrzeit_von.slice(0, 5)}</strong>
+                <span>{t.uhrzeit_bis.slice(0, 5)}</span>
+              </span>
+              <span className="day-list-detail">
+                <span className="day-list-title">{title}</span>
+                {t.name && names && <span className="day-list-names">{names}</span>}
+                <span className="day-list-meta">
+                  {duration} min{statusText && <> · <span className="day-list-status">{statusText}</span></>}
+                </span>
+              </span>
+            </button>
+            {canComplete && (selecting
+              ? <span className={`day-list-check${isSelected ? ' is-on' : ''}`} aria-hidden="true" />
+              : <button className="day-list-done" disabled={busy} title="Als durchgeführt markieren"
+                aria-label={`${label} als durchgeführt markieren`} onClick={() => void save([t.id])}>
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>)}
           </div>
         </li>
       })}
     </ul>
     {selecting && <div className="day-list-bulk">
       <button className="btn btn-primary" disabled={busy || selectedIds.length === 0}
-        onClick={() => void save(selectedIds)}>{selectedIds.length} Trainings abschließen</button>
+        onClick={() => void save(selectedIds)}>
+        {selectedIds.length === 1 ? '1 Training' : `${selectedIds.length} Trainings`} abschließen
+      </button>
     </div>}
   </section>
 }

@@ -790,10 +790,17 @@ function KalenderView({
     }
   }, [navigateToTraining, onNavigateComplete, onDateChange])
 
-  // Automatisch zwischen Tag- und Wochenansicht wechseln bei Resize
+  // Automatisch zwischen Tag- und Wochenansicht wechseln, aber nur beim echten
+  // Überschreiten der Breakpoint-Grenze. iOS Safari feuert resize auch beim
+  // Ein-/Ausfahren der Adressleiste oder beim Öffnen von Dialogen — das darf
+  // die manuell gewählte Wochenansicht nicht zurücksetzen.
   useEffect(() => {
+    let wasMobile = window.innerWidth < 768
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      const isMobile = window.innerWidth < 768
+      if (isMobile === wasMobile) return
+      wasMobile = isMobile
+      if (isMobile) {
         setViewMode(previous => previous === 'list' ? previous : 'day')
       } else {
         setViewMode(previous => previous === 'list' ? previous : 'week')
