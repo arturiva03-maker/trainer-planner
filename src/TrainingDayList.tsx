@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { supabase } from './supabaseClient'
-import type { Spieler, Training } from './types'
+import type { Spieler, Tarif, Training } from './types'
+import { calculateDuration, calculateSpielerPreisForTraining } from './utils'
 
 type Status = Training['status']
 
@@ -18,6 +19,41 @@ const formatGap = (gap: number) =>
   gap >= 60 ? `${Math.floor(gap / 60)} h${gap % 60 ? ` ${gap % 60} min` : ''}` : `${gap} min`
 
 const countLabel = (n: number) => `${n} ${n === 1 ? 'Training' : 'Trainings'}`
+
+const euro = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
+const hours = (n: number) => `${n.toLocaleString('de-DE', { maximumFractionDigits: 2 })} h`
+
+const isDone = (t: Training) => t.status === 'durchgefuehrt' || t.status === 'durchgefuehrt_halb'
+// Wie in der Abrechnung: abgesagte Trainings zaehlen nur mit zahlungspflichtigen Spielern.
+const isBillable = (t: Training) => isDone(t) ||
+  (t.status === 'abgesagt' && (t.entfernte_spieler || []).some(es => es.muss_bezahlen))
+
+// Betrag eines Trainings nach derselben Logik wie die Spieler-Abrechnung.
+// Monatstarife zaehlen nur, wenn `monthly` uebergeben wird, und dann einmal je
+// Spieler und Tarif.
+function trainingAmount(t: Training, tarife: Tarif[], monthly?: Set<string>) {
+  let sum = 0
+  t.spieler_ids.forEach(spielerId => {
+    const calc = calculateSpielerPreisForTraining(t, spielerId, tarife)
+    let preis = calc.spielerPreis
+    if (calc.abrechnungsart === 'monatlich') {
+      const key = `${spielerId}|${calc.tarifId || t.id}`
+      if (!monthly || monthly.has(key)) preis = 0
+      else monthly.add(key)
+    }
+    sum += preis + (t.korrektur_betrag || 0)
+  })
+  const abrechnung = tarife.find(ta => ta.id === t.tarif_id)?.abrechnung || 'proTraining'
+  if (abrechnung !== 'monatlich') {
+    (t.entfernte_spieler || []).filter(es => es.muss_bezahlen).forEach(es => {
+      sum += calculateSpielerPreisForTraining(t, es.spieler_id, tarife).spielerPreis
+    })
+  }
+  return sum
+}
+
+const hasMonthlyTarif = (t: Training, tarife: Tarif[]) => t.spieler_ids.some(id =>
+  calculateSpielerPreisForTraining(t, id, tarife).abrechnungsart === 'monatlich')
 
 // Zeile, die sich nach rechts (durchgeführt) oder links (abgesagt) wischen laesst.
 // touch-action: pan-y laesst vertikales Scrollen beim Browser, horizontale
@@ -95,9 +131,10 @@ function SwipeRow({ canRight, canLeft, disabled, onRight, onLeft, children }: {
   </div>
 }
 
-export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUpdate }: {
+export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEdit, onUpdate }: {
   trainings: Training[]
   spieler: Spieler[]
+  tarife: Tarif[]
   date: Date
   userId: string
   onEdit: (training: Training) => void
@@ -130,6 +167,20 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
   const selectedIds = eligible.filter(t => selected.has(t.id)).map(t => t.id)
   const doneCount = rows.filter(t => t.status === 'durchgefuehrt' || t.status === 'durchgefuehrt_halb').length
   const hasPlanned = rows.some(t => t.status === 'geplant')
+
+  const earned = rows.filter(isBillable).reduce((sum, t) => sum + trainingAmount(t, tarife), 0)
+  const planned = rows.filter(t => t.status === 'geplant').reduce((sum, t) => sum + trainingAmount(t, tarife), 0)
+  const doneHours = rows.filter(isDone).reduce((sum, t) =>
+    sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis) * (t.status === 'durchgefuehrt_halb' ? 0.5 : 1), 0)
+  const plannedHours = rows.filter(t => t.status === 'geplant')
+    .reduce((sum, t) => sum + calculateDuration(t.uhrzeit_von, t.uhrzeit_bis), 0)
+  const monthlyToday = rows.some(t => t.status !== 'abgesagt' && hasMonthlyTarif(t, tarife))
+  const monthSet = new Set<string>()
+  const monthEarned = trainings
+    .filter(t => t.user_id === userId && t.datum.slice(0, 7) === day.slice(0, 7) && t.datum <= day && isBillable(t))
+    .sort((a, b) => a.datum.localeCompare(b.datum) || a.uhrzeit_von.localeCompare(b.uhrzeit_von))
+    .reduce((sum, t) => sum + trainingAmount(t, tarife, monthSet), 0)
+  const monthName = date.toLocaleDateString('de-DE', { month: 'long' })
 
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev)
@@ -172,6 +223,25 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
   }
 
   return <section className="training-day-list" aria-label="Trainings des Tages" aria-busy={busy}>
+    {rows.length > 0 && <dl className="day-list-summary">
+      <div>
+        <dt>Verdient</dt>
+        <dd>{euro(earned)}</dd>
+      </div>
+      <div>
+        <dt>Noch geplant</dt>
+        <dd>{euro(planned)}</dd>
+      </div>
+      <div>
+        <dt>Stunden</dt>
+        <dd>{hours(doneHours)}{plannedHours > 0 && <span> von {hours(doneHours + plannedHours)}</span>}</dd>
+      </div>
+      <div>
+        <dt>{monthName} bis heute</dt>
+        <dd>{euro(monthEarned)}</dd>
+      </div>
+    </dl>}
+    {monthlyToday && <p className="day-list-note">Monatstarife sind im Monatswert enthalten, nicht im Tag.</p>}
     <div className="day-list-toolbar">
       <p>
         {rows.length === 0 ? 'Kein Training' : countLabel(rows.length)}
@@ -206,6 +276,7 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
           now.getTime() < new Date(`${t.datum}T${t.uhrzeit_bis}`).getTime()
         const label = `${t.uhrzeit_von.slice(0, 5)} ${title}`
         const statusText = running ? 'läuft gerade' : t.status !== 'geplant' ? statusLabels[t.status] : ''
+        const amount = t.status === 'abgesagt' && !isBillable(t) ? 0 : trainingAmount(t, tarife)
         return <li key={t.id} className={`day-list-row status-${t.status}${isSelected ? ' is-selected' : ''}${running ? ' is-running' : ''}`}>
           {gap >= 30 && <p className="day-list-gap">{formatGap(gap)} frei</p>}
           <SwipeRow canRight={canComplete} canLeft={t.status === 'geplant'} disabled={busy || selecting}
@@ -223,7 +294,7 @@ export function TrainingDayList({ trainings, spieler, date, userId, onEdit, onUp
                 <span className="day-list-title">{title}</span>
                 {t.name && names && <span className="day-list-names">{names}</span>}
                 <span className="day-list-meta">
-                  {duration} min{statusText && <> · <span className="day-list-status">{statusText}</span></>}
+                  {duration} min{amount !== 0 && ` · ${euro(amount)}`}{statusText && <> · <span className="day-list-status">{statusText}</span></>}
                 </span>
               </span>
             </button>

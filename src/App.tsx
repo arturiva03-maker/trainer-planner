@@ -1260,7 +1260,7 @@ function KalenderView({
 
         {viewMode === 'list' ? (
           <TrainingDayList key={`${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`}
-            trainings={trainings} spieler={spieler} date={currentDate} userId={userId}
+            trainings={trainings} spieler={spieler} tarife={tarife} date={currentDate} userId={userId}
             onEdit={setEditingTraining} onUpdate={onUpdate} />
         ) : (
         <div
