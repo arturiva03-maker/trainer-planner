@@ -80,12 +80,15 @@ const preserveScroll = () => {
   })
 }
 
-// Tennis Logo Icon Component - minimalistisches CourtPro-Zeichen
+// CourtPro-Zeichen: leuchtender Tennisball (passt zu Favicon und App-Icon)
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M45 14H15v36h30" stroke="var(--brand)" strokeWidth="6" />
-    <path d="M15 32h30M30 14v36" stroke="var(--brand)" strokeWidth="2" />
-    <circle cx="47" cy="32" r="7" fill="var(--accent)" />
+    <defs><clipPath id="courtpro-ball"><circle cx="32" cy="32" r="28" /></clipPath></defs>
+    <circle cx="32" cy="32" r="28" fill="var(--accent)" />
+    <g clipPath="url(#courtpro-ball)" stroke="#0A0D12" strokeWidth="3.2" strokeLinecap="round">
+      <path d="M4 5.4C27 19.4 27 44.6 4 58.6" />
+      <path d="M60 5.4C37 19.4 37 44.6 60 58.6" />
+    </g>
   </svg>
 )
 
