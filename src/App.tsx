@@ -5891,24 +5891,20 @@ function AbrechnungView({
                                 const optionen = [
                                   { key: 'offen' as const, label: 'Offen', farbe: 'var(--pay-offen)' },
                                   { key: 'bar' as const, label: 'Bar', farbe: 'var(--pay-bar)' },
-                                  { key: 'bezahlt' as const, label: 'Bez.', farbe: 'var(--pay-bezahlt)' }
+                                  { key: 'bezahlt' as const, label: 'Bezahlt', farbe: 'var(--pay-bezahlt)' }
                                 ]
                                 return (
-                                  <div style={{ display: 'inline-flex', gap: 3 }}>
+                                  <div className="mini-segment" role="group" aria-label="Zahlstatus dieses Trainings">
                                     {optionen.map(({ key, label, farbe }) => {
                                       const aktiv = aktuell === key
                                       return (
                                         <button
                                           key={key}
-                                          className="btn btn-sm"
+                                          type="button"
+                                          className={`mini-segment-item${aktiv ? ' active' : ''}`}
                                           title={`Auf "${label}" setzen`}
-                                          style={{
-                                            fontSize: 10,
-                                            padding: '2px 7px',
-                                            ...(aktiv
-                                              ? { background: farbe, borderColor: farbe, color: '#fff' }
-                                              : { background: 'var(--gray-100)', color: 'var(--gray-500)' })
-                                          }}
+                                          aria-pressed={aktiv}
+                                          style={aktiv ? { background: farbe, color: '#fff' } : undefined}
                                           onClick={(e) => {
                                             e.stopPropagation()
                                             if (!aktiv) setTrainingPaymentStatus(training.id, detail.spieler.id, key)

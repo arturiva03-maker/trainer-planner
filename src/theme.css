@@ -655,3 +655,10 @@ button, a, select, input, label { -webkit-tap-highlight-color: transparent; }
   .detail-trainings tbody tr td:nth-child(6) .btn { min-height: 40px; padding: 6px 14px; font-size: 14px; border-radius: 9px; }
   .detail-trainings tbody tr td:nth-child(7) .btn { min-height: 40px; min-width: 44px; padding: 6px 12px; font-size: 15px; border-radius: 9px; }
 }
+/* Mini-Umschalter Zahlstatus pro Training (Spieler-Detail) */
+.mini-segment { display: inline-flex; gap: 2px; padding: 2px; background: var(--fill); border-radius: 8px; }
+.mini-segment-item { border: 0; background: transparent; color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 6px; cursor: pointer; min-height: 28px; }
+.mini-segment-item:not(.active):hover { color: var(--text); }
+@media (max-width: 768px) {
+  .mini-segment-item { font-size: 14px; padding: 6px 14px; min-height: 40px; }
+}
