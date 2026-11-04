@@ -190,3 +190,26 @@
 .calendar-header-cell.is-today div:last-child { display: inline-block; min-width: 44px; padding: 1px 8px; border-radius: 999px; background: var(--primary); color: #fff; }
 .calendar-day-cell.is-today { background: #F5F8FD; }
 .calendar-day-cell.is-today:hover { background: #EAF0F9; }
+
+/* === Modernes Status-Design: Punkt statt Ring, flache Karten, getoente Pills === */
+.status-badge { padding: 3px 10px 3px 8px; box-shadow: none; display: inline-flex; align-items: center; gap: 6px; line-height: 1.5; }
+.status-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.training-tooltip .status-badge::before { width: 6px; height: 6px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: none; padding: 18px 20px; animation: none; }
+.stat-card::before { content: none; }
+.stat-card:hover { transform: none; background: var(--surface); border-color: color-mix(in srgb, var(--tone) 45%, var(--border)); box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--tone) 60%, transparent); }
+.stat-card .stat-label { display: flex; align-items: center; gap: 8px; }
+.stat-card .stat-label::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: 0 0 auto; }
+.stat-card .stat-value { letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.pay-pill { padding: 7px 12px; border-radius: 8px; }
+.pay-pill.active { transform: none; box-shadow: none; --pill: var(--gray-700); --pill-text: #fff; background: color-mix(in srgb, var(--pill) 14%, white); color: var(--pill-text); border-color: color-mix(in srgb, var(--pill) 38%, transparent); }
+.pay-pill.active .pay-pill-count { background: color-mix(in srgb, var(--pill) 22%, white); color: var(--pill-text); }
+.pay-pill-alle.active { --pill: var(--gray-700); --pill-text: var(--gray-800); }
+.pay-pill-offen.active { --pill: var(--pay-offen); --pill-text: var(--pay-offen-text); }
+.pay-pill-ausstehend.active { --pill: var(--pay-ausstehend); --pill-text: var(--pay-ausstehend-text); }
+.pay-pill-bar.active { --pill: var(--pay-bar); --pill-text: var(--pay-bar-text); }
+.pay-pill-bezahlt.active { --pill: var(--pay-bezahlt); --pill-text: var(--pay-bezahlt-text); }
+.training-block { border-radius: 6px; border-left-width: 3px; border-top: 0; border-right: 0; }
+.calendar-grid .calendar-day-cell, .calendar-grid .calendar-time-cell { border-color: #E6EBF2; }
+.calendar-header-cell { border-bottom: 1px solid var(--border); }
+.calendar-grid.day-view .training-block { border-radius: 6px; }

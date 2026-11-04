@@ -4,24 +4,27 @@
   --primary-hover: #174684;
   --primary-light: #DCE7F5;
   --accent: #D1F04A;
-  /* Kraeftigere Status-Farben mit besserer Abgrenzung */
-  --success: #166534;
-  --success-light: #BBF7D0;
-  --danger: #991B1B;
-  --danger-light: #FECACA;
-  --warning: #92400E;
-  --warning-light: #FDE68A;
-  /* Status-spezifische Farben (funktional) */
-  --status-geplant-bg: #F1F5F9;
-  --status-geplant-text: #334155;
-  --status-durchgefuehrt-bg: #BBF7D0;
-  --status-durchgefuehrt-text: #166534;
-  --status-durchgefuehrt_halb-bg: #BBF7D0;
-  --status-durchgefuehrt_halb-text: #166534;
-  --status-abgesagt-bg: #FECACA;
-  --status-abgesagt-text: #991B1B;
-  --status-bezahlt-bg: #DBEAFE;
-  --status-bezahlt-text: #1E40AF;
+  /* Statusfarben: gedeckte Toene statt Ampel. Geplant = Blau (liegt vor dir),
+     Durchgefuehrt = Teal, Abgesagt = Rosé. */
+  --success: #0F5C45;
+  --success-light: #DDF3EA;
+  --danger: #B3304A;
+  --danger-light: #FBE4EA;
+  --warning: #8A5200;
+  --warning-light: #FDF1DC;
+  --status-geplant-bg: #E3ECFA;
+  --status-geplant-text: #1D4F8F;
+  --status-geplant-tone: #3B7DD8;
+  --status-durchgefuehrt-bg: #DDF3EA;
+  --status-durchgefuehrt-text: #0F5C45;
+  --status-durchgefuehrt-tone: #1B9C7A;
+  --status-durchgefuehrt_halb-bg: #DDF3EA;
+  --status-durchgefuehrt_halb-text: #0F5C45;
+  --status-abgesagt-bg: #F6E9EE;
+  --status-abgesagt-text: #8E3A52;
+  --status-abgesagt-tone: #C4738C;
+  --status-bezahlt-bg: #E7E6FB;
+  --status-bezahlt-text: #3730A3;
   /* Grautöne (neutral) */
   --gray-50: #F8FAFC;
   --gray-100: #F1F5F9;
@@ -45,17 +48,17 @@
   /* Bezahlstatus – EINE feste Farbe je Status, app-weit einheitlich.
      Bar = Grün (Bargeld), Bezahlt = Blau (Überweisung),
      Ausstehend = Amber (Rechnung raus), Offen = Grau (noch nichts). */
-  --pay-bar: #047857;
-  --pay-bar-bg: #D1FAE5;
-  --pay-bar-text: #065F46;
-  --pay-bezahlt: #2563EB;
-  --pay-bezahlt-bg: #DBEAFE;
-  --pay-bezahlt-text: #1E40AF;
-  --pay-ausstehend: #92400E;
-  --pay-ausstehend-bg: #FEF3C7;
-  --pay-ausstehend-text: #92400E;
+  --pay-bar: #0E9F6E;
+  --pay-bar-bg: #DCF5EC;
+  --pay-bar-text: #0B6B4A;
+  --pay-bezahlt: #4F46E5;
+  --pay-bezahlt-bg: #E7E6FB;
+  --pay-bezahlt-text: #3730A3;
+  --pay-ausstehend: #D98B0C;
+  --pay-ausstehend-bg: #FDF1DC;
+  --pay-ausstehend-text: #8A5200;
   --pay-offen: #64748B;
-  --pay-offen-bg: #F1F5F9;
+  --pay-offen-bg: #EEF2F6;
   --pay-offen-text: #475569;
   /* Marken-Verlauf – EINE Quelle für alle Indigo-Flächen (Header, Bottom-Nav,
      aktive Tabs, Primär-Buttons). Vorher hatten Kopf-/Fußzeile abweichende
@@ -1580,18 +1583,18 @@ tbody tr:last-child td {
 }
 
 .training-tooltip .status-badge.geplant {
-  background: #FEF3C7;
-  color: #92400E;
+  background: var(--status-geplant-bg);
+  color: var(--status-geplant-text);
 }
 
 .training-tooltip .status-badge.durchgefuehrt {
-  background: #DCFCE7;
-  color: #166534;
+  background: var(--status-durchgefuehrt-bg);
+  color: var(--status-durchgefuehrt-text);
 }
 
 .training-tooltip .status-badge.abgesagt {
-  background: #FEE2E2;
-  color: #991B1B;
+  background: var(--status-abgesagt-bg);
+  color: var(--status-abgesagt-text);
 }
 
 .training-tooltip .tooltip-indiv-badge {
@@ -2209,7 +2212,7 @@ tbody tr:last-child td {
 
 .stat-card.success { --tone: var(--pay-bar); }
 .stat-card.warning { --tone: var(--pay-ausstehend); }
-.stat-card.danger { --tone: #B54332; }
+.stat-card.danger { --tone: var(--danger); }
 
 .stat-label {
   font-size: 13px;
@@ -4365,8 +4368,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-danger,
 .btn-danger:hover {
-  background: #B43C32;
-  border: 1px solid #B43C32;
+  background: var(--danger);
+  border: 1px solid var(--danger);
   box-shadow: none;
 }
 
@@ -4633,22 +4636,23 @@ tbody tr:hover {
 }
 
 .training-block.status-geplant {
-  --block-bg: #FCECCB;
-  --block-text: #603B06;
-  --block-border: #C87808;
+  --block-bg: var(--status-geplant-bg);
+  --block-text: var(--status-geplant-text);
+  --block-border: var(--status-geplant-tone);
 }
 
 .training-block.status-durchgefuehrt,
 .training-block.status-durchgefuehrt_halb {
-  --block-bg: #D9EEE1;
-  --block-text: #103F2A;
-  --block-border: #197A4B;
+  --block-bg: var(--status-durchgefuehrt-bg);
+  --block-text: var(--status-durchgefuehrt-text);
+  --block-border: var(--status-durchgefuehrt-tone);
 }
 
 .training-block.status-abgesagt {
-  --block-bg: #F6DEDA;
-  --block-text: #6E2520;
-  --block-border: #B43C32;
+  --block-bg: var(--status-abgesagt-bg);
+  --block-text: var(--status-abgesagt-text);
+  --block-border: var(--status-abgesagt-tone);
+  opacity: 0.85;
 }
 
 .training-block.selected,
