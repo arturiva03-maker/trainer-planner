@@ -85,9 +85,9 @@ const preserveScroll = () => {
 const TennisLogo = ({ size = 40 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs><clipPath id="courtpro-ball"><circle cx="32" cy="32" r="22" /></clipPath></defs>
-    <rect width="64" height="64" rx="15" fill="#1A1A1A" />
+    <rect width="64" height="64" rx="15" fill="#007AFF" />
     <circle cx="32" cy="32" r="22" fill="#C6F24E" />
-    <g clipPath="url(#courtpro-ball)" stroke="#1A1A1A" strokeWidth="3" strokeLinecap="round">
+    <g clipPath="url(#courtpro-ball)" stroke="#007AFF" strokeWidth="3" strokeLinecap="round">
       <path d="M10 10.1C28.1 21.1 28.1 42.9 10 53.9" />
       <path d="M54 10.1C35.9 21.1 35.9 42.9 54 53.9" />
     </g>

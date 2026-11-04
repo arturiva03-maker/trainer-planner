@@ -478,3 +478,71 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); back
 .status-select.is-ausstehend { color: var(--pay-ausstehend-text); background-color: var(--pay-ausstehend-bg); }
 .status-select.is-bezahlt { color: var(--pay-bezahlt-text); background-color: var(--pay-bezahlt-bg); }
 .row-actions { flex-direction: row-reverse; justify-content: flex-end; }
+
+/* =====================================================================
+   Feinschliff Handy und Abstaende (Nov 2026)
+   Abstandsraster: 4 / 8 / 12 / 16 / 24 / 32
+   ===================================================================== */
+:root { --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+button, a, select, input, label { -webkit-tap-highlight-color: transparent; }
+.main-content { min-width: 0; }
+.auth-toggle button { margin-left: 4px; }
+
+/* Einheitliche Abstaende: Karten, Kartenkoepfe, Raster */
+.card { padding: var(--space-5); margin-bottom: var(--space-4); }
+.card-header { padding: 0 0 var(--space-4); margin: 0 0 var(--space-4); gap: var(--space-3); }
+.card-header h3 { font-size: 17px; font-weight: 600; margin: 0; }
+.stats-grid { gap: var(--space-3); margin-bottom: var(--space-4); }
+.page-header { margin: var(--space-1) 0 var(--space-5); }
+.billing-monthbar { margin: 0 0 var(--space-3); }
+.filter-pills { row-gap: var(--space-2) !important; }
+.player-directory .search-box { margin: 0 0 var(--space-4); }
+.calendar-header { padding: 0 0 var(--space-4); gap: var(--space-3); }
+
+/* Dialoge: Kopf und Fuss bleiben beim Scrollen stehen */
+.modal { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.modal-header { position: sticky; top: 0; z-index: 3; }
+.modal-footer { position: sticky; bottom: 0; z-index: 3; }
+
+@media (max-width: 768px) {
+  /* iPhone zoomt bei Schrift unter 16px in Eingabefelder – deshalb 16px */
+  input, select, textarea, .form-control { font-size: 16px !important; }
+  .status-select { font-size: 15px !important; min-height: 44px; }
+  /* Klickflaechen: mindestens 44px (Apple-Richtwert) */
+  .btn, .segmented-item, .pay-pill, .view-toggle .btn, .tab, .month-nav button, .calendar-nav button, .mobile-nav-item, .modal-close, .day-list-link { min-height: 44px; }
+  .month-nav button, .calendar-nav button, .modal-close { min-width: 44px; }
+  .player-row, .mobile-card { min-height: 52px; }
+
+  .main-content { padding: var(--space-2) var(--space-4) calc(76px + env(safe-area-inset-bottom) + var(--space-4)); }
+  .mobile-header { padding: calc(env(safe-area-inset-top) + var(--space-2)) var(--space-4) var(--space-2); min-height: 0; gap: var(--space-3); }
+  .card { padding: var(--space-4); border-radius: var(--radius-lg); }
+  .card-header { padding-bottom: var(--space-3); margin-bottom: var(--space-3); }
+  .page-header { margin: var(--space-1) 0 var(--space-4); gap: var(--space-3); }
+  .stats-grid { gap: var(--space-2); }
+  .stat-card, .stat-card:hover { padding: var(--space-3); }
+
+  /* Untere Tab-Leiste: Platz fuer den Home-Balken */
+  .mobile-bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Dialoge als Sheet von unten, Hoehe passt sich der Tastatur an */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal, .modal-large, .training-editor {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top) - var(--space-3));
+    border-radius: 16px 16px 0 0;
+    overflow-y: auto;
+  }
+  .modal-header { padding: var(--space-4); background: var(--bg); }
+  .modal-body { padding: var(--space-4); }
+  .modal-footer { padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--border); }
+
+  /* Filterleiste der Abrechnung: Filter wischbar, Suche volle Breite */
+  .filter-pills { flex-wrap: wrap; }
+  .filter-pill-group { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .filter-pill-group::-webkit-scrollbar { display: none; }
+  .filter-pills > div[style*="relative"], .filter-pills > div[style*="relative"] input { width: 100% !important; }
+  .filter-pills select { width: 100%; }
+}
