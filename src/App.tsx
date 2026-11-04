@@ -815,6 +815,12 @@ function KalenderView({
   }, [])
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate])
+  // Aktuelle Uhrzeit fuer die rote Jetzt-Linie, jede Minute aktualisiert
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60000)
+    return () => window.clearInterval(id)
+  }, [])
   const timeSlots = useMemo(() => {
     const slots = []
     for (let h = 7; h <= 21; h++) {
@@ -1308,6 +1314,9 @@ function KalenderView({
                       onDragLeave={handleCellDragLeave}
                       onDrop={(e) => handleCellDrop(e, date, time)}
                     >
+                      {date.toDateString() === now.toDateString() && now.getHours() === parseInt(time) && (
+                        <div className="now-line" style={{ top: `${(now.getMinutes() / 60) * 100}%` }} aria-hidden="true" />
+                      )}
                       {slotTrainings.map((training) => {
                         const pos = getTrainingPosition(training, isDayView)
                         const tarifName = getTarifName(training.tarif_id)
