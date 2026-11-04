@@ -34,13 +34,13 @@
 }
 :root { --bg: #f5f7fb; --sidebar-width: 208px; }
 .main-content { min-width: 0; padding: 28px 32px; }
-.sidebar { background: #f5f7fb; border-color: var(--border); --brand: #13294b; }
+.sidebar { background: #f5f7fb; border-color: var(--border); --brand: var(--primary); }
 .sidebar-header { border-bottom: none; padding: 24px 18px; }
 .sidebar-header h2 { color: var(--text); font-size: 21px; }
 .sidebar-nav { padding: 12px; }
 .nav-item { color: var(--text-muted); font-size: 13px; }
 .nav-item:hover { background: #e6ecf4; color: var(--text); }
-.nav-item.active, .nav-item.active:hover { background: #13294b; color: white; }
+.nav-item.active, .nav-item.active:hover { background: var(--primary); color: white; }
 .nav-item.active::after { display: none; }
 .sidebar-footer { border-color: var(--border); }
 .sidebar-footer .btn { background: transparent; color: var(--text-muted); border-color: var(--border); }
@@ -55,8 +55,8 @@
 .calendar-nav .calendar-today { width: auto; min-width: 0; padding: 8px 12px; color: var(--brand); font-size: 13px; font-weight: 600; }
 .view-toggle { gap: 2px; width: auto; }
 .view-toggle .btn { min-height: 44px; border: 0; border-radius: 5px; padding: 10px 14px; background: transparent; }
-.view-toggle .btn.btn-primary { background: #dfe6f0; color: #13294b; }
-.view-toggle .btn.btn-success { margin-left: 12px; background: #13294b; color: white; }
+.view-toggle .btn.btn-primary { background: #dfe6f0; color: var(--primary); }
+.view-toggle .btn.btn-success { margin-left: 12px; background: var(--primary); color: white; }
 .calendar-scroll-container { padding: 0; }
 .calendar-grid { --calendar-hour-height: 60px; border: 1px solid var(--border); border-radius: 0; box-shadow: none; }
 .calendar-grid.day-view { --calendar-hour-height: 50px; }
@@ -73,12 +73,12 @@
 .calendar-grid.day-view .training-block .training-tarif { padding: 0; margin-top: 2px; background: none; font-size: 11px; }
 .tabs { background: transparent; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0; gap: 20px; justify-content: flex-start; }
 .tab { flex: 0 1 auto; padding: 14px 0; border-radius: 0; border-bottom: 2px solid transparent; }
-.tab.active { color: var(--text); background: transparent; border-bottom-color: #13294b; box-shadow: none; }
+.tab.active { color: var(--text); background: transparent; border-bottom-color: var(--primary); box-shadow: none; }
 .tab:hover { background: transparent; color: var(--brand); }
 .player-directory { padding: 20px 0 0; margin: 0; background: transparent; border: 0; border-radius: 0; }
 .player-directory .card-header { flex-direction: row; align-items: center; gap: 12px; padding: 0; margin: 0 0 20px; border: 0; }
 .player-directory .card-header h3 { font-size: 30px; letter-spacing: -.045em; }
-.player-directory .card-header .btn { width: auto; flex: 0 0 auto; background: #13294b; }
+.player-directory .card-header .btn { width: auto; flex: 0 0 auto; background: var(--primary); }
 .player-directory .search-box { margin: 0 0 16px; }
 .player-directory .search-box::before { content: none; }
 .player-directory .search-box input { padding: 12px 14px; font-size: 16px; border-radius: 5px; }
@@ -93,7 +93,7 @@
 .player-open { margin-left: auto; padding: 0 8px; color: var(--brand); font-size: 20px; }
 .mobile-bottom-nav { background: white; }
 @media (max-width: 768px) {
-  .mobile-header { min-height: 56px; padding: 8px 16px; background: #f5f7fb; --brand: #13294b; border-bottom: 0; backdrop-filter: none; }
+  .mobile-header { min-height: 56px; padding: 8px 16px; background: #f5f7fb; --brand: var(--primary); border-bottom: 0; backdrop-filter: none; }
   .mobile-header > svg { width: 28px; height: 28px; }
   .mobile-header .header-content { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
   .mobile-header .header-title { color: var(--text); font-size: 18px; }
@@ -107,8 +107,8 @@
   .calendar-nav .calendar-today { width: auto; min-width: 0; padding-inline: 8px; }
   .view-toggle { width: 100%; gap: 2px; }
   .view-toggle .btn { flex: 0 0 auto; min-height: 44px; padding: 8px 16px; border: 0; }
-  .view-toggle .btn.btn-primary { background: #dfe6f0; color: #13294b; }
-  .view-toggle .btn.btn-success { margin-left: auto; background: #13294b; }
+  .view-toggle .btn.btn-primary { background: #dfe6f0; color: var(--primary); }
+  .view-toggle .btn.btn-success { margin-left: auto; background: var(--primary); }
   .calendar-scroll-container { padding: 0; overflow-x: auto; }
   .calendar-grid:not(.day-view) { min-width: 560px; grid-template-columns: 40px repeat(7, minmax(0, 1fr)); }
   .calendar-grid.day-view { grid-template-columns: 44px 1fr; }
@@ -123,7 +123,7 @@
   .player-directory .card-header h3 { font-size: 28px; }
   .player-directory .card-header .btn { font-size: 12px; padding: 8px 12px; }
   .player-list { margin: 0; }
-  .mobile-nav-item.active { background: transparent; color: #13294b; border-radius: 0; box-shadow: inset 0 -2px #13294b; }
+  .mobile-nav-item.active { background: transparent; color: var(--primary); border-radius: 0; box-shadow: inset 0 -2px var(--primary); }
 }
 
 
@@ -184,3 +184,9 @@
 @media (max-width: 768px) {
   .calendar-header .view-toggle .btn { padding-inline: 12px; }
 }
+
+/* Heute im Wochenkalender: Datum als blaue Pille, Spalte leicht getoent */
+.calendar-header-cell.is-today div:first-child { color: var(--primary); }
+.calendar-header-cell.is-today div:last-child { display: inline-block; min-width: 44px; padding: 1px 8px; border-radius: 999px; background: var(--primary); color: #fff; }
+.calendar-day-cell.is-today { background: #F5F8FD; }
+.calendar-day-cell.is-today:hover { background: #EAF0F9; }

@@ -1276,7 +1276,7 @@ function KalenderView({
               <>
                 <div className="calendar-header-cell"></div>
                 {weekDates.map((date, i) => (
-                  <div key={i} className="calendar-header-cell">
+                  <div key={i} className={`calendar-header-cell${date.toDateString() === new Date().toDateString() ? ' is-today' : ''}`}>
                     <div>{WOCHENTAGE[i]}</div>
                     <div>{date.getDate()}.{date.getMonth() + 1}</div>
                   </div>
@@ -1299,7 +1299,7 @@ function KalenderView({
                   return (
                     <div
                       key={`cell-${dayIndex}-${time}`}
-                      className="calendar-day-cell"
+                      className={`calendar-day-cell${!isDayView && date.toDateString() === new Date().toDateString() ? ' is-today' : ''}`}
                       onClick={(e) => handleCellClick(e, date, time)}
                       onDragOver={handleCellDragOver}
                       onDragLeave={handleCellDragLeave}
