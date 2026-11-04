@@ -2397,7 +2397,7 @@ function TrainingModal({
                         {SAISONS[key].name}: {formatDateGerman(SAISONS[key].von)} – {formatDateGerman(SAISONS[key].bis)}
                       </label>
                     ))}
-                    <small style={{ color: '#888' }}>
+                    <small style={{ color: 'var(--text-subtle)' }}>
                       {getSaisonTermine(datum, wiederholenSaison).length} Termine, ohne 24.12. und 31.12.
                     </small>
                   </div>
@@ -3925,7 +3925,7 @@ function PlatzgebuehrView({
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Platzgebühr gesamt {jahr}</div>
-          <div className="stat-value" style={{ color: '#1E293B' }}>{gesamtBetrag.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: 'var(--text)' }}>{gesamtBetrag.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Stunden gesamt</div>
@@ -4082,7 +4082,7 @@ function PlatzgebuehrView({
                       }}
                       title="Stunden dieses Spielers anzeigen"
                     >
-                      <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{s.spieler.name}</td>
+                      <td style={{ color: 'var(--text)', fontWeight: 600 }}>{s.spieler.name}</td>
                       <td style={{ textAlign: 'right' }}>{fmtStd(s.stunden)}</td>
                       <td style={{ textAlign: 'right' }}>{s.anzahl}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{s.betrag.toFixed(2)} €</td>
@@ -5199,7 +5199,7 @@ function AbrechnungView({
       <div className="stats-grid">
         <div className="stat-card stat-card-clickable tone-total" onClick={() => setStatBreakdown('total')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Gesamtumsatz</div>
-          <div className="stat-value" style={{ color: '#1E293B' }}>{stats.total.toFixed(2)} €</div>
+          <div className="stat-value" style={{ color: 'var(--text)' }}>{stats.total.toFixed(2)} €</div>
         </div>
         <div className="stat-card stat-card-clickable tone-bar" onClick={() => setStatBreakdown('bar')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Bar bezahlt</div>
@@ -5227,7 +5227,7 @@ function AbrechnungView({
 
       {statBreakdown && (() => {
         const cfgMap = {
-          total: { label: 'Gesamtumsatz', color: '#1E293B', get: (s: (typeof filteredSummary)[number]) => s.summe },
+          total: { label: 'Gesamtumsatz', color: 'var(--text)', get: (s: (typeof filteredSummary)[number]) => s.summe },
           bar: { label: 'Bar bezahlt', color: 'var(--pay-bar)', get: (s: (typeof filteredSummary)[number]) => s.barSumme },
           bezahlt: { label: 'Bezahlt (Überweisung)', color: 'var(--pay-bezahlt)', get: (s: (typeof filteredSummary)[number]) => s.bezahltSumme },
           ausstehend: { label: 'Ausstehend', color: 'var(--pay-ausstehend)', get: (s: (typeof filteredSummary)[number]) => s.ausstehendSumme },
@@ -5267,7 +5267,7 @@ function AbrechnungView({
                             onClick={() => { setStatBreakdown(null); setSelectedSpielerDetail(spieler.id) }}
                             title="Detailansicht öffnen"
                           >
-                            <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{spieler.name}</td>
+                            <td style={{ color: 'var(--text)', fontWeight: 600 }}>{spieler.name}</td>
                             <td style={{ textAlign: 'right', fontWeight: 600, color: cfg.color }}>{betrag.toFixed(2)} €</td>
                           </tr>
                         ))}
@@ -5333,7 +5333,7 @@ function AbrechnungView({
                     top: '100%',
                     left: 0,
                     right: 0,
-                    background: 'white',
+                    background: 'var(--surface-elevated)',
                     border: '1px solid var(--gray-200)',
                     borderRadius: 8,
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -5424,7 +5424,7 @@ function AbrechnungView({
                   onClick={() => setSelectedSpielerDetail(item.spieler.id)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{item.spieler.name}</td>
+                  <td style={{ color: 'var(--text)', fontWeight: 600 }}>{item.spieler.name}</td>
                   <td>{item.trainings.length} Trainings</td>
                   <td>
                     {item.summe.toFixed(2)} €
@@ -5445,7 +5445,7 @@ function AbrechnungView({
                         <button
                           className="btn btn-sm"
                           onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
-                          style={{ background: 'var(--brand)', color: 'white', borderColor: 'var(--brand)' }}
+                          style={{ background: 'var(--brand)', color: 'var(--on-accent)', borderColor: 'var(--brand)' }}
                           title="Lexoffice-Rechnung erstellen"
                           aria-label="Lexoffice-Rechnung erstellen"
                         >
@@ -5471,7 +5471,7 @@ function AbrechnungView({
                             }}
                             style={{
                               background: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)',
-                              color: 'white',
+                              color: 'var(--on-accent)',
                               borderColor: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)'
                             }}
                             title={item.ausstehend ? "Zurück auf offen setzen" : "Als ausstehend markieren"}
@@ -5484,7 +5484,7 @@ function AbrechnungView({
                               e.stopPropagation()
                               toggleAlleBarBezahlt(item.spieler.id)
                             }}
-                            style={{ background: 'var(--pay-bar)', color: 'white', borderColor: 'var(--pay-bar)' }}
+                            style={{ background: 'var(--pay-bar)', color: 'var(--on-accent)', borderColor: 'var(--pay-bar)' }}
                             title="Alle Trainings als bar bezahlt markieren"
                           >
                             Bar
@@ -5545,7 +5545,7 @@ function AbrechnungView({
                   <button
                     className="btn btn-sm"
                     onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
-                    style={{ background: 'var(--brand)', color: 'white', borderColor: 'var(--brand)' }}
+                    style={{ background: 'var(--brand)', color: 'var(--on-accent)', borderColor: 'var(--brand)' }}
                     title="Lexoffice-Rechnung erstellen"
                     aria-label="Lexoffice-Rechnung erstellen"
                   >
@@ -5571,7 +5571,7 @@ function AbrechnungView({
                       }}
                       style={{
                         background: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)',
-                        color: 'white',
+                        color: 'var(--on-accent)',
                         borderColor: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)'
                       }}
                     >
@@ -5583,7 +5583,7 @@ function AbrechnungView({
                         e.stopPropagation()
                         toggleAlleBarBezahlt(item.spieler.id)
                       }}
-                      style={{ background: 'var(--pay-bar)', color: 'white', borderColor: 'var(--pay-bar)' }}
+                      style={{ background: 'var(--pay-bar)', color: 'var(--on-accent)', borderColor: 'var(--pay-bar)' }}
                     >
                       Bar
                     </button>

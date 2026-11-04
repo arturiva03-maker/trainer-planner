@@ -1,0 +1,425 @@
+/* =====================================================================
+   CourtPro Night – dunkles Dashboard (seit 11/2026)
+   Wird als letzte Datei geladen und ueberschreibt App.css/workspace.css.
+   Farben NUR hier im :root-Block aendern.
+   ===================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Flaechen: fast schwarz mit kuehlem Blaustich, nach oben heller */
+  --bg: #0A0D12;
+  --surface: #11161D;
+  --surface-2: #171E27;
+  --surface-3: #0E1319;
+  --surface-elevated: #161C24;
+  --surface-active: #1B2531;
+  --border: #212A35;
+  --border-strong: #2C3744;
+  --text: #E8EDF3;
+  --text-muted: #A4AFBD;
+  --text-subtle: #7B8798;
+  --overlay: rgba(3, 5, 8, 0.72);
+  --glass-bg: rgba(14, 19, 25, 0.82);
+
+  /* Akzent: Tennisball-Gelbgruen, dazu Cyan als zweite Leuchtfarbe */
+  --primary: #C6F24E;
+  --primary-hover: #D6FA72;
+  --primary-light: rgba(198, 242, 78, 0.12);
+  --accent: #C6F24E;
+  --cyan: #3DD6F5;
+  --brand: #C6F24E;
+  --brand-dark: #A9D62F;
+  --brand-gradient: #C6F24E;
+  --on-accent: #0A0D12;
+  --header-surface: var(--surface-elevated);
+  --ring: 0 0 0 3px rgba(198, 242, 78, 0.32);
+
+  /* Graurampe invertiert (Inline-Styles im Code nutzen --gray-*) */
+  --gray-50: #131920;
+  --gray-100: #19212B;
+  --gray-200: #232D39;
+  --gray-300: #303C4A;
+  --gray-400: #5B6878;
+  --gray-500: #8592A3;
+  --gray-600: #A4AFBD;
+  --gray-700: #C3CCD7;
+  --gray-800: #DCE3EB;
+  --gray-900: #EEF2F6;
+
+  /* Trainingsstatus */
+  --success: #4ADE80;
+  --success-light: rgba(74, 222, 128, 0.14);
+  --danger: #F47A95;
+  --danger-light: rgba(244, 122, 149, 0.14);
+  --warning: #FBBF24;
+  --warning-light: rgba(251, 191, 36, 0.14);
+  --status-geplant-tone: #3DD6F5;
+  --status-geplant-bg: rgba(61, 214, 245, 0.12);
+  --status-geplant-text: #9BE9FA;
+  --status-durchgefuehrt-tone: #4ADE80;
+  --status-durchgefuehrt-bg: rgba(74, 222, 128, 0.12);
+  --status-durchgefuehrt-text: #A7F3C0;
+  --status-durchgefuehrt_halb-bg: rgba(74, 222, 128, 0.12);
+  --status-durchgefuehrt_halb-text: #A7F3C0;
+  --status-abgesagt-tone: #F47A95;
+  --status-abgesagt-bg: rgba(244, 122, 149, 0.10);
+  --status-abgesagt-text: #F9B4C4;
+  --status-bezahlt-bg: rgba(167, 139, 250, 0.14);
+  --status-bezahlt-text: #CDBEFD;
+
+  /* Zahlungsstatus: Vollfarbe fuer Buttons, -bg/-text fuer Badges */
+  --pay-bar: #34D399;
+  --pay-bar-bg: rgba(52, 211, 153, 0.14);
+  --pay-bar-text: #86EFC4;
+  --pay-bezahlt: #A78BFA;
+  --pay-bezahlt-bg: rgba(167, 139, 250, 0.14);
+  --pay-bezahlt-text: #CDBEFD;
+  --pay-ausstehend: #FBBF24;
+  --pay-ausstehend-bg: rgba(251, 191, 36, 0.14);
+  --pay-ausstehend-text: #FCD873;
+  --pay-offen: #94A3B8;
+  --pay-offen-bg: rgba(148, 163, 184, 0.14);
+  --pay-offen-text: #C6D0DC;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 24px 64px -16px rgba(0, 0, 0, 0.8);
+
+  --font-ui: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', sans-serif;
+  --sidebar-width: 88px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+/* ---------- Grundlage ---------- */
+html, body { background: var(--bg); }
+body { font-family: var(--font-ui); color: var(--text); font-feature-settings: 'cv11', 'ss01', 'tnum'; }
+h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; color: var(--text); }
+::selection { background: rgba(198, 242, 78, 0.28); color: #fff; }
+html { scrollbar-color: #2C3744 transparent; }
+::-webkit-scrollbar-thumb { background: #2C3744; }
+
+/* ---------- Seitenleiste: schmale Icon-Leiste ---------- */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--surface-3);
+  border-right: 1px solid var(--border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  --brand: var(--primary);
+  align-items: center;
+}
+.sidebar-header { padding: 22px 0 18px; justify-content: center; border: 0; }
+.sidebar-header h2 { display: none; }
+.sidebar-nav { padding: 8px 10px; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.nav-item {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 4px 10px;
+  margin: 0;
+  border-radius: 14px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+.nav-item::before { display: none; }
+.nav-item .nav-icon { display: grid; place-items: center; width: 40px; height: 32px; border-radius: 10px; transition: background 160ms var(--ease), color 160ms var(--ease); }
+.nav-item:hover, .nav-item.active:hover { background: transparent; color: var(--text); transform: none; box-shadow: none; }
+.nav-item:hover .nav-icon { background: var(--surface-2); }
+.nav-item.active { background: transparent; color: var(--text); box-shadow: none; font-weight: 600; }
+.nav-item.active .nav-icon { background: var(--primary); color: var(--on-accent); box-shadow: 0 0 22px -4px rgba(198, 242, 78, 0.55); }
+.sidebar-footer { width: 100%; padding: 12px 10px 18px; border: 0; }
+.sidebar-footer .btn, .sidebar-footer .btn:hover {
+  font-size: 11px;
+  padding: 10px 4px;
+  min-height: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-subtle);
+  border-radius: 12px;
+}
+.sidebar-footer .btn:hover { color: var(--text); border-color: var(--border-strong); }
+.sidebar :focus-visible { outline: 2px solid var(--primary); }
+
+.main-content { margin-left: var(--sidebar-width); padding: 28px 36px 40px; max-width: 1680px; }
+
+/* ---------- Karten, Tabellen, Formulare ---------- */
+.card, .player-directory .table-container, .table-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+.card-header { background: transparent; border-color: var(--border); }
+table { color: var(--text); }
+th {
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+td { border-color: var(--border); }
+tbody tr:hover, tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+tbody tr:hover td:first-child { color: var(--primary) !important; }
+
+.form-control, input, select, textarea {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+.form-control:hover { border-color: #3A4757; }
+.form-control:focus, input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: var(--ring); outline: none; }
+.form-control::placeholder, input::placeholder { color: var(--text-subtle); }
+select option { background: var(--surface-elevated); color: var(--text); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
+.form-group label { color: var(--text-muted); }
+
+/* ---------- Buttons ---------- */
+.btn { border-radius: 10px; font-weight: 600; letter-spacing: 0; }
+.btn-primary, .btn-primary:hover, .btn-success, .btn-success:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-accent);
+  box-shadow: none;
+}
+.btn-primary:hover, .btn-success:hover { background: var(--primary-hover); box-shadow: 0 0 24px -6px rgba(198, 242, 78, 0.6); }
+.btn-secondary, .btn-outline {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.btn-secondary:hover, .btn-outline:hover { background: var(--surface-active); color: var(--text); }
+.btn-danger, .btn-danger:hover { background: rgba(244, 122, 149, 0.14); color: var(--danger); border: 1px solid rgba(244, 122, 149, 0.4); }
+.btn-warning, .btn-warning:hover { background: var(--warning-light); color: var(--warning); border-color: rgba(251, 191, 36, 0.4); }
+
+/* ---------- Badges ---------- */
+.status-badge { background: var(--pay-offen-bg); }
+.badge { border-radius: 999px; }
+.badge-success { background: var(--success-light); color: var(--success); }
+.badge-danger { background: var(--danger-light); color: var(--danger); }
+.badge-info { background: var(--pay-bezahlt-bg); color: var(--pay-bezahlt-text); }
+.badge-secondary { background: var(--surface-2); color: var(--text-muted); }
+
+/* ---------- Tabs (Verwaltung) ---------- */
+.tabs { border-bottom: 1px solid var(--border); gap: 6px; padding-bottom: 0; }
+.tab { padding: 12px 14px; color: var(--text-subtle); border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--primary); }
+
+/* ---------- Dialoge ---------- */
+.modal-overlay { background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.modal, .modal-content {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  color: var(--text);
+}
+.modal-header { background: transparent; color: var(--text); border-bottom: 1px solid var(--border); }
+.modal-header h3 { color: var(--text); }
+.modal-footer, .training-editor .modal-footer { background: var(--surface-elevated); border-color: var(--border); }
+.modal-close { background: var(--surface-2); color: var(--text-muted); }
+.modal-close:hover { background: var(--surface-active); color: var(--text); }
+.training-participants > span { background: var(--surface-2); }
+.training-cash { border-color: var(--border-strong); }
+.training-tooltip { background: var(--surface-elevated); border: 1px solid var(--border-strong); color: var(--text); box-shadow: var(--shadow-lg); }
+
+/* ---------- Kalender ---------- */
+.calendar-header { align-items: center; padding: 0 0 22px; }
+.calendar-nav h3 { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -0.03em; }
+.calendar-nav button { color: var(--text-muted); border-radius: 10px; }
+.calendar-nav button:hover { background: var(--surface-2); color: var(--text); border-color: transparent; }
+.calendar-nav .calendar-today {
+  color: var(--primary);
+  border: 1px solid rgba(198, 242, 78, 0.35);
+  border-radius: 999px;
+  padding: 6px 14px;
+  height: auto;
+}
+/* Ansichtsumschalter als Segment-Steuerung */
+.view-toggle { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px; gap: 2px; align-items: center; }
+.view-toggle .btn { min-height: 36px; padding: 6px 14px; border-radius: 9px; background: transparent; color: var(--text-muted); font-weight: 500; }
+.view-toggle .btn:hover { color: var(--text); background: var(--surface-2); }
+.view-toggle .btn.btn-primary, .view-toggle .btn.btn-primary:hover { background: var(--surface-active); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.view-toggle .btn.btn-success, .view-toggle .btn.btn-success:hover { margin-left: 8px; background: var(--primary); color: var(--on-accent); font-weight: 600; }
+
+.calendar-grid {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.calendar-header-cell { background: var(--surface); border-bottom: 1px solid var(--border); border-right: 0; padding: 14px 6px 12px; }
+.calendar-header-cell div:first-child { color: var(--text-subtle); font-size: 11px; letter-spacing: 0.12em; }
+.calendar-header-cell div:last-child { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); }
+.calendar-header-cell.is-today div:first-child { color: var(--primary); }
+.calendar-header-cell.is-today div:last-child { background: var(--primary); color: var(--on-accent); box-shadow: 0 0 20px -4px rgba(198, 242, 78, 0.6); }
+.calendar-time-cell { background: var(--surface); color: var(--text-subtle); font-size: 11px; border-color: rgba(255, 255, 255, 0.04); }
+.calendar-grid .calendar-day-cell, .calendar-grid .calendar-time-cell { border-color: rgba(255, 255, 255, 0.05); }
+.calendar-day-cell:hover { background: rgba(255, 255, 255, 0.025); }
+.calendar-day-cell.is-today { background: rgba(198, 242, 78, 0.035); }
+.calendar-day-cell.is-today:hover { background: rgba(198, 242, 78, 0.06); }
+.calendar-day-cell.drag-over { background: rgba(198, 242, 78, 0.12); outline-color: var(--primary); }
+
+/* Trainingsbloecke als Leuchtkacheln */
+.training-block {
+  --block-bg: var(--status-geplant-bg);
+  --block-text: var(--status-geplant-text);
+  --block-border: var(--status-geplant-tone);
+  background: var(--block-bg);
+  color: var(--block-text);
+  border: 1px solid color-mix(in srgb, var(--block-border) 28%, transparent);
+  border-left: 3px solid var(--block-border);
+  border-radius: 8px;
+  box-shadow: none;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.training-block:hover {
+  background: color-mix(in srgb, var(--block-border) 20%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--block-border) 45%, transparent), 0 8px 28px -10px var(--block-border);
+  transform: none;
+  filter: none;
+}
+.training-block .training-title { color: var(--block-text); font-weight: 600; }
+.training-block .training-time { color: color-mix(in srgb, var(--block-text) 70%, transparent); }
+.training-block.status-geplant { --block-bg: var(--status-geplant-bg); --block-text: var(--status-geplant-text); --block-border: var(--status-geplant-tone); }
+.training-block.status-durchgefuehrt,
+.training-block.status-durchgefuehrt_halb { --block-bg: var(--status-durchgefuehrt-bg); --block-text: var(--status-durchgefuehrt-text); --block-border: var(--status-durchgefuehrt-tone); }
+.training-block.status-abgesagt { --block-bg: var(--status-abgesagt-bg); --block-text: var(--status-abgesagt-text); --block-border: var(--status-abgesagt-tone); opacity: 0.7; }
+.training-block.selected, .training-block.selected:hover { outline: 2px solid var(--primary); box-shadow: 0 0 0 2px var(--bg), 0 0 24px -4px rgba(198, 242, 78, 0.6); }
+.training-indiv-marker { color: var(--block-text); text-shadow: none; }
+
+/* ---------- Abrechnung: KPI-Leiste statt Einzelkarten ---------- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.stat-card, .stat-card:hover {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 20px 22px 22px;
+  transform: none;
+}
+.stat-card:last-child { border-right: 0; }
+.stat-card-clickable:hover { background: rgba(255, 255, 255, 0.025); }
+.stat-card::before { content: none; }
+.stat-card::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--tone);
+  opacity: 0.85;
+  box-shadow: 0 0 14px var(--tone);
+}
+.stat-card.tone-total { --tone: var(--primary); }
+.stat-label { color: var(--text-subtle); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.stat-card .stat-label::before { content: none; }
+.stat-value { font-family: var(--font-display); font-size: 30px; font-weight: 600; letter-spacing: -0.03em; margin-top: 8px; }
+
+/* Werkzeugleiste: Monat, Filter, Suche in einer Zeile */
+.card-header-actions { width: 100%; }
+.filter-pills { display: flex; align-items: center; gap: 10px !important; }
+.filter-pill-group { display: inline-flex; gap: 2px; padding: 4px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 12px; }
+.pay-pill, .pay-pill:hover { border: 0; border-radius: 9px; padding: 7px 12px; background: transparent; color: var(--text-muted); }
+.pay-pill:hover { color: var(--text); background: var(--surface-2); }
+.pay-pill-count { background: var(--surface-2); color: var(--text-subtle); }
+.pay-pill.active { --pill: var(--text); --pill-text: var(--text); background: var(--surface-active); color: var(--pill-text); border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pill) 40%, transparent); }
+.pay-pill.active .pay-pill-count { background: color-mix(in srgb, var(--pill) 22%, transparent); color: var(--pill-text); }
+.pay-pill-alle.active { --pill: var(--text-muted); --pill-text: var(--text); }
+.month-nav { background: var(--surface-3); border: 1px solid var(--border); border-radius: 12px; color: var(--text); }
+.month-nav button { color: var(--text-muted); background: transparent; }
+.month-nav button:hover { background: var(--surface-2); color: var(--text); }
+
+/* ---------- Verwaltung ---------- */
+.player-directory .card-header h3 { font-family: var(--font-display); }
+.player-directory .card-header .btn { background: var(--primary); color: var(--on-accent); }
+.player-row { border-color: var(--border); }
+.player-row:hover { background: var(--surface); }
+.player-initial {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--primary);
+  font-family: var(--font-display);
+}
+.player-directory td .btn { color: var(--primary); }
+
+/* ---------- Tagesliste (Handy) ---------- */
+.day-list-item { background: var(--bg); }
+.day-list-detail { border-left-color: var(--status-geplant-tone); }
+.is-running .day-list-detail { border-left-color: var(--primary); }
+.is-running .day-list-status { color: var(--primary); }
+.day-list-summary dd { font-family: var(--font-display); }
+.day-list-swipe-bg.is-done { background: #15803D; }
+.day-list-swipe-bg.is-cancel { background: #BE3A5B; }
+.day-list-check.is-on { background: var(--primary); border-color: var(--primary); box-shadow: inset 0 0 0 4px var(--bg); }
+.day-list-bulk { background: var(--bg); }
+
+/* ---------- Login ---------- */
+.auth-container { background: var(--bg); }
+.auth-container::before, .auth-container::after { display: none; }
+.auth-feature { background: var(--surface); border: 1px solid var(--border); }
+.auth-logo h1 { color: var(--text); }
+
+/* ---------- Handy ---------- */
+@media (max-width: 768px) {
+  :root { --sidebar-width: 0px; }
+  .main-content { margin-left: 0; padding: 12px 14px calc(96px + env(safe-area-inset-bottom)); }
+  .mobile-header { background: var(--bg); border-bottom: 1px solid var(--border); --brand: var(--primary); }
+  .mobile-header .header-title { font-family: var(--font-display); color: var(--text); }
+  .calendar-nav h3 { font-size: 20px; }
+  .view-toggle { width: 100%; }
+  .view-toggle .btn.btn-success { margin-left: auto; }
+  /* Schwebende Navigationsleiste */
+  .mobile-bottom-nav {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+    background: rgba(17, 22, 29, 0.88);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid var(--border-strong);
+    border-radius: 20px;
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.8);
+    padding-bottom: 0;
+  }
+  .mobile-nav-item { color: var(--text-subtle); border-radius: 14px; }
+  .mobile-nav-item.active { color: var(--primary); background: rgba(198, 242, 78, 0.10); box-shadow: none; }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-card { border-bottom: 1px solid var(--border); }
+  .stat-value { font-size: 24px; }
+  .filter-pill-group { overflow-x: auto; max-width: 100%; }
+}

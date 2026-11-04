@@ -4,8 +4,8 @@
   "description": "Tennis-Trainer Planungs- und Abrechnungs-App",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6f7f4",
-  "theme_color": "#f6f7f4",
+  "background_color": "#0A0D12",
+  "theme_color": "#0A0D12",
   "orientation": "portrait-primary",
   "icons": [
     {
