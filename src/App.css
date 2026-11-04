@@ -2379,7 +2379,7 @@ tbody tr:last-child td {
 }
 
 .search-box::before {
-  content: "🔍";
+  content: none;
   position: absolute;
   left: 16px;
   top: 50%;

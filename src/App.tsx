@@ -119,42 +119,42 @@ const AppIcon = ({ name, size = 20 }: { name: AppIconName; size?: number }) => (
 // ============ FEATURE DETAILS DATA ============
 const featureDetails = {
   terminplanung: {
-    icon: '📅',
+    icon: 'calendar' as AppIconName,
     title: 'Terminplanung',
     subtitle: 'Behalte den Überblick über alle Trainingseinheiten',
     features: [
-      { icon: '📆', title: 'Wochenkalender', desc: 'Übersichtliche Wochenansicht mit allen Terminen auf einen Blick' },
-      { icon: '📋', title: 'Tagesansicht', desc: 'Detaillierte Tagesplanung mit Zeitslots und Spielerinformationen' },
-      { icon: '🔄', title: 'Serientermine', desc: 'Erstelle wiederkehrende Trainings für regelmäßige Gruppen' },
-      { icon: '✅', title: 'Status-Tracking', desc: 'Markiere Trainings als geplant, durchgeführt oder abgesagt' },
-      { icon: '📝', title: 'Notizen', desc: 'Füge Notizen zu einzelnen Trainingseinheiten hinzu' },
-      { icon: '👥', title: 'Gruppentraining', desc: 'Plane Einzel- oder Gruppentrainings mit mehreren Spielern' }
+      { title: 'Wochenkalender', desc: 'Übersichtliche Wochenansicht mit allen Terminen auf einen Blick' },
+      { title: 'Tagesansicht', desc: 'Detaillierte Tagesplanung mit Zeitslots und Spielerinformationen' },
+      { title: 'Serientermine', desc: 'Erstelle wiederkehrende Trainings für regelmäßige Gruppen' },
+      { title: 'Status-Tracking', desc: 'Markiere Trainings als geplant, durchgeführt oder abgesagt' },
+      { title: 'Notizen', desc: 'Füge Notizen zu einzelnen Trainingseinheiten hinzu' },
+      { title: 'Gruppentraining', desc: 'Plane Einzel- oder Gruppentrainings mit mehreren Spielern' }
     ]
   },
   spieler: {
-    icon: '👥',
+    icon: 'users' as AppIconName,
     title: 'Spieler & Tarife',
     subtitle: 'Zentrale Verwaltung aller Spieler und Preismodelle',
     features: [
-      { icon: '📇', title: 'Spielerdatenbank', desc: 'Speichere alle Spieler mit Kontaktdaten und Notizen' },
-      { icon: '📧', title: 'Kontaktdaten', desc: 'E-Mail und Telefonnummer für schnelle Kommunikation' },
-      { icon: '🏠', title: 'Rechnungsadressen', desc: 'Individuelle Rechnungsadressen und -empfänger pro Spieler' },
-      { icon: '💵', title: 'Flexible Tarife', desc: 'Erstelle verschiedene Tarife für unterschiedliche Trainingsarten' },
-      { icon: '📊', title: 'Abrechnungsmodelle', desc: 'Pro Training oder monatliche Pauschalen' },
-      { icon: '🔗', title: 'Verknüpfungen', desc: 'Verknüpfe Spieler für gemeinsame Rechnungen (z.B. Geschwister)' }
+      { title: 'Spielerdatenbank', desc: 'Speichere alle Spieler mit Kontaktdaten und Notizen' },
+      { title: 'Kontaktdaten', desc: 'E-Mail und Telefonnummer für schnelle Kommunikation' },
+      { title: 'Rechnungsadressen', desc: 'Individuelle Rechnungsadressen und -empfänger pro Spieler' },
+      { title: 'Flexible Tarife', desc: 'Erstelle verschiedene Tarife für unterschiedliche Trainingsarten' },
+      { title: 'Abrechnungsmodelle', desc: 'Pro Training oder monatliche Pauschalen' },
+      { title: 'Verknüpfungen', desc: 'Verknüpfe Spieler für gemeinsame Rechnungen (z.B. Geschwister)' }
     ]
   },
   abrechnung: {
-    icon: '💰',
+    icon: 'invoice' as AppIconName,
     title: 'Abrechnung',
     subtitle: 'Professionelle Rechnungen mit wenigen Klicks',
     features: [
-      { icon: '🧾', title: 'PDF-Rechnungen', desc: 'Professionelle Rechnungen automatisch als PDF erstellen' },
-      { icon: '📬', title: 'E-Mail-Versand', desc: 'Rechnungen direkt per E-Mail an Spieler versenden' },
-      { icon: '⏳', title: 'Offene Posten', desc: 'Überblick über ausstehende Zahlungen pro Monat' },
-      { icon: '✔️', title: 'Zahlungsverfolgung', desc: 'Markiere Rechnungen als bezahlt (Bar oder Überweisung)' },
-      { icon: '📑', title: 'Manuelle Rechnungen', desc: 'Erstelle individuelle Rechnungen für Platzmiete etc.' },
-      { icon: '📈', title: 'Statistiken', desc: 'Monatliche Übersicht über Umsätze und offene Beträge' }
+      { title: 'PDF-Rechnungen', desc: 'Professionelle Rechnungen automatisch als PDF erstellen' },
+      { title: 'E-Mail-Versand', desc: 'Rechnungen direkt per E-Mail an Spieler versenden' },
+      { title: 'Offene Posten', desc: 'Überblick über ausstehende Zahlungen pro Monat' },
+      { title: 'Zahlungsverfolgung', desc: 'Markiere Rechnungen als bezahlt (Bar oder Überweisung)' },
+      { title: 'Manuelle Rechnungen', desc: 'Erstelle individuelle Rechnungen für Platzmiete etc.' },
+      { title: 'Statistiken', desc: 'Monatliche Übersicht über Umsätze und offene Beträge' }
     ]
   }
 }
@@ -214,7 +214,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
 
           <div className="auth-features">
             <div className="auth-feature" onClick={() => setSelectedFeature('terminplanung')}>
-              <span className="auth-feature-icon">📅</span>
+              <span className="auth-feature-icon"><AppIcon name="calendar" size={22} /></span>
               <div>
                 <strong>Terminplanung</strong>
                 <p>Kalender mit Wochen- und Tagesansicht, Serientermine und Status-Tracking</p>
@@ -222,7 +222,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
               <span className="auth-feature-arrow">→</span>
             </div>
             <div className="auth-feature" onClick={() => setSelectedFeature('spieler')}>
-              <span className="auth-feature-icon">👥</span>
+              <span className="auth-feature-icon"><AppIcon name="users" size={22} /></span>
               <div>
                 <strong>Spieler & Tarife</strong>
                 <p>Verwalte Spieler, Kontaktdaten und flexible Tarifmodelle</p>
@@ -230,7 +230,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
               <span className="auth-feature-arrow">→</span>
             </div>
             <div className="auth-feature" onClick={() => setSelectedFeature('abrechnung')}>
-              <span className="auth-feature-icon">💰</span>
+              <span className="auth-feature-icon"><AppIcon name="invoice" size={22} /></span>
               <div>
                 <strong>Abrechnung</strong>
                 <p>Automatische Rechnungserstellung, offene Posten und Zahlungsverfolgung</p>
@@ -301,7 +301,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
           <div className="feature-modal" onClick={e => e.stopPropagation()}>
             <button className="feature-modal-close" onClick={() => setSelectedFeature(null)}>×</button>
             <div className="feature-modal-header">
-              <span className="feature-modal-icon">{featureDetails[selectedFeature].icon}</span>
+              <span className="feature-modal-icon"><AppIcon name={featureDetails[selectedFeature].icon} size={28} /></span>
               <div>
                 <h2>{featureDetails[selectedFeature].title}</h2>
                 <p>{featureDetails[selectedFeature].subtitle}</p>
@@ -310,7 +310,6 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
             <div className="feature-modal-grid">
               {featureDetails[selectedFeature].features.map((feature, index) => (
                 <div key={index} className="feature-modal-item">
-                  <span className="feature-modal-item-icon">{feature.icon}</span>
                   <div>
                     <strong>{feature.title}</strong>
                     <p>{feature.desc}</p>
@@ -353,19 +352,7 @@ function ConfirmDialog({
     <div className="modal-overlay" onClick={onCancel} style={{ zIndex: 10000 }}>
       <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{
-              fontSize: 28,
-              width: 44,
-              height: 44,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: variant === 'danger' ? 'var(--danger-light)' : variant === 'warning' ? 'var(--warning-light)' : 'var(--primary-light)'
-            }}>
-              {variant === 'danger' ? '🗑️' : variant === 'warning' ? '⚠️' : 'ℹ️'}
-            </span>
+          <h3>
             {title}
           </h3>
           <button className="modal-close" onClick={onCancel}>×</button>
@@ -1347,7 +1334,7 @@ function KalenderView({
                             onTouchCancel={handleTrainingTouchEnd}
                           >
                             {hasIndividualTariffs(training) && (
-                              <span className="training-indiv-marker" title="Individuelle Tarife">★</span>
+                              <span className="training-indiv-marker" title="Individuelle Tarife">€</span>
                             )}
                             <div className="training-title">{training.name || getTrainingDisplayTitle(training, true)}</div>
                             <div className="training-time">
@@ -2047,7 +2034,7 @@ function TrainingModal({
 
           {selectedSpieler.length > 0 && (
             <div className="form-group">
-              <label>🎾 Platzgebühr (einmalig für dieses Training)</label>
+              <label>Platzgebühr (einmalig für dieses Training)</label>
               {ohnePlatzgebuehrIds.size === selectedSpieler.length ? (
                 <small style={{ color: 'var(--gray-500)', fontSize: 12, display: 'block' }}>
                   Hallen-/Wintertarif gewählt – die Platzmiete steckt im Trainingspreis.
@@ -3442,7 +3429,7 @@ function LexofficeRechnungModal({
             <label style={{ fontWeight: 600, fontSize: 14 }}>Rechnungsempfänger (Lexoffice-Kontakt)</label>
             {contactId ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                <span style={{ padding: '6px 10px', background: 'var(--gray-100)', borderRadius: 6 }}>✓ {contactName}</span>
+                <span style={{ padding: '6px 10px', background: 'var(--gray-100)', borderRadius: 6 }}>Verknüpft: {contactName}</span>
                 <button className="btn btn-secondary" disabled={linking} onClick={unlink}>ändern</button>
               </div>
             ) : (
@@ -3584,7 +3571,7 @@ function LexofficeRechnungModal({
           {result && (
             <div style={{ marginTop: 14, padding: 10, borderRadius: 6, background: result.ok ? 'var(--gray-100)' : '#fde8e8' }}>
               {result.ok
-                ? <>✓ Rechnung {finalize ? 'angelegt' : 'als Entwurf angelegt'}. {result.permalink && <a href={result.permalink} target="_blank" rel="noreferrer">In Lexoffice öffnen</a>}</>
+                ? <>Rechnung {finalize ? 'angelegt' : 'als Entwurf angelegt'}. {result.permalink && <a href={result.permalink} target="_blank" rel="noreferrer">In Lexoffice öffnen</a>}</>
                 : <>Fehler: {result.error}</>}
             </div>
           )}
@@ -3928,7 +3915,7 @@ function PlatzgebuehrView({
   return (
     <div>
       <div className="view-header" style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>🎾 Platzgebühr</h2>
+        <h2 style={{ margin: 0 }}>Platzgebühr</h2>
         <p style={{ margin: '4px 0 0', color: 'var(--gray-600)', fontSize: 14 }}>
           Sommersaison 1. Mai – 30. September · {PLATZGEBUEHR_PRO_STUNDE},00 € pro Trainingsstunde
         </p>
@@ -3966,7 +3953,7 @@ function PlatzgebuehrView({
             </select>
             {selectedSpielerId && (
               <button className="btn btn-sm btn-secondary" onClick={() => setSelectedSpielerId('')}>
-                Filter aufheben ✕
+                Filter aufheben
               </button>
             )}
             <button
@@ -5397,7 +5384,7 @@ function AbrechnungView({
                       fontSize: 16
                     }}
                   >
-                    ✕
+                    ×
                   </button>
                 )}
               </div>
@@ -5761,7 +5748,7 @@ function AbrechnungView({
                             onClick={() => markSelectedTrainingsAsBezahlt(detail.spieler.id)}
                             style={{ background: 'var(--success)', borderColor: 'var(--success)' }}
                           >
-                            ✓ Als bezahlt markieren
+                            Als bezahlt markieren
                           </button>
                         </>
                       )}
@@ -5978,7 +5965,7 @@ function AbrechnungView({
               <div className="modal-footer">
                 {lexofficeEnabled && (
                   <button className="btn btn-primary" onClick={() => openLexofficeRechnung(detail)}>
-                    📄 Lexoffice-Rechnung
+                    Lexoffice-Rechnung
                   </button>
                 )}
                 <button className="btn btn-secondary" onClick={() => setSelectedSpielerDetail(null)}>
