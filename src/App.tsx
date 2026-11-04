@@ -94,6 +94,13 @@ const TennisLogo = ({ size = 40 }: { size?: number }) => (
   </svg>
 )
 
+// iOS-Pfeilspitze fuer Vor/Zurueck und Listen
+const Chevron = ({ dir = 'right', size = 18 }: { dir?: 'left' | 'right'; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={dir === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} />
+  </svg>
+)
+
 type AppIconName = 'calendar' | 'users' | 'invoice' | 'court' | 'coach' | 'settings'
 
 const AppIcon = ({ name, size = 20 }: { name: AppIconName; size?: number }) => (
@@ -221,7 +228,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
                 <strong>Terminplanung</strong>
                 <p>Kalender mit Wochen- und Tagesansicht, Serientermine und Status-Tracking</p>
               </div>
-              <span className="auth-feature-arrow">→</span>
+              <span className="auth-feature-arrow"><Chevron /></span>
             </div>
             <div className="auth-feature" onClick={() => setSelectedFeature('spieler')}>
               <span className="auth-feature-icon"><AppIcon name="users" size={22} /></span>
@@ -229,7 +236,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
                 <strong>Spieler & Tarife</strong>
                 <p>Verwalte Spieler, Kontaktdaten und flexible Tarifmodelle</p>
               </div>
-              <span className="auth-feature-arrow">→</span>
+              <span className="auth-feature-arrow"><Chevron /></span>
             </div>
             <div className="auth-feature" onClick={() => setSelectedFeature('abrechnung')}>
               <span className="auth-feature-icon"><AppIcon name="invoice" size={22} /></span>
@@ -237,7 +244,7 @@ function AuthScreen({ onLogin }: { onLogin: (user: User) => void }) {
                 <strong>Abrechnung</strong>
                 <p>Automatische Rechnungserstellung, offene Posten und Zahlungsverfolgung</p>
               </div>
-              <span className="auth-feature-arrow">→</span>
+              <span className="auth-feature-arrow"><Chevron /></span>
             </div>
           </div>
         </div>
@@ -1190,7 +1197,7 @@ function KalenderView({
       <div className="calendar-container">
         <div className="calendar-header">
           <div className="calendar-nav">
-            <button aria-label={isSingleDay ? 'Vorheriger Tag' : 'Vorherige Woche'} onClick={() => isSingleDay ? navigateDay(-1) : navigateWeek(-1)}>←</button>
+            <button aria-label={isSingleDay ? 'Vorheriger Tag' : 'Vorherige Woche'} onClick={() => isSingleDay ? navigateDay(-1) : navigateWeek(-1)}><Chevron dir="left" size={22} /></button>
             <div className="calendar-nav-center">
               <h3>
                 {isSingleDay
@@ -1200,7 +1207,7 @@ function KalenderView({
               </h3>
               <button className="btn calendar-today" onClick={goToToday}>Heute</button>
             </div>
-            <button aria-label={isSingleDay ? 'Nächster Tag' : 'Nächste Woche'} onClick={() => isSingleDay ? navigateDay(1) : navigateWeek(1)}>→</button>
+            <button aria-label={isSingleDay ? 'Nächster Tag' : 'Nächste Woche'} onClick={() => isSingleDay ? navigateDay(1) : navigateWeek(1)}><Chevron size={22} /></button>
           </div>
           <div className="view-toggle">
             <button className={`btn ${viewMode === 'list' ? 'btn-primary' : ''}`}
@@ -2639,7 +2646,7 @@ function VerwaltungView({
               >
                 <span className="player-initial" aria-hidden="true">{s.name.charAt(0).toLocaleUpperCase('de-DE')}</span>
                 <span className="player-name">{s.name}</span>
-                <span className="player-open" aria-hidden="true">↗</span>
+                <span className="player-open" aria-hidden="true"><Chevron size={16} /></span>
               </button>
             ))}
             {filteredSpieler.length === 0 && (
@@ -3740,7 +3747,7 @@ function MonthNav({ value, onChange }: { value: string; onChange: (monat: string
   return (
     <div className="month-nav-wrap" ref={wrapRef}>
       <div className="month-nav">
-        <button type="button" aria-label="Vorheriger Monat" onClick={() => onChange(shiftMonth(value, -1))}>←</button>
+        <button type="button" aria-label="Vorheriger Monat" onClick={() => onChange(shiftMonth(value, -1))}><Chevron dir="left" /></button>
         <button
           type="button"
           className="month-nav-label"
@@ -3750,15 +3757,15 @@ function MonthNav({ value, onChange }: { value: string; onChange: (monat: string
         >
           {label}
         </button>
-        <button type="button" aria-label="Nächster Monat" onClick={() => onChange(shiftMonth(value, 1))}>→</button>
+        <button type="button" aria-label="Nächster Monat" onClick={() => onChange(shiftMonth(value, 1))}><Chevron /></button>
       </div>
 
       {pickerOffen && (
         <div className="month-picker">
           <div className="month-picker-jahr">
-            <button type="button" aria-label="Vorheriges Jahr" onClick={() => setPickerJahr((j) => j - 1)}>←</button>
+            <button type="button" aria-label="Vorheriges Jahr" onClick={() => setPickerJahr((j) => j - 1)}><Chevron dir="left" /></button>
             <span>{pickerJahr}</span>
-            <button type="button" aria-label="Nächstes Jahr" onClick={() => setPickerJahr((j) => j + 1)}>→</button>
+            <button type="button" aria-label="Nächstes Jahr" onClick={() => setPickerJahr((j) => j + 1)}><Chevron /></button>
           </div>
           <div className="month-picker-grid">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((mm) => {
