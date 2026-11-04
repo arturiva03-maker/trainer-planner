@@ -473,3 +473,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); back
   .page-header .segmented-item { flex: 1; padding: 6px 8px; }
   .mobile-header .header-content { justify-content: flex-start; }
 }
+/* Status-Menue zeigt den Status farbig (ersetzt das fruehere Badge) */
+.status-select.is-offen { color: var(--pay-offen-text); background-color: var(--pay-offen-bg); }
+.status-select.is-ausstehend { color: var(--pay-ausstehend-text); background-color: var(--pay-ausstehend-bg); }
+.status-select.is-bezahlt { color: var(--pay-bezahlt-text); background-color: var(--pay-bezahlt-bg); }
+.row-actions { flex-direction: row-reverse; justify-content: flex-end; }

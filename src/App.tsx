@@ -5515,7 +5515,6 @@ function AbrechnungView({
                 <th>Trainings</th>
                 <th>Summe</th>
                 <th>Status</th>
-                <th>Aktionen</th>
               </tr>
             </thead>
             <tbody>
@@ -5536,11 +5535,6 @@ function AbrechnungView({
                     )}
                   </td>
                   <td>
-                    <span className={`status-badge ${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}>
-                      {item.bezahlt ? 'Bezahlt' : item.ausstehend ? 'Ausstehend' : 'Offen'}
-                    </span>
-                  </td>
-                  <td>
                     <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                       {lexofficeEnabled && (
                         <button
@@ -5553,7 +5547,7 @@ function AbrechnungView({
                         </button>
                       )}
                       <select
-                        className="status-select"
+                        className={`status-select is-${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}
                         aria-label={`Status für ${item.spieler.name} ändern`}
                         value={item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}
                         onChange={(e) => setSpielerStatus(item, e.target.value)}
@@ -5569,7 +5563,7 @@ function AbrechnungView({
               ))}
               {filteredSummary.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="empty-state">
+                  <td colSpan={4} className="empty-state">
                     Keine Abrechnungen für diesen Monat
                   </td>
                 </tr>
@@ -5592,9 +5586,6 @@ function AbrechnungView({
                   <div className="mobile-card-title">{item.spieler.name}</div>
                   <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
                 </div>
-                <span className={`status-badge ${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}>
-                  {item.bezahlt ? 'Bezahlt' : item.ausstehend ? 'Ausstehend' : 'Offen'}
-                </span>
               </div>
               <div className="mobile-card-body">
                 <div className="mobile-card-row">
@@ -5624,7 +5615,7 @@ function AbrechnungView({
                   </button>
                 )}
                 <select
-                  className="status-select"
+                  className={`status-select is-${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}
                   aria-label={`Status für ${item.spieler.name} ändern`}
                   value={item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}
                   onChange={(e) => setSpielerStatus(item, e.target.value)}
