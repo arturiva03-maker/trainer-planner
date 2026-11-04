@@ -650,3 +650,8 @@ button, a, select, input, label { -webkit-tap-highlight-color: transparent; }
   .detail-trainings tbody tr:has(td[colspan]) { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
   .detail-trainings tbody tr:has(td[colspan]) td:empty { display: none; }
 }
+@media (max-width: 768px) {
+  .detail-trainings tbody tr td:nth-child(6) > div { display: inline-flex; gap: 4px; }
+  .detail-trainings tbody tr td:nth-child(6) .btn { min-height: 40px; padding: 6px 14px; font-size: 14px; border-radius: 9px; }
+  .detail-trainings tbody tr td:nth-child(7) .btn { min-height: 40px; min-width: 44px; padding: 6px 12px; font-size: 15px; border-radius: 9px; }
+}
