@@ -619,3 +619,34 @@ button, a, select, input, label { -webkit-tap-highlight-color: transparent; }
   .mobile-card-row .mobile-card-value { font-size: 15px; }
   .mobile-card-row .mobile-card-label { font-size: 14px; }
 }
+
+/* Spieler-Detail (Abrechnung): Trainings-Tabelle wird auf dem Handy zur Liste */
+@media (max-width: 768px) {
+  .detail-trainings { max-height: none !important; overflow: visible !important; border-radius: var(--radius-lg); }
+  .detail-trainings table, .detail-trainings tbody { display: block; width: 100%; }
+  .detail-trainings thead { display: none; }
+  .detail-trainings tbody tr {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check datum betrag"
+      "check zeit  betrag"
+      "check tarif tarif"
+      "status status korr";
+    column-gap: var(--space-2);
+    row-gap: 2px;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-trainings tbody tr td { padding: 0; border: 0; text-align: left !important; background: transparent; }
+  .detail-trainings tbody tr td:nth-child(1) { grid-area: check; align-self: start; padding-top: 2px; }
+  .detail-trainings tbody tr td:nth-child(2) { grid-area: datum; font-weight: 600; }
+  .detail-trainings tbody tr td:nth-child(3) { grid-area: zeit; color: var(--text-muted); font-size: 14px; }
+  .detail-trainings tbody tr td:nth-child(4) { grid-area: tarif; color: var(--text-subtle); font-size: 13px; }
+  .detail-trainings tbody tr td:nth-child(5) { grid-area: betrag; text-align: right !important; font-weight: 600; align-self: start; }
+  .detail-trainings tbody tr td:nth-child(6) { grid-area: status; margin-top: var(--space-2); }
+  .detail-trainings tbody tr td:nth-child(7) { grid-area: korr; margin-top: var(--space-2); justify-self: end; }
+  /* Summen- und Korrekturzeilen: Text links, Betrag rechts */
+  .detail-trainings tbody tr:has(td[colspan]) { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+  .detail-trainings tbody tr:has(td[colspan]) td:empty { display: none; }
+}

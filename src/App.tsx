@@ -5799,7 +5799,7 @@ function AbrechnungView({
                   )
                 })()}
 
-                <div className="table-container" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                <div className="table-container detail-trainings" style={{ maxHeight: 400, overflowY: 'auto' }}>
                   <table>
                     <thead>
                       <tr>
