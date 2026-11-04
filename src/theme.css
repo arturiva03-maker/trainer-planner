@@ -611,3 +611,11 @@ button, a, select, input, label { -webkit-tap-highlight-color: transparent; }
   .mobile-card-actions .status-select { flex: 1 1 auto; min-width: 0; }
   .mobile-card-actions .btn-secondary { background: var(--fill); color: var(--primary); }
 }
+@media (max-width: 768px) {
+  .main-content .card { margin-left: 0; margin-right: 0; }
+  .mobile-card .row-actions { flex-direction: row-reverse; flex-wrap: nowrap; justify-content: flex-start; gap: var(--space-2); margin-top: var(--space-2); }
+  .mobile-card .row-actions .status-select { flex: 1 1 auto; min-width: 0; }
+  .mobile-card .row-actions .btn { flex: 0 0 auto; padding: 8px 16px; font-size: 15px; }
+  .mobile-card-row .mobile-card-value { font-size: 15px; }
+  .mobile-card-row .mobile-card-label { font-size: 14px; }
+}
