@@ -407,3 +407,69 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); back
   .stat-value { font-size: 22px; }
   .filter-pill-group { overflow-x: auto; max-width: 100%; }
 }
+
+/* =====================================================================
+   Neue Struktur (Nov 2026): einheitlicher Seitenkopf, Segment-Umschalter,
+   Status-Menue in der Abrechnung, Einstellungen als gruppierte Karten
+   ===================================================================== */
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 4px 0 18px; }
+.page-header h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; }
+.page-subtitle { margin: 4px 0 0; font-size: 14px; color: var(--text-subtle); font-weight: 400; }
+
+.segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--fill); border-radius: 9px; }
+.segmented-item { border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; padding: 6px 16px; border-radius: 7px; cursor: pointer; min-height: 32px; }
+.segmented-item.active { background: var(--surface); font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04); }
+.segmented-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Spieler-Seite: Kartenkopf wird zum Seitenkopf */
+.player-directory { background: transparent; border: 0; padding: 0; }
+.player-directory .card-header { align-items: flex-end; margin: 4px 0 18px; padding: 0; border: 0; background: transparent; }
+.player-directory .card-header h3 { font-size: 30px; font-weight: 700; letter-spacing: -0.025em; margin: 0; }
+.player-directory .search-box input { background: var(--fill); border: 0; border-radius: 10px; }
+.player-directory .table-container { background: var(--surface); border-radius: var(--radius-lg); }
+
+/* Abrechnung: Monat als eigene Zeile, Aktionen pro Spieler */
+.billing-monthbar { display: flex; align-items: center; margin: 0 0 14px; }
+.billing-monthbar .month-nav { background: var(--surface); }
+.row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row-actions .btn { min-height: 32px; padding: 5px 12px; font-size: 13px; }
+.status-select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 32px;
+  padding: 5px 30px 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  background-color: var(--fill);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23007AFF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  width: auto;
+}
+.status-select:focus { background-color: var(--fill); }
+.mobile-card-actions .row-actions { width: 100%; }
+.mobile-card-actions .status-select { flex: 1; }
+
+/* Platzgebuehr und Trainer im Umschalter: Ueberschriften zuruecknehmen */
+.platz-header h2 { display: none; }
+
+/* Einstellungen */
+.settings-card { padding-bottom: 16px; }
+.settings-rows { display: flex; flex-direction: column; }
+.settings-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.settings-row span:first-child { color: var(--text-muted); }
+.settings-logout { margin: 16px 20px 0; width: calc(100% - 40px); }
+.sidebar-user { padding: 8px 12px; font-size: 13px; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card + .card { margin-top: 16px; }
+
+@media (max-width: 768px) {
+  .page-header { margin: 0 0 14px; }
+  .page-header h1, .player-directory .card-header h3 { font-size: 26px; }
+  .page-header .segmented { width: 100%; }
+  .page-header .segmented-item { flex: 1; padding: 6px 8px; }
+  .mobile-header .header-content { justify-content: flex-start; }
+}

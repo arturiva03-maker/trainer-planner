@@ -123,4 +123,4 @@ export interface MonthlyAdjustment {
   created_at?: string
 }
 
-export type Tab = 'kalender' | 'verwaltung' | 'abrechnung' | 'platzgebuehr' | 'abrechnung-trainer'
+export type Tab = 'kalender' | 'spieler' | 'abrechnung' | 'einstellungen'

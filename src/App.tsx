@@ -1,5 +1,6 @@
 import { TrainingDayList } from './TrainingDayList'
 import { useState, useEffect, useMemo, useRef } from 'react'
+import type { ComponentProps } from 'react'
 import { supabase } from './supabaseClient'
 import { searchLexofficeContacts, createLexofficeInvoice } from './lexoffice'
 import { getKalenderAboLink } from './kalender'
@@ -93,7 +94,7 @@ const TennisLogo = ({ size = 40 }: { size?: number }) => (
   </svg>
 )
 
-type AppIconName = 'calendar' | 'users' | 'invoice' | 'court' | 'coach'
+type AppIconName = 'calendar' | 'users' | 'invoice' | 'court' | 'coach' | 'settings'
 
 const AppIcon = ({ name, size = 20 }: { name: AppIconName; size?: number }) => (
   <svg
@@ -113,6 +114,7 @@ const AppIcon = ({ name, size = 20 }: { name: AppIconName; size?: number }) => (
     {name === 'invoice' && <><path d="M6 2h10l4 4v16l-3-2-3 2-3-2-3 2-2-1V2z"/><path d="M14 2v5h5M9 11h6M9 15h6"/></>}
     {name === 'court' && <><path d="M4 3h16v18H4zM4 12h16M12 3v18"/><circle cx="12" cy="12" r="3"/></>}
     {name === 'coach' && <><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2M18 8v6M15 11h6"/></>}
+    {name === 'settings' && <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>}
   </svg>
 )
 
@@ -547,22 +549,17 @@ function MainApp({ user }: { user: User }) {
   const poolEnabled = isPoolAllowed(user.email)
   const lexofficeEnabled = isLexofficeAllowed(user.email)
 
-  const baseTabs: { id: Tab; label: string; icon: AppIconName }[] = [
+  // Vier Hauptbereiche, auf Desktop (Seitenleiste) und Handy (Tab-Leiste) identisch.
+  // Platzgebuehr und Trainer-Abrechnung liegen als Umschalter in der Abrechnung,
+  // Tarife und Kalender-Abo in den Einstellungen.
+  const tabs: { id: Tab; label: string; icon: AppIconName }[] = [
     { id: 'kalender', label: 'Kalender', icon: 'calendar' },
-    { id: 'verwaltung', label: 'Verwaltung', icon: 'users' },
+    { id: 'spieler', label: 'Spieler', icon: 'users' },
     { id: 'abrechnung', label: 'Abrechnung', icon: 'invoice' },
-    { id: 'platzgebuehr', label: 'Platzgebühr', icon: 'court' },
+    { id: 'einstellungen', label: 'Einstellungen', icon: 'settings' },
   ]
-
-  const tabs: { id: Tab; label: string; icon: AppIconName }[] = [...baseTabs]
-  if (trainer.length > 0) tabs.push({ id: 'abrechnung-trainer', label: 'Abr. Trainer', icon: 'coach' })
-
-  const mobileNavTabs: { id: Tab; label: string; icon: AppIconName }[] = [
-    { id: 'kalender', label: 'Kalender', icon: 'calendar' },
-    { id: 'verwaltung', label: 'Verwalten', icon: 'users' },
-    { id: 'abrechnung', label: 'Rechnung', icon: 'invoice' },
-    { id: 'platzgebuehr', label: 'Platz', icon: 'court' },
-  ]
+  const mobileNavTabs = tabs
+  const aktuellerTabLabel = tabs.find((t) => t.id === activeTab)?.label ?? 'CourtPro'
 
   // Warte-Bildschirm für nicht freigeschaltete User
   if (!dataLoading && profile && profile.approved !== true) {
@@ -592,9 +589,9 @@ function MainApp({ user }: { user: User }) {
     <div className="app-container">
       {/* Mobile Header */}
       <div className="mobile-header">
-        <TennisLogo size={36} />
+        <TennisLogo size={30} />
         <div className="header-content">
-          <h1 className="header-title">CourtPro</h1>
+          <h1 className="header-title">{aktuellerTabLabel}</h1>
         </div>
       </div>
 
@@ -627,9 +624,7 @@ function MainApp({ user }: { user: User }) {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button className="btn btn-secondary btn-block" onClick={handleLogout}>
-            Abmelden
-          </button>
+          <div className="sidebar-user">{profile?.name || user.email}</div>
         </div>
       </aside>
 
@@ -671,8 +666,9 @@ function MainApp({ user }: { user: User }) {
                 poolEnabled={poolEnabled}
               />
             )}
-            {activeTab === 'verwaltung' && (
+            {activeTab === 'spieler' && (
               <VerwaltungView
+                section="spieler"
                 spieler={spieler}
                 tarife={tarife}
                 onUpdate={loadAllData}
@@ -680,7 +676,7 @@ function MainApp({ user }: { user: User }) {
               />
             )}
             {activeTab === 'abrechnung' && (
-              <AbrechnungView
+              <AbrechnungBereich
                 trainings={trainings}
                 spieler={spieler}
                 tarife={tarife}
@@ -691,22 +687,19 @@ function MainApp({ user }: { user: User }) {
                 onNavigateToTraining={handleNavigateToTraining}
                 userId={user.id}
                 lexofficeEnabled={lexofficeEnabled}
+                trainer={trainer}
               />
             )}
-            {activeTab === 'platzgebuehr' && (
-              <PlatzgebuehrView
-                trainings={trainings}
+            {activeTab === 'einstellungen' && (
+              <VerwaltungView
+                section="einstellungen"
                 spieler={spieler}
                 tarife={tarife}
                 onUpdate={loadAllData}
-              />
-            )}
-            {activeTab === 'abrechnung-trainer' && trainer.length > 0 && (
-              <AbrechnungTrainerView
-                trainings={trainings}
-                trainer={trainer}
-                onUpdate={loadAllData}
                 userId={user.id}
+                kontoName={profile?.name}
+                kontoEmail={user.email}
+                onLogout={handleLogout}
               />
             )}
           </>
@@ -2514,14 +2507,21 @@ function VerwaltungView({
   spieler,
   tarife,
   onUpdate,
-  userId
+  userId,
+  section,
+  kontoName,
+  kontoEmail,
+  onLogout
 }: {
   spieler: Spieler[]
   tarife: Tarif[]
   onUpdate: () => void
   userId: string
+  section: 'spieler' | 'einstellungen'
+  kontoName?: string | null
+  kontoEmail?: string | null
+  onLogout?: () => void
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'spieler' | 'tarife' | 'kalender'>('spieler')
   const [showSpielerModal, setShowSpielerModal] = useState(false)
   const [showTarifModal, setShowTarifModal] = useState(false)
   const [editingSpieler, setEditingSpieler] = useState<Spieler | null>(null)
@@ -2556,31 +2556,22 @@ function VerwaltungView({
 
   return (
     <div>
-      <div className="tabs">
-        <button
-          className={`tab ${activeSubTab === 'spieler' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('spieler')}
-        >
-          Spieler ({aktiveSpieler.length})
-        </button>
-        <button
-          className={`tab ${activeSubTab === 'tarife' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('tarife')}
-        >
-          Tarife ({aktiveTarife.length})
-        </button>
-        <button
-          className={`tab ${activeSubTab === 'kalender' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('kalender')}
-        >
-          Kalender-Abo
-        </button>
-      </div>
+      {section === 'einstellungen' && (
+        <header className="page-header">
+          <div>
+            <h1>Einstellungen</h1>
+            <p className="page-subtitle">Tarife, Kalender-Abo und Konto</p>
+          </div>
+        </header>
+      )}
 
-      {activeSubTab === 'spieler' && (
+      {section === 'spieler' && (
         <div className="card player-directory">
           <div className="card-header">
-            <h3>Spieler</h3>
+            <div>
+              <h3>Spieler</h3>
+              <p className="page-subtitle">{aktiveSpieler.length} aktiv{archivierteSpieler.length > 0 ? ` · ${archivierteSpieler.length} archiviert` : ''}</p>
+            </div>
             <button className="btn btn-primary" onClick={() => setShowSpielerModal(true)}>
               + Neuer Spieler
             </button>
@@ -2694,10 +2685,10 @@ function VerwaltungView({
         </div>
       )}
 
-      {activeSubTab === 'tarife' && (
+      {section === 'einstellungen' && (
         <div className="card">
           <div className="card-header">
-            <h3>Tarif-Verwaltung</h3>
+            <h3>Tarife</h3>
             <button className="btn btn-primary" onClick={() => setShowTarifModal(true)}>
               + Neuer Tarif
             </button>
@@ -2835,7 +2826,28 @@ function VerwaltungView({
         </div>
       )}
 
-      {activeSubTab === 'kalender' && <KalenderAboView />}
+      {section === 'einstellungen' && <KalenderAboView />}
+
+      {section === 'einstellungen' && (
+        <div className="card settings-card">
+          <div className="card-header">
+            <h3>Konto</h3>
+          </div>
+          <div className="settings-rows">
+            {kontoName && (
+              <div className="settings-row"><span>Name</span><span>{kontoName}</span></div>
+            )}
+            {kontoEmail && (
+              <div className="settings-row"><span>E-Mail</span><span>{kontoEmail}</span></div>
+            )}
+          </div>
+          {onLogout && (
+            <button type="button" className="btn btn-danger btn-block settings-logout" onClick={onLogout}>
+              Abmelden
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Spieler Modal */}
       {showSpielerModal && (
@@ -3238,6 +3250,75 @@ function TarifModal({
   )
 }
 
+
+// ============ ABRECHNUNG (Bereiche) ============
+// Eine Seite fuer alles Geld: Spieler-Abrechnung, Platzgebuehr und (falls
+// vorhanden) Trainer-Abrechnung, oben per Segment-Umschalter erreichbar.
+type AbrechnungsBereich = 'spieler' | 'platz' | 'trainer'
+
+function AbrechnungBereich(
+  props: ComponentProps<typeof AbrechnungView> & { trainer: ComponentProps<typeof AbrechnungTrainerView>['trainer'] }
+) {
+  const { trainer, ...abrechnungProps } = props
+  const [bereich, setBereich] = useState<AbrechnungsBereich>(() => {
+    try {
+      const gespeichert = localStorage.getItem('abrechnung-bereich')
+      if (gespeichert === 'platz' || gespeichert === 'trainer' || gespeichert === 'spieler') return gespeichert
+    } catch { /* ohne Speicher einfach Standard */ }
+    return 'spieler'
+  })
+  useEffect(() => {
+    try { localStorage.setItem('abrechnung-bereich', bereich) } catch { /* egal */ }
+  }, [bereich])
+
+  const optionen: { id: AbrechnungsBereich; label: string }[] = [
+    { id: 'spieler', label: 'Spieler' },
+    { id: 'platz', label: 'Platzgebühr' },
+  ]
+  if (trainer.length > 0) optionen.push({ id: 'trainer', label: 'Trainer' })
+  const aktiv: AbrechnungsBereich = bereich === 'trainer' && trainer.length === 0 ? 'spieler' : bereich
+
+  return (
+    <div>
+      <header className="page-header">
+        <div>
+          <h1>Abrechnung</h1>
+        </div>
+        <div className="segmented" role="tablist" aria-label="Bereich der Abrechnung">
+          {optionen.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="tab"
+              aria-selected={aktiv === o.id}
+              className={`segmented-item${aktiv === o.id ? ' active' : ''}`}
+              onClick={() => setBereich(o.id)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </header>
+      {aktiv === 'spieler' && <AbrechnungView {...abrechnungProps} />}
+      {aktiv === 'platz' && (
+        <PlatzgebuehrView
+          trainings={abrechnungProps.trainings}
+          spieler={abrechnungProps.spieler}
+          tarife={abrechnungProps.tarife}
+          onUpdate={abrechnungProps.onUpdate}
+        />
+      )}
+      {aktiv === 'trainer' && (
+        <AbrechnungTrainerView
+          trainings={abrechnungProps.trainings}
+          trainer={trainer}
+          onUpdate={abrechnungProps.onUpdate}
+          userId={abrechnungProps.userId}
+        />
+      )}
+    </div>
+  )
+}
 
 // ============ ABRECHNUNG VIEW ============
 // ============ LEXOFFICE RECHNUNG MODAL ============
@@ -3915,8 +3996,7 @@ function PlatzgebuehrView({
   return (
     <div>
       <div className="view-header" style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>Platzgebühr</h2>
-        <p style={{ margin: '4px 0 0', color: 'var(--gray-600)', fontSize: 14 }}>
+        <p className="page-subtitle" style={{ margin: 0 }}>
           Sommersaison 1. Mai – 30. September · {PLATZGEBUEHR_PRO_STUNDE},00 € pro Trainingsstunde
         </p>
       </div>
@@ -5181,6 +5261,25 @@ function AbrechnungView({
 
   // Baut die offenen Rechnungspositionen eines Spielers (Monat) und oeffnet das
   // Lexoffice-Modal.
+  // Status-Menue pro Spieler: bildet die bisherigen Knoepfe (Bezahlt/Offen,
+  // Ausstehend/Offen, Bar) auf eine Auswahl ab. Logik bleibt die alte.
+  const setSpielerStatus = async (
+    item: { spieler: Spieler; bezahlt: boolean; ausstehend: boolean },
+    ziel: string
+  ) => {
+    const id = item.spieler.id
+    if (ziel === 'bezahlt') {
+      if (!item.bezahlt) await toggleAlleBezahlt(id, false)
+    } else if (ziel === 'bar') {
+      if (!item.bezahlt) await toggleAlleBarBezahlt(id)
+    } else if (ziel === 'ausstehend') {
+      if (!item.bezahlt && !item.ausstehend) await toggleAlleAusstehend(id, false)
+    } else if (ziel === 'offen') {
+      if (item.bezahlt) await toggleAlleBezahlt(id, true)
+      else if (item.ausstehend) await toggleAlleAusstehend(id, true)
+    }
+  }
+
   const openLexofficeRechnung = (item: { spieler: Spieler; trainings: Training[] }) => {
     const previewItems = buildLexofficePreview(item.spieler, item.trainings)
     const [yy, mm] = selectedMonth.split('-').map(Number)
@@ -5196,6 +5295,15 @@ function AbrechnungView({
 
   return (
     <div {...monatGesten}>
+      <div className="billing-monthbar">
+        <MonthNav
+          value={selectedMonth}
+          onChange={(monat) => {
+            setSelectedMonth(monat)
+            setSelectedTag('')
+          }}
+        />
+      </div>
       <div className="stats-grid">
         <div className="stat-card stat-card-clickable tone-total" onClick={() => setStatBreakdown('total')} title="Aufschlüsselung anzeigen">
           <div className="stat-label">Gesamtumsatz</div>
@@ -5289,13 +5397,6 @@ function AbrechnungView({
         <div className="card-header">
           <div className="card-header-actions">
             <div className="filter-pills" style={{ flexWrap: 'wrap', gap: 8 }}>
-              <MonthNav
-                value={selectedMonth}
-                onChange={(monat) => {
-                  setSelectedMonth(monat)
-                  setSelectedTag('')
-                }}
-              />
               <div className="filter-pill-group">
                 {([
                   ['alle', 'Alle'],
@@ -5440,57 +5541,28 @@ function AbrechnungView({
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                       {lexofficeEnabled && (
                         <button
-                          className="btn btn-sm"
-                          onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
-                          style={{ background: 'var(--brand)', color: 'var(--on-accent)', borderColor: 'var(--brand)' }}
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => openLexofficeRechnung(item)}
                           title="Lexoffice-Rechnung erstellen"
-                          aria-label="Lexoffice-Rechnung erstellen"
                         >
-                          <AppIcon name="invoice" size={16} />
+                          Rechnung
                         </button>
                       )}
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleAlleBezahlt(item.spieler.id, item.bezahlt)
-                        }}
+                      <select
+                        className="status-select"
+                        aria-label={`Status für ${item.spieler.name} ändern`}
+                        value={item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}
+                        onChange={(e) => setSpielerStatus(item, e.target.value)}
                       >
-                        {item.bezahlt ? 'Offen' : 'Bezahlt'}
-                      </button>
-                      {!item.bezahlt && (
-                        <>
-                          <button
-                            className="btn btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleAlleAusstehend(item.spieler.id, item.ausstehend)
-                            }}
-                            style={{
-                              background: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)',
-                              color: 'var(--on-accent)',
-                              borderColor: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)'
-                            }}
-                            title={item.ausstehend ? "Zurück auf offen setzen" : "Als ausstehend markieren"}
-                          >
-                            {item.ausstehend ? 'Offen' : 'Ausstehend'}
-                          </button>
-                          <button
-                            className="btn btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleAlleBarBezahlt(item.spieler.id)
-                            }}
-                            style={{ background: 'var(--pay-bar)', color: 'var(--on-accent)', borderColor: 'var(--pay-bar)' }}
-                            title="Alle Trainings als bar bezahlt markieren"
-                          >
-                            Bar
-                          </button>
-                        </>
-                      )}
+                        <option value="offen">Offen</option>
+                        <option value="ausstehend" disabled={item.bezahlt}>Ausstehend</option>
+                        <option value="bezahlt">Bezahlt (Überweisung)</option>
+                        <option value="bar" disabled={item.bezahlt}>Bar bezahlt</option>
+                      </select>
                     </div>
                   </td>
                 </tr>
@@ -5517,7 +5589,7 @@ function AbrechnungView({
             >
               <div className="mobile-card-header">
                 <div>
-                  <div className="mobile-card-title" style={{ color: 'var(--primary)' }}>{item.spieler.name}</div>
+                  <div className="mobile-card-title">{item.spieler.name}</div>
                   <div className="mobile-card-subtitle">{item.trainings.length} Trainings</div>
                 </div>
                 <span className={`status-badge ${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}>
@@ -5540,55 +5612,28 @@ function AbrechnungView({
                   </div>
                 )}
               </div>
-              <div className="mobile-card-actions">
+              <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                 {lexofficeEnabled && (
                   <button
-                    className="btn btn-sm"
-                    onClick={(e) => { e.stopPropagation(); openLexofficeRechnung(item) }}
-                    style={{ background: 'var(--brand)', color: 'var(--on-accent)', borderColor: 'var(--brand)' }}
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => openLexofficeRechnung(item)}
                     title="Lexoffice-Rechnung erstellen"
-                    aria-label="Lexoffice-Rechnung erstellen"
                   >
-                    <AppIcon name="invoice" size={16} />
+                    Rechnung
                   </button>
                 )}
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleAlleBezahlt(item.spieler.id, item.bezahlt)
-                  }}
+                <select
+                  className="status-select"
+                  aria-label={`Status für ${item.spieler.name} ändern`}
+                  value={item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}
+                  onChange={(e) => setSpielerStatus(item, e.target.value)}
                 >
-                  {item.bezahlt ? 'Offen' : 'Bezahlt'}
-                </button>
-                {!item.bezahlt && (
-                  <>
-                    <button
-                      className="btn btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleAlleAusstehend(item.spieler.id, item.ausstehend)
-                      }}
-                      style={{
-                        background: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)',
-                        color: 'var(--on-accent)',
-                        borderColor: item.ausstehend ? 'var(--pay-offen)' : 'var(--pay-ausstehend)'
-                      }}
-                    >
-                      {item.ausstehend ? 'Offen' : 'Ausstehend'}
-                    </button>
-                    <button
-                      className="btn btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleAlleBarBezahlt(item.spieler.id)
-                      }}
-                      style={{ background: 'var(--pay-bar)', color: 'var(--on-accent)', borderColor: 'var(--pay-bar)' }}
-                    >
-                      Bar
-                    </button>
-                  </>
-                )}
+                  <option value="offen">Offen</option>
+                  <option value="ausstehend" disabled={item.bezahlt}>Ausstehend</option>
+                  <option value="bezahlt">Bezahlt (Überweisung)</option>
+                  <option value="bar" disabled={item.bezahlt}>Bar bezahlt</option>
+                </select>
               </div>
             </div>
           ))}
