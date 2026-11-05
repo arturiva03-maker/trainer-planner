@@ -876,7 +876,12 @@ function KalenderView({
     const endMinutes = endH * 60 + endM - 7 * 60
     const top = (startMinutes / 60) * cellHeight
     const height = ((endMinutes - startMinutes) / 60) * cellHeight
-    return { top, height: Math.max(height, isDayView ? 40 : 30) }
+    // Tagesansicht: echte Dauer zeigen, sonst ragen kurze Termine in den naechsten hinein
+    return {
+      top,
+      height: isDayView ? Math.max(height, 20) : Math.max(height, 30),
+      isCompact: isDayView && endMinutes - startMinutes < 60,
+    }
   }
 
   // Berechnet Layout für überlappende Trainings (nebeneinander)
@@ -1315,7 +1320,7 @@ function KalenderView({
                         return (
                           <div
                             key={training.id}
-                            className={`training-block status-${training.status}${isSelected ? ' selected' : ''}`}
+                            className={`training-block status-${training.status}${isSelected ? ' selected' : ''}${pos.isCompact ? ' is-compact' : ''}`}
                             style={{
                               top: pos.top % cellHeight,
                               height: pos.height,

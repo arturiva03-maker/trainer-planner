@@ -213,3 +213,12 @@
 .calendar-grid .calendar-day-cell, .calendar-grid .calendar-time-cell { border-color: #E6EBF2; }
 .calendar-header-cell { border-bottom: 1px solid var(--border); }
 .calendar-grid.day-view .training-block { border-radius: 6px; }
+/* Tagesansicht: Termine unter einer Stunde einzeilig, damit sie in ihre echte Hoehe passen */
+.calendar-grid.day-view .training-block.is-compact { display: flex; align-items: center; gap: 8px; padding-top: 0; padding-bottom: 0; white-space: nowrap; }
+.calendar-grid.day-view .training-block.is-compact .training-title { flex: 0 1 auto; min-width: 0; margin: 0; font-size: 13px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; }
+.calendar-grid.day-view .training-block.is-compact .training-time { flex: 0 0 auto; margin: 0; font-size: 11px; line-height: 16px; }
+.calendar-grid.day-view .training-block.is-compact .training-tarif { display: none; }
+/* Volle Stunde: Uhrzeit und Tarif in eine Zeile, sonst wird der Tarif unten abgeschnitten */
+.calendar-grid.day-view .training-block:not(.is-compact) .training-time,
+.calendar-grid.day-view .training-block:not(.is-compact) .training-tarif { display: inline; }
+.calendar-grid.day-view .training-block:not(.is-compact) .training-tarif { margin-left: 8px; }
