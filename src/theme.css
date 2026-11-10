@@ -477,6 +477,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); back
 .status-select.is-offen { color: var(--pay-offen-text); background-color: var(--pay-offen-bg); }
 .status-select.is-ausstehend { color: var(--pay-ausstehend-text); background-color: var(--pay-ausstehend-bg); }
 .status-select.is-bezahlt { color: var(--pay-bezahlt-text); background-color: var(--pay-bezahlt-bg); }
+.status-select.is-bar { color: var(--pay-bar-text); background-color: var(--pay-bar-bg); }
 .row-actions { flex-direction: row-reverse; justify-content: flex-end; }
 
 /* =====================================================================

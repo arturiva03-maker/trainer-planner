@@ -5275,6 +5275,13 @@ function AbrechnungView({
   // Lexoffice-Modal.
   // Status-Menue pro Spieler: bildet die bisherigen Knoepfe (Bezahlt/Offen,
   // Ausstehend/Offen, Bar) auf eine Auswahl ab. Logik bleibt die alte.
+  // Anzeige im Status-Auswahlfeld: komplett bar bezahlt -> 'bar',
+  // sonst bezahlt (Ueberweisung oder gemischt) / ausstehend / offen.
+  const statusWert = (item: { bezahlt: boolean; ausstehend: boolean; barSumme: number; bezahltSumme: number }) =>
+    item.bezahlt
+      ? (item.barSumme > 0 && item.bezahltSumme === 0 ? 'bar' : 'bezahlt')
+      : item.ausstehend ? 'ausstehend' : 'offen'
+
   const setSpielerStatus = async (
     item: { spieler: Spieler; bezahlt: boolean; ausstehend: boolean },
     ziel: string
@@ -5559,15 +5566,15 @@ function AbrechnungView({
                         </button>
                       )}
                       <select
-                        className={`status-select is-${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}
+                        className={`status-select is-${statusWert(item)}`}
                         aria-label={`Status für ${item.spieler.name} ändern`}
-                        value={item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}
+                        value={statusWert(item)}
                         onChange={(e) => setSpielerStatus(item, e.target.value)}
                       >
                         <option value="offen">Offen</option>
                         <option value="ausstehend" disabled={item.bezahlt}>Ausstehend</option>
                         <option value="bezahlt">Bezahlt (Überweisung)</option>
-                        <option value="bar" disabled={item.bezahlt}>Bar bezahlt</option>
+                        <option value="bar" disabled={item.bezahlt && statusWert(item) !== 'bar'}>Bar bezahlt</option>
                       </select>
                     </div>
                   </td>
@@ -5627,15 +5634,15 @@ function AbrechnungView({
                   </button>
                 )}
                 <select
-                  className={`status-select is-${item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}`}
+                  className={`status-select is-${statusWert(item)}`}
                   aria-label={`Status für ${item.spieler.name} ändern`}
-                  value={item.bezahlt ? 'bezahlt' : item.ausstehend ? 'ausstehend' : 'offen'}
+                  value={statusWert(item)}
                   onChange={(e) => setSpielerStatus(item, e.target.value)}
                 >
                   <option value="offen">Offen</option>
                   <option value="ausstehend" disabled={item.bezahlt}>Ausstehend</option>
                   <option value="bezahlt">Bezahlt (Überweisung)</option>
-                  <option value="bar" disabled={item.bezahlt}>Bar bezahlt</option>
+                  <option value="bar" disabled={item.bezahlt && statusWert(item) !== 'bar'}>Bar bezahlt</option>
                 </select>
               </div>
             </div>
