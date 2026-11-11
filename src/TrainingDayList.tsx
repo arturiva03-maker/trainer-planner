@@ -146,7 +146,10 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
   const locked = useRef(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [undo, setUndo] = useState<{ ids: string[], status: Status } | null>(null)
+  const [undo, setUndo] = useState<{ ids: string[], status: Status, restore: Record<string, unknown> } | null>(null)
+  // Offene Bezahl-Abfrage nach Wischen nach links. `done` gibt die Zeile frei,
+  // sobald entschieden oder abgebrochen wurde.
+  const [cancelAsk, setCancelAsk] = useState<{ training: Training, done: () => void } | null>(null)
   const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   const rows = trainings.filter(t => t.datum === day && t.user_id === userId)
     .sort((a, b) => a.uhrzeit_von.localeCompare(b.uhrzeit_von) || a.id.localeCompare(b.id))
@@ -190,7 +193,11 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
 
   // Setzt Trainings von `from` auf `to`. Die Status-Bedingung verhindert, dass
   // zwischenzeitlich anderweitig geaenderte Trainings ueberschrieben werden.
-  async function save(ids: string[], to: Status, from: Status, isUndo = false) {
+  // `patch` erlaubt zusaetzliche Felder (Spieler beim Absagen), `restore` ist
+  // das, was "Rueckgaengig" wieder zurueckschreibt.
+  async function save(ids: string[], to: Status, from: Status, opts: {
+    isUndo?: boolean, patch?: Record<string, unknown>, restore?: Record<string, unknown>, note?: string
+  } = {}) {
     if (locked.current || ids.length === 0) return
     locked.current = true
     setBusy(true)
@@ -198,17 +205,18 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
     setMessage('')
     try {
       const { data, error: dbError } = await supabase.from('trainings')
-        .update({ status: to })
+        .update({ ...opts.patch, status: to })
         .eq('user_id', userId).eq('status', from)
         .in('id', ids).select('id')
       if (dbError) throw dbError
       const changed = (data || []).map(t => t.id as string)
-      setUndo(isUndo || changed.length === 0 ? null : { ids: changed, status: to })
+      setUndo(opts.isUndo || changed.length === 0 ? null
+        : { ids: changed, status: to, restore: { ...opts.restore, status: from } })
       setSelected(new Set())
       setSelecting(false)
       setMessage(changed.length === 0 ? 'Keine Änderung: Die Trainings wurden inzwischen geändert.'
-        : isUndo ? `${countLabel(changed.length)} wieder auf geplant gesetzt.`
-        : to === 'abgesagt' ? `${countLabel(changed.length)} abgesagt.`
+        : opts.isUndo ? `${countLabel(changed.length)} wieder auf geplant gesetzt.`
+        : to === 'abgesagt' ? `${countLabel(changed.length)} abgesagt${opts.note ? ` · ${opts.note}` : ''}.`
         : `${countLabel(changed.length)} abgeschlossen.`)
       if (changed.length < ids.length && changed.length > 0) {
         setError('Einige Trainings wurden inzwischen geändert und deshalb ausgelassen.')
@@ -221,6 +229,44 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
       setBusy(false)
     }
   }
+
+  // Wie im Bearbeiten-Fenster: Bei Abrechnung pro Training mit Spielern wird
+  // gefragt, ob trotzdem bezahlt werden muss. Die Spieler wandern dann mit
+  // dieser Angabe nach `entfernte_spieler`, so wie es die Abrechnung erwartet.
+  const needsPaymentAsk = (t: Training) => t.spieler_ids.length > 0 &&
+    (tarife.find(ta => ta.id === t.tarif_id)?.abrechnung || 'proTraining') === 'proTraining'
+
+  function cancelTraining(t: Training) {
+    if (!needsPaymentAsk(t)) return save([t.id], 'abgesagt', 'geplant')
+    return new Promise<void>(resolve => setCancelAsk({ training: t, done: resolve }))
+  }
+
+  async function answerCancel(mussBezahlen: boolean | null) {
+    if (!cancelAsk) return
+    const { training: t, done } = cancelAsk
+    setCancelAsk(null)
+    try {
+      if (mussBezahlen === null) return
+      const bisher = t.entfernte_spieler || []
+      const entfernt_am = new Date().toISOString()
+      await save([t.id], 'abgesagt', 'geplant', {
+        patch: {
+          spieler_ids: [],
+          entfernte_spieler: [
+            ...bisher.filter(es => !t.spieler_ids.includes(es.spieler_id)),
+            ...t.spieler_ids.map(spieler_id => ({ spieler_id, muss_bezahlen: mussBezahlen, entfernt_am }))
+          ]
+        },
+        restore: { spieler_ids: t.spieler_ids, entfernte_spieler: t.entfernte_spieler ?? null },
+        note: mussBezahlen ? 'muss bezahlt werden' : 'ohne Bezahlung'
+      })
+    } finally {
+      done()
+    }
+  }
+
+  const cancelNames = cancelAsk ? cancelAsk.training.spieler_ids
+    .map(id => spieler.find(s => s.id === id)?.name).filter(Boolean).join(', ') : ''
 
   return <section className="training-day-list" aria-label="Trainings des Tages" aria-busy={busy}>
     {rows.length > 0 && <dl className="day-list-summary">
@@ -258,7 +304,7 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
     {(busy || message) && <div className="day-list-feedback" role="status">
       <span>{busy ? 'Wird gespeichert …' : message}</span>
       {undo && <button className="day-list-link" disabled={busy}
-        onClick={() => void save(undo.ids, 'geplant', undo.status, true)}>Rückgängig</button>}
+        onClick={() => void save(undo.ids, 'geplant', undo.status, { isUndo: true, patch: undo.restore })}>Rückgängig</button>}
     </div>}
     {error && <p className="day-list-error" role="alert">{error}</p>}
     {rows.length === 0 && <p className="day-list-empty">Keine Trainings an diesem Tag.</p>}
@@ -281,7 +327,7 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
           {gap >= 30 && <p className="day-list-gap">{formatGap(gap)} frei</p>}
           <SwipeRow canRight={canComplete} canLeft={t.status === 'geplant'} disabled={busy || selecting}
             onRight={() => save([t.id], 'durchgefuehrt', 'geplant')}
-            onLeft={() => save([t.id], 'abgesagt', 'geplant')}>
+            onLeft={() => cancelTraining(t)}>
             <button className="day-list-main" disabled={busy || (selecting && !canComplete)}
               aria-pressed={selecting ? isSelected : undefined}
               aria-label={selecting ? `${label} auswählen` : `${label} bearbeiten`}
@@ -311,6 +357,23 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
         onClick={() => void save(selectedIds, 'durchgefuehrt', 'geplant')}>
         {selectedIds.length === 1 ? '1 Training' : `${selectedIds.length} Trainings`} abschließen
       </button>
+    </div>}
+    {cancelAsk && <div className="modal-overlay" onClick={() => void answerCancel(null)} style={{ zIndex: 1001 }}>
+      <div className="modal" role="dialog" aria-labelledby="day-cancel-title" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
+        <div className="modal-header">
+          <h3 id="day-cancel-title">Training absagen</h3>
+          <button className="modal-close" aria-label="Abbrechen" onClick={() => void answerCancel(null)}>×</button>
+        </div>
+        <div className="modal-body">
+          <p style={{ marginBottom: 8 }}>Müssen die Spieler den Betrag trotzdem bezahlen?</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Betroffene Spieler: {cancelNames}</p>
+        </div>
+        <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => void answerCancel(null)}>Abbrechen</button>
+          <button className="btn btn-success" onClick={() => void answerCancel(false)}>Nein, nicht bezahlen</button>
+          <button className="btn btn-warning" onClick={() => void answerCancel(true)}>Ja, müssen bezahlen</button>
+        </div>
+      </div>
     </div>}
   </section>
 }
