@@ -312,15 +312,23 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
       {rows.map((t, index) => {
         const canComplete = eligible.some(item => item.id === t.id)
         const isSelected = selected.has(t.id)
-        const names = t.spieler_ids.map(id => spieler.find(s => s.id === id)?.name || 'Unbekannter Spieler').join(', ')
-        const title = t.name || names || 'Training ohne Teilnehmer'
+        // Wie in der Wochenansicht: beim Absagen entfernte Spieler bleiben sichtbar, durchgestrichen.
+        const people = [
+          ...t.spieler_ids.map(id => ({ id, removed: false })),
+          ...(t.entfernte_spieler || []).map(es => ({ id: es.spieler_id, removed: true }))
+        ].map(p => ({ ...p, name: spieler.find(s => s.id === p.id)?.name || 'Unbekannter Spieler' }))
+        const names = people.map(p => p.name).join(', ')
+        const nameNodes = people.length > 0 ? people.map((p, i) => <span key={`${p.id}-${i}`}>
+          {i > 0 && ', '}{p.removed ? <s className="day-list-removed">{p.name}</s> : p.name}
+        </span>) : null
+        const title = t.name || nameNodes || 'Training ohne Teilnehmer'
         const duration = toMinutes(t.uhrzeit_bis) - toMinutes(t.uhrzeit_von)
         const previous = rows[index - 1]
         const gap = previous ? toMinutes(t.uhrzeit_von) - toMinutes(previous.uhrzeit_bis) : 0
         const running = t.status === 'geplant' &&
           now.getTime() >= new Date(`${t.datum}T${t.uhrzeit_von}`).getTime() &&
           now.getTime() < new Date(`${t.datum}T${t.uhrzeit_bis}`).getTime()
-        const label = `${t.uhrzeit_von.slice(0, 5)} ${title}`
+        const label = `${t.uhrzeit_von.slice(0, 5)} ${t.name || names || 'Training ohne Teilnehmer'}`
         const statusText = running ? 'läuft gerade' : t.status !== 'geplant' ? statusLabels[t.status] : ''
         const amount = t.status === 'abgesagt' && !isBillable(t) ? 0 : trainingAmount(t, tarife)
         return <li key={t.id} className={`day-list-row status-${t.status}${isSelected ? ' is-selected' : ''}${running ? ' is-running' : ''}`}>
@@ -338,7 +346,7 @@ export function TrainingDayList({ trainings, spieler, tarife, date, userId, onEd
               </span>
               <span className="day-list-detail">
                 <span className="day-list-title">{title}</span>
-                {t.name && names && <span className="day-list-names">{names}</span>}
+                {t.name && nameNodes && <span className="day-list-names">{nameNodes}</span>}
                 <span className="day-list-meta">
                   {duration} min{amount !== 0 && ` · ${euro(amount)}`}{statusText && <> · <span className="day-list-status">{statusText}</span></>}
                 </span>
